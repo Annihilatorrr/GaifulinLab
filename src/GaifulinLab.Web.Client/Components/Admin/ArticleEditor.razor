@@ -1,6 +1,93 @@
 @using Markdig
 
 <div class="article-editor" data-active-pane="@_activePane">
+    <header class="editor-toolbar surface">
+        <a class="back-link" href="/admin/articles" aria-label="Back to articles">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m15 18-6-6 6-6" />
+            </svg>
+        </a>
+
+        <label class="title-field">
+            <span class="visually-hidden">Article title</span>
+            <input type="text"
+                   placeholder="Untitled article"
+                   autocomplete="off"
+                   @bind="_title"
+                   @bind:event="oninput" />
+        </label>
+
+        <span class="draft-badge">Draft</span>
+
+        <div class="editor-actions" aria-label="Article actions">
+            <button class="button button-secondary" type="button" disabled title="Saving will be enabled with the backend">Save</button>
+            <button class="button button-primary" type="button" disabled title="Publishing will be enabled with the backend">Publish</button>
+        </div>
+    </header>
+
+    <details class="article-settings surface">
+        <summary>
+            <span class="settings-title">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" />
+                </svg>
+                Article settings
+            </span>
+            <span class="settings-summary">English · URL · taxonomy</span>
+            <svg class="settings-chevron" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m8 10 4 4 4-4" />
+            </svg>
+        </summary>
+
+        <div class="settings-grid">
+            <div class="settings-field">
+                <span class="field-label">Content language</span>
+                <div class="readonly-value">
+                    <span>English</span>
+                    <span class="language-code">en</span>
+                </div>
+                <span class="field-help">The first version supports English content.</span>
+            </div>
+
+            <label class="settings-field">
+                <span class="field-label">URL slug</span>
+                <span class="slug-field">
+                    <span>/articles/</span>
+                    <input type="text"
+                           placeholder="article-slug"
+                           autocomplete="off"
+                           spellcheck="false"
+                           @bind="_slug"
+                           @bind:event="oninput" />
+                </span>
+                <span class="field-help">Public URLs use a readable slug without an ID.</span>
+            </label>
+
+            <div class="settings-field">
+                <span class="field-label">Topics</span>
+                <div class="selection-empty">No topics created yet.</div>
+                <span class="field-help">An article can belong to several topics.</span>
+            </div>
+
+            <div class="settings-field">
+                <span class="field-label">Series</span>
+                <div class="selection-empty">No series created yet.</div>
+                <span class="field-help">An article can belong to several series.</span>
+            </div>
+
+            <label class="settings-field settings-field-wide">
+                <span class="field-label">Tags</span>
+                <input class="text-field"
+                       type="text"
+                       placeholder="Separate tags with commas"
+                       autocomplete="off"
+                       @bind="_tags"
+                       @bind:event="oninput" />
+                <span class="field-help">Tags will be created when the article is saved.</span>
+            </label>
+        </div>
+    </details>
+
     <nav class="editor-tabs" aria-label="Editor view">
         <button type="button"
                 aria-selected="@(_activePane == EditorPane.Edit)"
@@ -62,6 +149,9 @@
         .Build();
 
     private string _markdown = string.Empty;
+    private string _title = string.Empty;
+    private string _slug = string.Empty;
+    private string _tags = string.Empty;
     private EditorPane _activePane = EditorPane.Edit;
 
     private string RenderedHtml => Markdown.ToHtml(_markdown, PreviewPipeline);

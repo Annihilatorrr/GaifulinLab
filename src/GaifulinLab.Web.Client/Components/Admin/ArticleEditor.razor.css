@@ -5,6 +5,250 @@
     gap: var(--space-4);
 }
 
+.editor-toolbar {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+}
+
+.back-link {
+    width: 2.75rem;
+    height: 2.75rem;
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+}
+
+.back-link:hover {
+    background: var(--color-surface-subtle);
+    color: var(--color-accent);
+}
+
+.back-link svg {
+    width: 1.35rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+}
+
+.title-field {
+    min-width: 8rem;
+    flex: 1;
+}
+
+.title-field input {
+    width: 100%;
+    min-height: 2.75rem;
+    border: 0;
+    padding-inline: var(--space-2);
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--text-lg);
+    font-weight: 700;
+}
+
+.title-field input::placeholder {
+    color: var(--color-text-subtle);
+}
+
+.draft-badge {
+    flex: 0 0 auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    padding: 0.25rem 0.65rem;
+    background: var(--color-surface-subtle);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+}
+
+.editor-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: var(--space-2);
+}
+
+.editor-actions button:disabled {
+    cursor: not-allowed;
+    filter: none;
+    opacity: 0.48;
+    transform: none;
+}
+
+.article-settings {
+    overflow: hidden;
+}
+
+.article-settings summary {
+    min-height: 3.5rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    cursor: pointer;
+    list-style: none;
+}
+
+.article-settings summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-title {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: 700;
+}
+
+.settings-title svg,
+.settings-chevron {
+    width: 1.25rem;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.settings-title svg {
+    color: var(--color-accent);
+}
+
+.settings-summary {
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+}
+
+.settings-chevron {
+    margin-left: auto;
+    color: var(--color-text-muted);
+    transition: transform var(--transition-fast);
+}
+
+.article-settings[open] .settings-chevron {
+    transform: rotate(180deg);
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-5);
+    border-top: 1px solid var(--color-border);
+    padding: var(--space-5);
+    background: var(--color-surface);
+}
+
+.settings-field {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.settings-field-wide {
+    grid-column: 1 / -1;
+}
+
+.field-label {
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: 700;
+}
+
+.field-help {
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+    line-height: 1.45;
+}
+
+.readonly-value,
+.selection-empty,
+.text-field,
+.slug-field {
+    min-height: 2.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-subtle);
+}
+
+.readonly-value,
+.selection-empty {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 0.6rem var(--space-3);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+}
+
+.readonly-value {
+    color: var(--color-text);
+}
+
+.language-code {
+    border-radius: var(--radius-pill);
+    padding: 0.12rem 0.5rem;
+    background: var(--color-surface-accent);
+    color: var(--color-accent);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 700;
+}
+
+.text-field {
+    width: 100%;
+    padding-inline: var(--space-3);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+.text-field::placeholder,
+.slug-field input::placeholder {
+    color: var(--color-text-subtle);
+}
+
+.slug-field {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    background: var(--color-surface);
+}
+
+.slug-field > span {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid var(--color-border);
+    padding-inline: var(--space-3);
+    background: var(--color-surface-subtle);
+    color: var(--color-text-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+}
+
+.slug-field input {
+    min-width: 0;
+    min-height: 2.65rem;
+    flex: 1;
+    border: 0;
+    padding-inline: var(--space-3);
+    background: transparent;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+}
+
 .editor-tabs {
     display: none;
 }
@@ -186,6 +430,32 @@
 }
 
 @media (max-width: 52rem) {
+    .editor-toolbar {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .title-field {
+        grid-column: 2;
+    }
+
+    .draft-badge {
+        grid-column: 3;
+    }
+
+    .editor-actions {
+        grid-column: 2 / 4;
+        justify-content: flex-end;
+    }
+
+    .settings-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .settings-field-wide {
+        grid-column: auto;
+    }
+
     .editor-tabs {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -227,6 +497,27 @@
 }
 
 @media (max-width: 40rem) {
+    .editor-toolbar {
+        gap: var(--space-2);
+    }
+
+    .title-field input {
+        font-size: var(--text-base);
+    }
+
+    .editor-actions .button {
+        flex: 1;
+    }
+
+    .settings-summary {
+        display: none;
+    }
+
+    .settings-grid {
+        gap: var(--space-4);
+        padding: var(--space-4);
+    }
+
     .editor-workspace {
         min-height: calc(100vh - 16rem);
     }

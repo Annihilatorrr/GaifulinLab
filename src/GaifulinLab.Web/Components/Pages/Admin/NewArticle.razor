@@ -5,28 +5,5 @@
 
 <section class="editor-page" aria-labelledby="editor-title">
     <h1 class="visually-hidden" id="editor-title">New article</h1>
-
-    <header class="editor-toolbar surface">
-        <a class="back-link" href="/admin/articles" aria-label="Back to articles">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m15 18-6-6 6-6" />
-            </svg>
-        </a>
-
-        <label class="title-field">
-            <span class="visually-hidden">Article title</span>
-            <input type="text" placeholder="Untitled article" autocomplete="off" />
-        </label>
-
-        <span class="draft-badge">Draft</span>
-
-        <div class="editor-actions" aria-label="Article actions">
-            <button class="button button-secondary" type="button" disabled title="Saving will be enabled with the backend">Save</button>
-            <button class="button button-primary" type="button" disabled title="Publishing will be enabled with the backend">Publish</button>
-        </div>
-    </header>
-
-    <div class="editor-host">
-        <ArticleEditor @rendermode="InteractiveWebAssembly" />
-    </div>
+    <ArticleEditor @rendermode="InteractiveWebAssembly" />
 </section>
