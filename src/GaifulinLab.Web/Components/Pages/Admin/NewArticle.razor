@@ -26,36 +26,7 @@
         </div>
     </header>
 
-    <input class="editor-view-control" type="radio" name="editor-view" id="editor-view-edit" checked />
-    <input class="editor-view-control" type="radio" name="editor-view" id="editor-view-preview" />
-
-    <nav class="editor-tabs" aria-label="Editor view">
-        <label for="editor-view-edit">Edit</label>
-        <label for="editor-view-preview">Preview</label>
-    </nav>
-
-    <div class="editor-workspace surface">
-        <section class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
-            <header class="pane-heading" id="markdown-heading">
-                <span>Markdown</span>
-                <span class="pane-hint">Plain text</span>
-            </header>
-            <label class="visually-hidden" for="article-markdown">Article Markdown</label>
-            <textarea id="article-markdown" placeholder="Start writing in Markdown…" spellcheck="true"></textarea>
-        </section>
-
-        <section class="editor-pane preview-pane" aria-labelledby="preview-heading">
-            <header class="pane-heading" id="preview-heading">
-                <span>Preview</span>
-            </header>
-            <div class="preview-empty">
-                <svg viewBox="0 0 64 64" aria-hidden="true">
-                    <path d="M12 10h28l12 12v32H12z" />
-                    <path d="M40 10v14h12M21 34h22M21 42h16" />
-                </svg>
-                <h2>Nothing to preview yet</h2>
-                <p>The rendered article will appear here.</p>
-            </div>
-        </section>
+    <div class="editor-host">
+        <ArticleEditor @rendermode="InteractiveWebAssembly" />
     </div>
 </section>

@@ -1,0 +1,74 @@
+@using Markdig
+
+<div class="article-editor" data-active-pane="@_activePane">
+    <nav class="editor-tabs" aria-label="Editor view">
+        <button type="button"
+                aria-selected="@(_activePane == EditorPane.Edit)"
+                @onclick="() => _activePane = EditorPane.Edit">
+            Edit
+        </button>
+        <button type="button"
+                aria-selected="@(_activePane == EditorPane.Preview)"
+                @onclick="() => _activePane = EditorPane.Preview">
+            Preview
+        </button>
+    </nav>
+
+    <div class="editor-workspace surface">
+        <section class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
+            <header class="pane-heading" id="markdown-heading">
+                <span>Markdown</span>
+                <span class="pane-hint">Plain text</span>
+            </header>
+            <label class="visually-hidden" for="article-markdown">Article Markdown</label>
+            <textarea id="article-markdown"
+                      placeholder="Start writing in Markdown…"
+                      spellcheck="true"
+                      @bind="_markdown"
+                      @bind:event="oninput"></textarea>
+        </section>
+
+        <section class="editor-pane preview-pane" aria-labelledby="preview-heading" aria-live="polite">
+            <header class="pane-heading" id="preview-heading">
+                <span>Preview</span>
+                <span class="pane-hint">Live</span>
+            </header>
+
+            @if (string.IsNullOrWhiteSpace(_markdown))
+            {
+                <div class="preview-empty">
+                    <svg viewBox="0 0 64 64" aria-hidden="true">
+                        <path d="M12 10h28l12 12v32H12z" />
+                        <path d="M40 10v14h12M21 34h22M21 42h16" />
+                    </svg>
+                    <h2>Nothing to preview yet</h2>
+                    <p>Start writing to see the rendered article.</p>
+                </div>
+            }
+            else
+            {
+                <article class="article-preview">
+                    @((MarkupString)RenderedHtml)
+                </article>
+            }
+        </section>
+    </div>
+</div>
+
+@code {
+    private static readonly MarkdownPipeline PreviewPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .DisableHtml()
+        .Build();
+
+    private string _markdown = string.Empty;
+    private EditorPane _activePane = EditorPane.Edit;
+
+    private string RenderedHtml => Markdown.ToHtml(_markdown, PreviewPipeline);
+
+    private enum EditorPane
+    {
+        Edit,
+        Preview
+    }
+}
