@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GaifulinLab.Web.Client/GaifulinLab.Web.Client.csproj" />
+    <Project Path="src/GaifulinLab.Web/GaifulinLab.Web.csproj" />
+  </Folder>
+</Solution>

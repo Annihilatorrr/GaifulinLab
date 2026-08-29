@@ -1,0 +1,27 @@
+@import url("css/tokens.css");
+@import url("css/base.css");
+
+.valid.modified:not([type="checkbox"]) {
+    outline: 2px solid var(--color-success);
+    outline-offset: 1px;
+}
+
+.invalid {
+    outline: 2px solid var(--color-danger);
+    outline-offset: 1px;
+}
+
+.validation-message {
+    color: var(--color-danger);
+    font-size: var(--text-sm);
+}
+
+.blazor-error-boundary {
+    padding: var(--space-4);
+    background: var(--color-danger);
+    color: #ffffff;
+}
+
+.blazor-error-boundary::after {
+    content: "An unexpected error occurred.";
+}

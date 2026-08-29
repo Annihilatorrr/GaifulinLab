@@ -1,0 +1,30 @@
+#blazor-error-ui {
+    color-scheme: light only;
+    background: #fff4cc;
+    bottom: var(--space-4);
+    box-shadow: var(--shadow-md);
+    box-sizing: border-box;
+    display: none;
+    left: 50%;
+    max-width: min(40rem, calc(100% - (2 * var(--site-gutter))));
+    padding: var(--space-3) var(--space-10) var(--space-3) var(--space-4);
+    position: fixed;
+    transform: translateX(-50%);
+    width: 100%;
+    z-index: 1000;
+    border: 1px solid #e7c861;
+    border-radius: var(--radius-md);
+    color: #352b09;
+}
+
+#blazor-error-ui .reload {
+    color: inherit;
+    font-weight: 700;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: var(--space-3);
+    top: var(--space-2);
+}
