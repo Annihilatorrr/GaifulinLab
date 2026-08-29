@@ -1,0 +1,143 @@
+.hero {
+    overflow: hidden;
+    border-bottom: 1px solid var(--color-border);
+    background:
+        radial-gradient(circle at 72% 42%, color-mix(in srgb, var(--color-accent) 7%, transparent), transparent 34%),
+        var(--color-background);
+}
+
+.hero-layout {
+    min-height: 39rem;
+    display: grid;
+    grid-template-columns: minmax(20rem, 0.88fr) minmax(31rem, 1.12fr);
+    align-items: center;
+    gap: clamp(var(--space-8), 5vw, var(--space-16));
+    padding-block: var(--space-16);
+}
+
+.hero-copy {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-copy h1 {
+    max-width: 10ch;
+    margin: var(--space-4) 0 var(--space-6);
+    font-size: var(--text-display);
+    letter-spacing: -0.055em;
+    line-height: var(--line-tight);
+}
+
+.hero-copy p {
+    max-width: 37rem;
+    margin: 0;
+    font-size: clamp(var(--text-base), 1.6vw, var(--text-lg));
+}
+
+.hero-visual {
+    width: 100%;
+}
+
+.hero-visual svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.visual-panel {
+    fill: color-mix(in srgb, var(--color-surface) 90%, transparent);
+    stroke: var(--color-border);
+}
+
+.grid-line {
+    fill: none;
+    stroke: color-mix(in srgb, var(--color-border) 66%, transparent);
+    stroke-width: 1;
+}
+
+.surface-lines path {
+    fill: none;
+    stroke: url(#hero-signal-gradient);
+    stroke-linecap: round;
+    stroke-width: 2.1;
+}
+
+.axis-line {
+    fill: none;
+    stroke: var(--color-text-muted);
+    stroke-width: 1.2;
+}
+
+.axis-arrow {
+    fill: var(--color-text-muted);
+}
+
+.axis-label {
+    fill: var(--color-text-muted);
+    font-family: var(--font-sans);
+    font-size: 12px;
+}
+
+.code-sample {
+    fill: var(--color-accent);
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.signal-chain rect {
+    fill: var(--color-surface);
+    stroke: var(--color-text-muted);
+    stroke-width: 1.2;
+}
+
+.signal-chain path {
+    fill: var(--color-text-muted);
+    stroke: var(--color-text-muted);
+    stroke-width: 1;
+}
+
+.signal-chain text {
+    fill: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 12px;
+}
+
+.spectrum > path:not(.axis-line) {
+    fill: none;
+    stroke: url(#hero-signal-gradient);
+    stroke-width: 2.1;
+}
+
+@media (max-width: 64rem) {
+    .hero-layout {
+        min-height: auto;
+        grid-template-columns: 1fr;
+        gap: var(--space-10);
+        padding-block: var(--space-12);
+    }
+
+    .hero-copy h1 {
+        max-width: 13ch;
+    }
+
+    .hero-visual {
+        width: min(100%, 45rem);
+        margin-inline: auto;
+    }
+}
+
+@media (max-width: 40rem) {
+    .hero-layout {
+        gap: var(--space-8);
+        padding-block: var(--space-10);
+    }
+
+    .hero-copy h1 {
+        font-size: clamp(2.55rem, 13vw, 4rem);
+    }
+
+    .hero-visual {
+        width: 115%;
+        margin-left: -7.5%;
+    }
+}

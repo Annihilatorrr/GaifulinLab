@@ -1,0 +1,73 @@
+<section class="hero" aria-labelledby="hero-title">
+    <div class="site-container hero-layout">
+        <div class="hero-copy">
+            <span class="eyebrow">Welcome</span>
+            <h1 id="hero-title">Engineering notes, experiments and deep dives.</h1>
+            <p>
+                Practical writing about software, digital signal processing,
+                embedded systems and everything interesting around them.
+            </p>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+            <svg viewBox="0 0 760 500" focusable="false">
+                <defs>
+                    <pattern id="hero-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+                        <path d="M24 0H0V24" class="grid-line" />
+                    </pattern>
+                    <linearGradient id="hero-signal-gradient" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stop-color="var(--color-accent)" />
+                        <stop offset="1" stop-color="var(--color-accent-secondary)" />
+                    </linearGradient>
+                </defs>
+
+                <rect x="22" y="26" width="430" height="398" rx="16" class="visual-panel" />
+                <rect x="22" y="26" width="430" height="398" rx="16" fill="url(#hero-grid)" />
+
+                <g class="surface-lines">
+                    <path d="M60 320C116 222 173 166 229 211S343 358 414 155" />
+                    <path d="M60 341C118 244 174 188 230 231S345 377 414 176" />
+                    <path d="M60 362C120 266 176 210 232 252S346 397 414 197" />
+                    <path d="M60 299C114 201 171 144 227 190S342 338 414 134" />
+                    <path d="M60 278C112 180 169 122 225 170S340 318 414 113" />
+                    <path d="M82 382C139 314 197 284 254 301S357 347 429 252" />
+                    <path d="M76 353C133 286 191 256 248 273S352 319 424 224" />
+                    <path d="M70 324C127 258 185 228 242 245S347 291 419 196" />
+                    <path d="M64 295C121 230 179 200 236 217S342 263 414 168" />
+                    <path d="M58 266C115 202 173 172 230 189S337 235 409 140" />
+                </g>
+
+                <path d="M49 402H438M49 402V64" class="axis-line" />
+                <path d="m438 402-9-5v10Z" class="axis-arrow" />
+                <path d="m49 64-5 9h10Z" class="axis-arrow" />
+                <text x="298" y="446" class="axis-label">Frequency (ω)</text>
+                <text x="36" y="205" transform="rotate(-90 36 205)" class="axis-label">Amplitude</text>
+
+                <g class="code-sample">
+                    <text x="486" y="54">for (int n = 0; n &lt; N; ++n) &#123;</text>
+                    <text x="510" y="82">float acc = 0.0f;</text>
+                    <text x="510" y="110">for (int k = 0; k &lt; M; ++k)</text>
+                    <text x="534" y="138">acc += h[k] * x[n - k];</text>
+                    <text x="510" y="166">y[n] = acc;</text>
+                    <text x="486" y="194">&#125;</text>
+                </g>
+
+                <g class="signal-chain">
+                    <rect x="484" y="236" width="58" height="40" rx="5" />
+                    <rect x="568" y="236" width="58" height="40" rx="5" />
+                    <rect x="652" y="236" width="70" height="40" rx="5" />
+                    <path d="M542 256h26M626 256h26" />
+                    <path d="m561 252 7 4-7 4M645 252l7 4-7 4" />
+                    <text x="500" y="261">ADC</text>
+                    <text x="585" y="261">FIR</text>
+                    <text x="667" y="261">FFT</text>
+                </g>
+
+                <g class="spectrum">
+                    <path d="M486 440V315M486 440H730" class="axis-line" />
+                    <path d="M500 440v-28M510 440v-55M520 440v-34M530 440v-72M540 440v-48M550 440v-96M560 440v-62M570 440v-118M580 440v-83M590 440v-101M600 440v-68M610 440v-88M620 440v-51M630 440v-72M640 440v-39M650 440v-58M660 440v-31M670 440v-45M680 440v-25M690 440v-36M700 440v-19M710 440v-27" />
+                </g>
+            </svg>
+        </div>
+    </div>
+</section>

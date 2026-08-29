@@ -22,6 +22,25 @@ body {
     line-height: var(--line-body);
 }
 
+.skip-link {
+    position: fixed;
+    z-index: 2000;
+    top: var(--space-3);
+    left: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--color-text);
+    color: var(--color-background);
+    font-weight: 700;
+    transform: translateY(calc(-100% - var(--space-6)));
+    transition: transform var(--transition-fast);
+}
+
+.skip-link:focus {
+    color: var(--color-background);
+    transform: translateY(0);
+}
+
 button,
 input,
 select,
