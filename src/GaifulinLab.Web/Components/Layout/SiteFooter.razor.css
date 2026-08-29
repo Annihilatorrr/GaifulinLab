@@ -1,6 +1,7 @@
 .site-footer {
     border-top: 1px solid var(--color-border);
     background: var(--color-surface-subtle);
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
 .footer-content {

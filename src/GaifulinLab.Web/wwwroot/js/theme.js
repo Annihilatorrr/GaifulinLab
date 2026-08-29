@@ -34,4 +34,12 @@
 
     document.addEventListener("DOMContentLoaded", bindThemeToggle);
     document.addEventListener("enhancedload", bindThemeToggle);
+    media.addEventListener("change", () => {
+        if (!root.dataset.theme) {
+            const button = document.querySelector("[data-theme-toggle]");
+            if (button) {
+                updateButton(button);
+            }
+        }
+    });
 })();

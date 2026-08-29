@@ -20,6 +20,7 @@ body {
     font-family: var(--font-sans);
     font-size: var(--text-base);
     line-height: var(--line-body);
+    overflow-wrap: break-word;
 }
 
 .skip-link {
@@ -108,8 +109,11 @@ button {
 }
 
 .site-container {
-    width: min(100% - (2 * var(--site-gutter)), var(--site-width));
+    width: 100%;
+    max-width: calc(var(--site-width) + (2 * var(--site-gutter)));
     margin-inline: auto;
+    padding-left: max(var(--site-gutter), env(safe-area-inset-left));
+    padding-right: max(var(--site-gutter), env(safe-area-inset-right));
 }
 
 .site-main {

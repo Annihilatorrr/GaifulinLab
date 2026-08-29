@@ -162,3 +162,22 @@
         display: none;
     }
 }
+
+@media (max-width: 22rem) {
+    .header-content {
+        gap: var(--space-3);
+    }
+
+    .brand {
+        gap: var(--space-3);
+    }
+
+    .brand-name {
+        font-size: var(--text-sm);
+    }
+
+    .theme-toggle {
+        width: 4rem;
+        min-width: 4rem;
+    }
+}
