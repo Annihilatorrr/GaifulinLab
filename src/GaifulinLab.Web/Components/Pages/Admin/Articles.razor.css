@@ -46,6 +46,10 @@
     margin: 0;
 }
 
+.empty-state .button {
+    margin-top: var(--space-6);
+}
+
 @media (max-width: 40rem) {
     .articles-page {
         min-height: calc(100vh - 4.25rem);
