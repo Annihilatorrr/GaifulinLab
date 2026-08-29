@@ -1,0 +1,24 @@
+@inherits LayoutComponentBase
+
+<a class="skip-link" href="#admin-main-content">Skip to content</a>
+
+<div class="admin-shell">
+    <header class="admin-header">
+        <div class="admin-header-inner">
+            <a class="admin-brand" href="/" aria-label="Return to Gaifulin Lab">
+                <span class="admin-mark" aria-hidden="true">GL</span>
+                <span class="admin-brand-name">GAIFULIN LAB</span>
+                <span class="admin-badge">Admin</span>
+            </a>
+
+            <div class="admin-header-actions">
+                <a class="view-site" href="/">View site</a>
+                <ThemeToggle />
+            </div>
+        </div>
+    </header>
+
+    <main id="admin-main-content" class="admin-main">
+        @Body
+    </main>
+</div>

@@ -1,0 +1,111 @@
+.admin-shell {
+    min-height: 100vh;
+    background:
+        linear-gradient(var(--color-border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-border) 1px, transparent 1px),
+        var(--color-surface-subtle);
+    background-size: 3rem 3rem;
+}
+
+.admin-header {
+    border-bottom: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-background) 96%, transparent);
+}
+
+.admin-header-inner {
+    width: 100%;
+    min-height: 4.75rem;
+    display: flex;
+    max-width: calc(var(--site-width) + (2 * var(--site-gutter)));
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-6);
+    margin-inline: auto;
+    padding-left: max(var(--site-gutter), env(safe-area-inset-left));
+    padding-right: max(var(--site-gutter), env(safe-area-inset-right));
+}
+
+.admin-brand {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--space-3);
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.admin-brand:hover {
+    color: var(--color-text);
+}
+
+.admin-mark {
+    display: grid;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1.5px solid var(--color-text);
+    font-size: var(--text-xs);
+    font-weight: 800;
+    letter-spacing: -0.06em;
+}
+
+.admin-brand-name {
+    overflow: hidden;
+    font-size: var(--text-sm);
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-badge {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    padding: 0.15rem 0.55rem;
+    background: var(--color-surface-accent);
+    color: var(--color-accent);
+    font-size: var(--text-xs);
+    font-weight: 700;
+}
+
+.admin-header-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.view-site {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.view-site:hover {
+    color: var(--color-accent);
+}
+
+.admin-main {
+    width: 100%;
+    max-width: calc(var(--site-width) + (2 * var(--site-gutter)));
+    margin-inline: auto;
+    padding-left: max(var(--site-gutter), env(safe-area-inset-left));
+    padding-right: max(var(--site-gutter), env(safe-area-inset-right));
+}
+
+@media (max-width: 40rem) {
+    .admin-header-inner {
+        min-height: 4.25rem;
+        gap: var(--space-3);
+    }
+
+    .admin-brand {
+        gap: var(--space-2);
+    }
+
+    .admin-brand-name,
+    .view-site {
+        display: none;
+    }
+}

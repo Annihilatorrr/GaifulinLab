@@ -1,0 +1,36 @@
+@page "/admin/login"
+@layout AdminLayout
+
+<PageTitle>Admin sign in · Gaifulin Lab</PageTitle>
+
+<section class="login-page" aria-labelledby="login-title">
+    <div class="login-card surface">
+        <span class="eyebrow">Private workspace</span>
+        <h1 id="login-title">Sign in</h1>
+        <p>Enter the owner credentials to manage Gaifulin Lab.</p>
+
+        <form class="login-form" method="post" action="/api/auth/login">
+            <div class="field">
+                <label for="admin-login">Login</label>
+                <input id="admin-login"
+                       name="login"
+                       type="text"
+                       autocomplete="username"
+                       required />
+            </div>
+
+            <div class="field">
+                <label for="admin-password">Password</label>
+                <input id="admin-password"
+                       name="password"
+                       type="password"
+                       autocomplete="current-password"
+                       required />
+            </div>
+
+            <button class="button button-primary login-submit" type="submit">Sign in</button>
+        </form>
+
+        <p class="login-note">There is no public registration or account area.</p>
+    </div>
+</section>
