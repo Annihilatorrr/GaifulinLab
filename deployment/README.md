@@ -18,6 +18,7 @@ checkout по SSH, серверные Bash-скрипты настраивают
 deployment/
 ├── client/
 │   ├── common.ps1
+│   ├── create_local_db_in_docker.ps1
 │   ├── sync.ps1
 │   ├── configure-env.ps1
 │   ├── deploy.ps1
@@ -38,6 +39,18 @@ deployment/
 
 `deployment/.env` содержит безопасные placeholders. Перед первым sync замените
 пароль БД, hash пароля администратора, JWT key и TLS email реальными значениями.
+
+## Локальная PostgreSQL
+
+Создать локальный PostgreSQL-контейнер или запустить его повторно:
+
+```powershell
+.\deployment\client\create_local_db_in_docker.ps1
+```
+
+Параметры скрипта совпадают с `appsettings.Development.json`: база, пользователь
+и пароль — `gaifulinlab`, endpoint — `localhost:5432`. Данные сохраняются в Docker
+volume `gaifulinlab-postgres-dev-data`.
 
 ## Первый production setup
 
