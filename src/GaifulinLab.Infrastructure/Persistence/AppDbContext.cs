@@ -1,0 +1,42 @@
+using GaifulinLab.Application.Persistence;
+using GaifulinLab.Domain.Articles;
+using GaifulinLab.Domain.Media;
+using GaifulinLab.Domain.Series;
+using GaifulinLab.Domain.Tags;
+using GaifulinLab.Domain.Topics;
+using Microsoft.EntityFrameworkCore;
+using SeriesAggregate = GaifulinLab.Domain.Series.Series;
+
+namespace GaifulinLab.Infrastructure.Persistence;
+
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
+    : DbContext(options), IAppDbContext
+{
+    public DbSet<Article> Articles => Set<Article>();
+
+    public DbSet<ArticleLocalization> ArticleLocalizations => Set<ArticleLocalization>();
+
+    public DbSet<ArticleTopic> ArticleTopics => Set<ArticleTopic>();
+
+    public DbSet<ArticleTag> ArticleTags => Set<ArticleTag>();
+
+    public DbSet<Topic> Topics => Set<Topic>();
+
+    public DbSet<TopicLocalization> TopicLocalizations => Set<TopicLocalization>();
+
+    public DbSet<SeriesAggregate> Series => Set<SeriesAggregate>();
+
+    public DbSet<SeriesLocalization> SeriesLocalizations => Set<SeriesLocalization>();
+
+    public DbSet<ArticleSeries> ArticleSeries => Set<ArticleSeries>();
+
+    public DbSet<Tag> Tags => Set<Tag>();
+
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        base.OnModelCreating(modelBuilder);
+    }
+}

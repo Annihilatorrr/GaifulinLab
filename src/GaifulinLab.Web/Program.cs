@@ -1,3 +1,4 @@
+using GaifulinLab.Infrastructure;
 using GaifulinLab.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,6 +6,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
+
+var postgresConnectionString = builder.Configuration.GetConnectionString("Postgres")
+    ?? throw new InvalidOperationException("Connection string 'Postgres' is not configured.");
+
+builder.Services.AddInfrastructure(postgresConnectionString);
 
 var app = builder.Build();
 
