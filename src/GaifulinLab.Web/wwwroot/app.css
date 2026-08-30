@@ -73,6 +73,7 @@
     width: 1.15em;
     overflow: hidden;
     vertical-align: bottom;
+    white-space: nowrap;
     animation: preloader-ellipsis 1.5s steps(4, end) infinite;
 }
 

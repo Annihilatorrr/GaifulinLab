@@ -3,43 +3,37 @@
     const root = document.documentElement;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
 
-    const storedTheme = localStorage.getItem(storageKey);
-    if (storedTheme === "light" || storedTheme === "dark") {
+    const readStoredTheme = () => {
+        try {
+            const theme = localStorage.getItem(storageKey);
+            return theme === "light" || theme === "dark" ? theme : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const saveTheme = (theme) => {
+        try {
+            localStorage.setItem(storageKey, theme);
+        } catch {
+            // A blocked storage API must not prevent switching the current page.
+        }
+    };
+
+    const storedTheme = readStoredTheme();
+    if (storedTheme) {
         root.dataset.theme = storedTheme;
     }
 
     const currentTheme = () => root.dataset.theme ?? (media.matches ? "dark" : "light");
 
-    const updateButton = (button) => {
-        const isDark = currentTheme() === "dark";
-        button.setAttribute("aria-pressed", String(isDark));
-        button.setAttribute("aria-label", isDark ? "Switch to light theme" : "Switch to dark theme");
-    };
-
-    const bindThemeToggle = () => {
-        const button = document.querySelector("[data-theme-toggle]");
-        if (!button || button.dataset.themeBound === "true") {
-            return;
-        }
-
-        button.dataset.themeBound = "true";
-        updateButton(button);
-        button.addEventListener("click", () => {
+    window.gaifulinLabTheme = {
+        getCurrent: currentTheme,
+        toggle: () => {
             const nextTheme = currentTheme() === "dark" ? "light" : "dark";
             root.dataset.theme = nextTheme;
-            localStorage.setItem(storageKey, nextTheme);
-            updateButton(button);
-        });
-    };
-
-    document.addEventListener("DOMContentLoaded", bindThemeToggle);
-    document.addEventListener("enhancedload", bindThemeToggle);
-    media.addEventListener("change", () => {
-        if (!root.dataset.theme) {
-            const button = document.querySelector("[data-theme-toggle]");
-            if (button) {
-                updateButton(button);
-            }
+            saveTheme(nextTheme);
+            return nextTheme;
         }
-    });
+    };
 })();

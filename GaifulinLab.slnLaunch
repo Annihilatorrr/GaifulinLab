@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Web and API",
+    "Projects": [
+      {
+        "Path": "src\\GaifulinLab.Api\\GaifulinLab.Api.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "src\\GaifulinLab.Web\\GaifulinLab.Web.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]
