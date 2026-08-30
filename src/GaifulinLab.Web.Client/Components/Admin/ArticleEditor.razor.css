@@ -338,6 +338,19 @@
     margin: 0;
 }
 
+.preview-status {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    padding: var(--space-8);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.preview-error {
+    color: var(--color-danger, #b42318);
+}
+
 .article-preview {
     width: 100%;
     max-width: var(--article-width);

@@ -1,4 +1,5 @@
-@using Markdig
+@implements IDisposable
+@inject AdminMarkdownClient MarkdownClient
 
 <div class="article-editor" data-active-pane="@_activePane">
     <header class="editor-toolbar surface">
@@ -111,8 +112,8 @@
             <textarea id="article-markdown"
                       placeholder="Start writing in Markdown…"
                       spellcheck="true"
-                      @bind="_markdown"
-                      @bind:event="oninput"></textarea>
+                      value="@_markdown"
+                      @oninput="HandleMarkdownInput"></textarea>
         </section>
 
         <section class="editor-pane preview-pane" aria-labelledby="preview-heading" aria-live="polite">
@@ -132,10 +133,20 @@
                     <p>Start writing to see the rendered article.</p>
                 </div>
             }
+            else if (_previewLoading)
+            {
+                <div class="preview-status" role="status">Rendering preview…</div>
+            }
+            else if (_previewError is not null)
+            {
+                <div class="preview-status preview-error" role="alert">
+                    @_previewError
+                </div>
+            }
             else
             {
                 <article class="article-preview">
-                    @((MarkupString)RenderedHtml)
+                    @((MarkupString)_renderedHtml)
                 </article>
             }
         </section>
@@ -143,18 +154,65 @@
 </div>
 
 @code {
-    private static readonly MarkdownPipeline PreviewPipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
-        .DisableHtml()
-        .Build();
-
     private string _markdown = string.Empty;
+    private string _renderedHtml = string.Empty;
+    private string? _previewError;
     private string _title = string.Empty;
     private string _slug = string.Empty;
     private string _tags = string.Empty;
     private EditorPane _activePane = EditorPane.Edit;
+    private CancellationTokenSource? _previewCancellation;
+    private bool _previewLoading;
 
-    private string RenderedHtml => Markdown.ToHtml(_markdown, PreviewPipeline);
+    private async Task HandleMarkdownInput(ChangeEventArgs eventArgs)
+    {
+        _markdown = eventArgs.Value?.ToString() ?? string.Empty;
+        _previewCancellation?.Cancel();
+        _previewCancellation?.Dispose();
+        _previewCancellation = null;
+
+        if (string.IsNullOrWhiteSpace(_markdown))
+        {
+            _renderedHtml = string.Empty;
+            _previewError = null;
+            _previewLoading = false;
+            return;
+        }
+
+        var cancellation = new CancellationTokenSource();
+        _previewCancellation = cancellation;
+        _previewLoading = true;
+        _previewError = null;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(300, cancellation.Token);
+            var html = await MarkdownClient.PreviewAsync(_markdown, cancellation.Token);
+            if (_previewCancellation == cancellation)
+            {
+                _renderedHtml = html;
+                _previewLoading = false;
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (HttpRequestException)
+        {
+            if (_previewCancellation == cancellation)
+            {
+                _previewError = "Preview is temporarily unavailable.";
+                _previewLoading = false;
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _previewCancellation?.Cancel();
+        _previewCancellation?.Dispose();
+    }
 
     private enum EditorPane
     {

@@ -1,5 +1,7 @@
+using GaifulinLab.Application.Content;
 using GaifulinLab.Application.Persistence;
 using GaifulinLab.Infrastructure.Authentication;
+using GaifulinLab.Infrastructure.Content;
 using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -25,6 +27,7 @@ public static class DependencyInjection
 
         services.AddScoped<IAppDbContext>(serviceProvider =>
             serviceProvider.GetRequiredService<AppDbContext>());
+        services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
 
         services.AddAdminAuthentication(configuration);
 
