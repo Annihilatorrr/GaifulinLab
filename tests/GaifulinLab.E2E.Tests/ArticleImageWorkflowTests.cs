@@ -1,0 +1,72 @@
+using System.Text.RegularExpressions;
+using Microsoft.Playwright;
+using Microsoft.Playwright.Xunit;
+
+namespace GaifulinLab.E2E.Tests;
+
+[Collection(E2ECollection.Name)]
+public sealed class ArticleImageWorkflowTests : PageTest
+{
+    private static readonly byte[] OnePixelPng = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+
+    private readonly E2EEnvironment _environment;
+
+    public ArticleImageWorkflowTests(E2EEnvironment environment)
+    {
+        _environment = environment;
+    }
+
+    [Fact]
+    public async Task UploadImage_SaveAndPublish_ImageIsAvailableOnThePrimarySite()
+    {
+        var (login, password) = _environment.GetAdminCredentials();
+        var uniqueId = Guid.NewGuid().ToString("N");
+        var title = $"E2E image article {uniqueId}";
+        var slug = $"e2e-image-{uniqueId}";
+        var publicPath = $"/en/articles/{slug}";
+
+        await Page.GotoAsync(new Uri(_environment.BaseUri, "/admin/login").ToString());
+        await Page.Locator("#admin-login").FillAsync(login);
+        await Page.Locator("#admin-password").FillAsync(password);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles$", RegexOptions.CultureInvariant));
+
+        await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/new$", RegexOptions.CultureInvariant));
+
+        await Page.GetByLabel("Article title").FillAsync(title);
+        await Page.GetByPlaceholder("article-slug").FillAsync(slug);
+        await Page.Locator("input[type=file]").SetInputFilesAsync(new FilePayload
+        {
+            Name = "e2e-diagram.png",
+            MimeType = "image/png",
+            Buffer = OnePixelPng
+        });
+
+        var markdown = Page.Locator("#article-markdown");
+        await Expect(markdown).ToHaveValueAsync(new Regex(
+            "!\\[e2e-diagram\\]\\(/media/[0-9a-f-]{36}\\)",
+            RegexOptions.CultureInvariant));
+
+        var previewImage = Page.Locator("article.article-preview img");
+        await Expect(previewImage).ToBeVisibleAsync();
+        await Expect(previewImage).ToHaveAttributeAsync("src", new Regex("^/media/[0-9a-f-]{36}$"));
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$", RegexOptions.CultureInvariant));
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Publish" }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article" })).ToBeVisibleAsync();
+
+        await AssertPublicImageLoadsAsync(Page, new Uri(_environment.BaseUri, publicPath));
+    }
+
+    private static async Task AssertPublicImageLoadsAsync(IPage page, Uri publicArticleUri)
+    {
+        await page.GotoAsync(publicArticleUri.ToString());
+        var image = page.Locator("article.article-body img");
+        await image.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        var width = await image.EvaluateAsync<int>("element => element.naturalWidth");
+        Assert.True(width > 0, "The public article image was rendered but could not be loaded.");
+    }
+}

@@ -37,6 +37,44 @@
     stroke-width: 2;
 }
 
+.language-picker {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.language-picker::after {
+    position: absolute;
+    top: 50%;
+    right: 0.7rem;
+    width: 0;
+    height: 0;
+    border-top: 0.3rem solid currentColor;
+    border-inline: 0.25rem solid transparent;
+    color: var(--color-text-muted);
+    content: "";
+    pointer-events: none;
+    transform: translateY(-25%);
+}
+
+.language-picker select {
+    min-height: 2.75rem;
+    max-width: 13rem;
+    appearance: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 2rem 0.55rem 0.75rem;
+    background: var(--color-surface-subtle);
+    color: var(--color-text);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    font-weight: 700;
+}
+
+.language-picker select:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
 .title-field {
     min-width: 8rem;
     flex: 1;
@@ -90,38 +128,43 @@
     color: var(--color-danger, #b42318);
 }
 
-.language-tabs {
+.article-route {
+    min-width: 0;
     display: flex;
-    gap: var(--space-2);
-    padding: var(--space-2);
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
 }
 
-.language-tabs button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    padding: 0.5rem 0.75rem;
-    background: transparent;
-    color: var(--color-text-muted);
-    cursor: pointer;
+.article-route > span:first-child {
+    flex: 0 0 auto;
+    color: var(--color-text);
     font-weight: 700;
 }
 
-.language-tabs button[aria-current="true"] {
-    border-color: var(--color-border);
-    background: var(--color-surface-accent);
-    color: var(--color-accent);
+.article-route code {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.language-tabs button span {
-    font-size: var(--text-xs);
-    font-weight: 500;
-}
-
-.language-tabs .add-language {
+.article-route a {
     margin-left: auto;
+    color: var(--color-accent);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.article-route .route-hint {
+    margin-left: auto;
+    color: var(--color-text-subtle);
+    white-space: nowrap;
 }
 
 .article-settings {
@@ -578,22 +621,37 @@
     border-radius: var(--radius-md);
 }
 
+.article-preview ::deep .math,
+.article-preview ::deep mjx-container[display="true"] {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.article-preview ::deep mjx-container[display="true"] {
+    padding-block: var(--space-2);
+}
+
 @media (max-width: 52rem) {
     .editor-toolbar {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-columns: auto auto minmax(0, 1fr) auto;
     }
 
-    .title-field {
+    .language-picker {
         grid-column: 2;
     }
 
-    .draft-badge {
+    .title-field {
         grid-column: 3;
     }
 
+    .draft-badge {
+        grid-column: 4;
+    }
+
     .editor-actions {
-        grid-column: 2 / 4;
+        grid-column: 2 / 5;
         justify-content: flex-end;
     }
 
@@ -647,7 +705,38 @@
 
 @media (max-width: 40rem) {
     .editor-toolbar {
+        grid-template-columns: auto minmax(0, 1fr) auto;
         gap: var(--space-2);
+    }
+
+    .back-link {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .language-picker {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .language-picker select {
+        width: 100%;
+        max-width: none;
+    }
+
+    .draft-badge {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    .title-field {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .editor-actions {
+        grid-column: 1 / -1;
+        grid-row: 3;
     }
 
     .title-field input {
@@ -656,6 +745,21 @@
 
     .editor-actions .button {
         flex: 1;
+    }
+
+    .article-route {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .article-route code {
+        width: 100%;
+        order: 3;
+    }
+
+    .article-route a,
+    .article-route .route-hint {
+        margin-left: auto;
     }
 
     .settings-summary {

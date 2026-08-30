@@ -59,7 +59,7 @@ endpoint — `localhost:5435`. Данные сохраняются в Docker vol
 `appsettings.Development.json`:
 
 - login: `admin`;
-- password: `gaifulinlab-dev-admin`.
+- password: configured separately; only its hash is stored in `appsettings.Development.json`.
 
 Применить migrations, используя connection string из
 `appsettings.Development.json`:

@@ -3,10 +3,21 @@
 @inject AdminMarkdownClient MarkdownClient
 @inject AdminMediaClient MediaClient
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="article-editor" data-active-pane="@_activePane">
     <header class="editor-toolbar surface">
         <a class="back-link" href="/admin/articles" aria-label="Back to articles">←</a>
+        <label class="language-picker">
+            <span class="visually-hidden">Article language</span>
+            <select value="@_activeLanguage" @onchange="HandleLanguageChanged" disabled="@IsBusy"
+                    aria-label="Article language">
+                @foreach (var language in SupportedLanguages)
+                {
+                    <option value="@language">@LanguageOptionLabel(language)</option>
+                }
+            </select>
+        </label>
         <label class="title-field">
             <span class="visually-hidden">Article title</span>
             <input type="text" placeholder="Untitled article" autocomplete="off"
@@ -37,19 +48,18 @@
             <div class="editor-message surface @(_hasError ? "message-error" : null)" role="@(_hasError ? "alert" : "status")">@_message</div>
         }
 
-        <nav class="language-tabs surface" aria-label="Article localizations">
-            @foreach (var localization in _localizations.Values)
+        <div class="article-route surface" aria-label="Public article path">
+            <span>Public path</span>
+            <code>@PublicPath</code>
+            @if (CanOpenPublicArticle)
             {
-                <button type="button" aria-current="@(localization.LanguageCode == _activeLanguage ? "true" : null)"
-                        @onclick="() => SelectLanguage(localization.LanguageCode)">
-                    @localization.LanguageCode.ToUpperInvariant() <span>@localization.Status</span>
-                </button>
+                <a href="@PublicPath" target="_blank" rel="noopener">Open article</a>
             }
-            @foreach (var language in SupportedLanguages.Where(language => !_localizations.ContainsKey(language)))
+            else
             {
-                <button class="add-language" type="button" @onclick="() => AddLanguage(language)">+ @language.ToUpperInvariant()</button>
+                <span class="route-hint">Available after publishing</span>
             }
-        </nav>
+        </div>
 
         <details class="article-settings surface">
             <summary>
@@ -146,7 +156,7 @@
                 }
                 else if (_previewLoading) { <div class="preview-status" role="status">Rendering preview…</div> }
                 else if (_previewError is not null) { <div class="preview-status preview-error" role="alert">@_previewError</div> }
-                else { <article class="article-preview">@((MarkupString)_renderedHtml)</article> }
+                else { <article class="article-preview" @ref="_previewElement">@((MarkupString)_renderedHtml)</article> }
             </section>
         </div>
     }
@@ -172,6 +182,9 @@
     private bool _imageUploading;
     private EditorPane _activePane = EditorPane.Edit;
     private CancellationTokenSource? _previewCancellation;
+    private ElementReference _previewElement;
+    private bool _previewElementReady;
+    private bool _mathTypesetPending;
     private LocalizationModel Current => _localizations[_activeLanguage];
     private bool IsBusy => _loading || _saving;
 
@@ -198,8 +211,63 @@
         finally { _loading = false; }
     }
 
-    private void SelectLanguage(string languageCode) { _activeLanguage = languageCode; _renderedHtml = ""; _ = RefreshPreview(); }
-    private void AddLanguage(string languageCode) { _localizations[languageCode] = new(languageCode); SelectLanguage(languageCode); }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_loading
+            || _previewLoading
+            || _previewError is not null
+            || string.IsNullOrWhiteSpace(_renderedHtml))
+        {
+            return;
+        }
+
+        _previewElementReady = true;
+        if (!_mathTypesetPending)
+        {
+            return;
+        }
+
+        _mathTypesetPending = false;
+        try
+        {
+            await JS.InvokeVoidAsync("MathJax.typesetClear", new[] { _previewElement });
+            await JS.InvokeVoidAsync("MathJax.texReset");
+            await JS.InvokeVoidAsync("MathJax.typesetPromise", new[] { _previewElement });
+        }
+        catch (JSException)
+        {
+            // Raw TeX remains readable if the external renderer is unavailable.
+        }
+    }
+
+    private async Task HandleLanguageChanged(ChangeEventArgs eventArgs)
+    {
+        var languageCode = eventArgs.Value?.ToString();
+        if (languageCode is null
+            || !SupportedLanguages.Contains(languageCode, StringComparer.OrdinalIgnoreCase)
+            || string.Equals(languageCode, _activeLanguage, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (ArticleId is null)
+        {
+            var replacement = new LocalizationModel(languageCode, Current);
+            _localizations.Clear();
+            _localizations[languageCode] = replacement;
+        }
+        else if (!_localizations.ContainsKey(languageCode))
+        {
+            _localizations[languageCode] = new(languageCode);
+        }
+
+        _activeLanguage = languageCode;
+        _message = null;
+        await ClearPreviewMathAsync();
+        _previewElementReady = false;
+        _renderedHtml = "";
+        await RefreshPreview();
+    }
 
     private Task SaveAsync() => SaveCoreAsync(navigateAfterCreate: true);
 
@@ -207,6 +275,7 @@
     {
         _saving = true;
         _message = null;
+        _hasError = false;
         try
         {
             var wasNew = ArticleId is null;
@@ -224,6 +293,7 @@
                 _topicIds.ToArray(),
                 _series.Select(item => new SeriesAssignmentRequest(item.Key, item.Value)).ToArray(),
                 ParseTags()));
+            await ReloadLocalizationsAsync();
             ShowMessage("Article saved.", false);
             if (wasNew && navigateAfterCreate) Navigation.NavigateTo($"/admin/articles/{ArticleId}", replace: true);
         }
@@ -233,6 +303,12 @@
 
     private async Task PublishAsync()
     {
+        if (string.IsNullOrWhiteSpace(Current.Slug))
+        {
+            ShowMessage("Add a URL slug before publishing.", true);
+            return;
+        }
+
         var wasNew = ArticleId is null;
         await SaveCoreAsync(navigateAfterCreate: false);
         if (_hasError || ArticleId is null) return;
@@ -282,19 +358,66 @@
     {
         _previewCancellation?.Cancel();
         _previewCancellation?.Dispose();
-        if (string.IsNullOrWhiteSpace(Current.Markdown)) { _renderedHtml = ""; _previewError = null; _previewLoading = false; return; }
+        if (string.IsNullOrWhiteSpace(Current.Markdown))
+        {
+            await ClearPreviewMathAsync();
+            _previewElementReady = false;
+            _renderedHtml = "";
+            _previewError = null;
+            _previewLoading = false;
+            return;
+        }
         var cancellation = new CancellationTokenSource();
         _previewCancellation = cancellation;
+        await ClearPreviewMathAsync();
+        _previewElementReady = false;
         _previewLoading = true;
         _previewError = null;
         try
         {
             await Task.Delay(300, cancellation.Token);
             var html = await MarkdownClient.PreviewAsync(Current.Markdown, cancellation.Token);
-            if (_previewCancellation == cancellation) { _renderedHtml = html; _previewLoading = false; }
+            if (_previewCancellation == cancellation)
+            {
+                _renderedHtml = html;
+                _mathTypesetPending = true;
+                _previewLoading = false;
+            }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (HttpRequestException) { if (_previewCancellation == cancellation) { _previewError = "Preview is temporarily unavailable."; _previewLoading = false; } }
+    }
+
+    private async Task ClearPreviewMathAsync()
+    {
+        if (!_previewElementReady)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("MathJax.typesetClear", new[] { _previewElement });
+            await JS.InvokeVoidAsync("MathJax.texReset");
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    private async Task ReloadLocalizationsAsync()
+    {
+        var activeLanguage = _activeLanguage;
+        var article = await ArticlesClient.GetArticleAsync(ArticleId!.Value);
+        _localizations.Clear();
+        foreach (var localization in article.Localizations)
+        {
+            _localizations[localization.LanguageCode] = new(localization);
+        }
+
+        _activeLanguage = _localizations.ContainsKey(activeLanguage)
+            ? activeLanguage
+            : _localizations.Keys.First();
     }
 
     private void ToggleTopic(Guid id, ChangeEventArgs args) { if (args.Value is true) _topicIds.Add(id); else _topicIds.Remove(id); }
@@ -302,6 +425,18 @@
     private void SetSeriesPosition(Guid id, ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out var value) && value > 0) _series[id] = value; }
     private string TaxonomyName(IEnumerable<(string LanguageCode, string Name)> names) => names.FirstOrDefault(x => x.LanguageCode == _activeLanguage).Name ?? names.FirstOrDefault().Name ?? "Untitled";
     private static string LanguageName(string languageCode) => languageCode == "ru" ? "Russian" : "English";
+    private string LanguageOptionLabel(string languageCode)
+    {
+        var label = $"{LanguageName(languageCode)} ({languageCode.ToUpperInvariant()})";
+        if (ArticleId is null || _localizations.ContainsKey(languageCode))
+        {
+            return label;
+        }
+
+        return $"{label} — add translation";
+    }
+    private string PublicPath => $"/{Current.LanguageCode}/articles/{(string.IsNullOrWhiteSpace(Current.Slug) ? "{slug}" : Current.Slug.Trim())}";
+    private bool CanOpenPublicArticle => Current.Status == PublicationStatusDto.Published && !string.IsNullOrWhiteSpace(Current.Slug);
     private string[] ParseTags() => _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     private void ShowMessage(string message, bool error) { _message = message; _hasError = error; }
     public void Dispose() { _previewCancellation?.Cancel(); _previewCancellation?.Dispose(); }
@@ -309,6 +444,14 @@
     private sealed class LocalizationModel
     {
         public LocalizationModel(string languageCode) => LanguageCode = languageCode;
+        public LocalizationModel(string languageCode, LocalizationModel source)
+        {
+            LanguageCode = languageCode;
+            Title = source.Title;
+            Summary = source.Summary;
+            Markdown = source.Markdown;
+            Slug = source.Slug;
+        }
         public LocalizationModel(AdminArticleLocalizationDto dto) { LanguageCode = dto.LanguageCode; Title = dto.Title; Summary = dto.Summary ?? ""; Markdown = dto.Markdown; Slug = dto.Slug ?? ""; Status = dto.Status; }
         public string LanguageCode { get; }
         public string Title { get; set; } = "";

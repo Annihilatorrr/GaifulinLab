@@ -1,8 +1,12 @@
 ﻿@inherits LayoutComponentBase
 
 <a class="skip-link" href="#main-content">Skip to content</a>
-<SiteHeader />
+<div class="site-shell">
+    <SiteHeader />
 
-@Body
+    <div class="site-content">
+        @Body
+    </div>
 
-<SiteFooter />
+    <SiteFooter />
+</div>

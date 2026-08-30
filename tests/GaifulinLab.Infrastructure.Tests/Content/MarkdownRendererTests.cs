@@ -44,4 +44,36 @@ public sealed class MarkdownRendererTests
         Assert.DoesNotContain("style=", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("javascript:", html, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void Render_PreservesInlineAndDisplayMathematicsForClientTypesetting()
+    {
+        const string markdown = """
+            Inline \(X\) and $Y$.
+
+            \[
+            \mathbb E[X]
+            \]
+
+            $$
+            \frac{1}{n-1}
+            $$
+
+            `literal \(code\)`
+
+            ```text
+            literal \[fenced code\]
+            ```
+            """;
+
+        var html = _renderer.Render(markdown);
+
+        Assert.Contains("class=\"math\"", html);
+        Assert.Contains("\\(X\\)", html);
+        Assert.Contains("\\(Y\\)", html);
+        Assert.Contains("\\mathbb E[X]", html);
+        Assert.Contains("\\frac{1}{n-1}", html);
+        Assert.Contains("literal \\(code\\)", html);
+        Assert.Contains("literal \\[fenced code\\]", html);
+    }
 }

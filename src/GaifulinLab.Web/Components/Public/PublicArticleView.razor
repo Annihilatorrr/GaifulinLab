@@ -1,4 +1,5 @@
 @inject PublicContentClient ContentClient
+@inject IJSRuntime JS
 
 <main id="main-content" class="site-main article-page">
     <div class="site-container article-layout">
@@ -17,7 +18,7 @@
                     </nav>
                 }
             </header>
-            <article class="article-body">@((MarkupString)_article.Html)</article>
+            <article class="article-body" @ref="_articleElement">@((MarkupString)_article.Html)</article>
         }
     </div>
 </main>
@@ -27,11 +28,64 @@
     [Parameter, EditorRequired] public string Slug { get; set; } = "";
     private PublicArticleDetailsDto? _article;
     private bool _loading = true;
+    private ElementReference _articleElement;
+    private bool _articleElementReady;
+    private bool _mathTypesetPending;
+
     protected override async Task OnParametersSetAsync()
     {
+        await ClearArticleMathAsync();
+        _articleElementReady = false;
         _loading = true;
-        try { _article = await ContentClient.GetArticleAsync(LanguageCode, Slug); }
+        try
+        {
+            _article = await ContentClient.GetArticleAsync(LanguageCode, Slug);
+            _mathTypesetPending = _article is not null;
+        }
         catch (HttpRequestException) { _article = null; }
         finally { _loading = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_loading || _article is null)
+        {
+            return;
+        }
+
+        _articleElementReady = true;
+        if (!_mathTypesetPending)
+        {
+            return;
+        }
+
+        _mathTypesetPending = false;
+        try
+        {
+            await JS.InvokeVoidAsync("MathJax.typesetClear", new[] { _articleElement });
+            await JS.InvokeVoidAsync("MathJax.texReset");
+            await JS.InvokeVoidAsync("MathJax.typesetPromise", new[] { _articleElement });
+        }
+        catch (JSException)
+        {
+            // Raw TeX remains readable if the external renderer is unavailable.
+        }
+    }
+
+    private async Task ClearArticleMathAsync()
+    {
+        if (!_articleElementReady)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("MathJax.typesetClear", new[] { _articleElement });
+            await JS.InvokeVoidAsync("MathJax.texReset");
+        }
+        catch (JSException)
+        {
+        }
     }
 }

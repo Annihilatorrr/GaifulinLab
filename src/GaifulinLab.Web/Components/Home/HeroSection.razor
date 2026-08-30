@@ -1,7 +1,6 @@
 <section class="hero" aria-labelledby="hero-title">
     <div class="site-container hero-layout">
         <div class="hero-copy">
-            <span class="eyebrow">Welcome</span>
             <h1 id="hero-title">Engineering notes, experiments and deep dives.</h1>
             <p>
                 Practical writing about software, digital signal processing,
@@ -11,7 +10,7 @@
             <div class="hero-actions">
                 <a class="button button-primary" href="/topics">
                     Explore topics
-                    <span aria-hidden="true">→</span>
+                    <span aria-hidden="true">&rarr;</span>
                 </a>
                 <a class="button button-secondary" href="/articles">Browse latest articles</a>
             </div>
@@ -29,53 +28,61 @@
                     </linearGradient>
                 </defs>
 
-                <rect x="22" y="26" width="430" height="398" rx="16" class="visual-panel" />
-                <rect x="22" y="26" width="430" height="398" rx="16" fill="url(#hero-grid)" />
+                <rect x="24" y="30" width="712" height="440" rx="24" class="lab-panel" />
+                <rect x="24" y="30" width="712" height="440" rx="24" fill="url(#hero-grid)" />
 
-                <g class="surface-lines">
-                    <path d="M60 320C116 222 173 166 229 211S343 358 414 155" />
-                    <path d="M60 341C118 244 174 188 230 231S345 377 414 176" />
-                    <path d="M60 362C120 266 176 210 232 252S346 397 414 197" />
-                    <path d="M60 299C114 201 171 144 227 190S342 338 414 134" />
-                    <path d="M60 278C112 180 169 122 225 170S340 318 414 113" />
-                    <path d="M82 382C139 314 197 284 254 301S357 347 429 252" />
-                    <path d="M76 353C133 286 191 256 248 273S352 319 424 224" />
-                    <path d="M70 324C127 258 185 228 242 245S347 291 419 196" />
-                    <path d="M64 295C121 230 179 200 236 217S342 263 414 168" />
-                    <path d="M58 266C115 202 173 172 230 189S337 235 409 140" />
+                <g class="lab-links">
+                    <path d="M127 145h73l28 28h78" />
+                    <path d="M127 175h55l24 24h100" />
+                    <path d="M518 172h55l28-28h57" />
+                    <path d="M518 210h73l22-22h45" />
+                    <path d="M267 352v39h-91v37H95" />
+                    <path d="M417 352v39h91v37h78" />
+                    <path d="M380 352v69" />
                 </g>
 
-                <path d="M49 402H438M49 402V64" class="axis-line" />
-                <path d="m438 402-9-5v10Z" class="axis-arrow" />
-                <path d="m49 64-5 9h10Z" class="axis-arrow" />
-                <text x="298" y="446" class="axis-label">Frequency (ω)</text>
-                <text x="36" y="205" transform="rotate(-90 36 205)" class="axis-label">Amplitude</text>
-
-                <g class="code-sample">
-                    <text x="486" y="54">for (int n = 0; n &lt; N; ++n) &#123;</text>
-                    <text x="510" y="82">float acc = 0.0f;</text>
-                    <text x="510" y="110">for (int k = 0; k &lt; M; ++k)</text>
-                    <text x="534" y="138">acc += h[k] * x[n - k];</text>
-                    <text x="510" y="166">y[n] = acc;</text>
-                    <text x="486" y="194">&#125;</text>
+                <g class="lab-waveform">
+                    <path d="M64 160h16l9-25 12 53 14-87 15 119 13-73 12 31h28" />
+                    <text x="64" y="118">SAMPLE IN</text>
                 </g>
 
-                <g class="signal-chain">
-                    <rect x="466" y="236" width="50" height="40" rx="5" />
-                    <rect x="532" y="236" width="50" height="40" rx="5" />
-                    <rect x="598" y="236" width="50" height="40" rx="5" />
-                    <rect x="664" y="236" width="78" height="40" rx="5" />
-                    <path d="M516 256h16M582 256h16M648 256h16" />
-                    <path d="m525 252 7 4-7 4M591 252l7 4-7 4M657 252l7 4-7 4" />
-                    <text x="478" y="261">ADC</text>
-                    <text x="548" y="261">FIR</text>
-                    <text x="613" y="261">FFT</text>
-                    <text x="677" y="261">Detector</text>
+                <g class="lab-code">
+                    <rect x="548" y="75" width="148" height="106" rx="12" />
+                    <path d="M574 112h42M574 154h82" />
+                    <text x="572" y="97">DSP LOOP</text>
+                    <text x="572" y="130" class="code-line">for (auto s : x)</text>
+                    <text x="572" y="146" class="code-line">y += fir(s);</text>
                 </g>
 
-                <g class="spectrum">
-                    <path d="M486 440V315M486 440H730" class="axis-line" />
-                    <path d="M500 440v-28M510 440v-55M520 440v-34M530 440v-72M540 440v-48M550 440v-96M560 440v-62M570 440v-118M580 440v-83M590 440v-101M600 440v-68M610 440v-88M620 440v-51M630 440v-72M640 440v-39M650 440v-58M660 440v-31M670 440v-45M680 440v-25M690 440v-36M700 440v-19M710 440v-27" />
+                <g class="lab-board">
+                    <rect x="218" y="130" width="320" height="224" rx="20" />
+                    <rect x="304" y="186" width="152" height="112" rx="13" class="lab-chip" />
+                    <path d="M330 214h100M330 236h76M330 258h100M330 280h58" class="chip-code" />
+                    <path d="M286 198h18M286 222h18M286 246h18M286 270h18M456 198h18M456 222h18M456 246h18M456 270h18" class="chip-pins" />
+                    <circle cx="262" cy="174" r="6" />
+                    <circle cx="494" cy="310" r="6" />
+                    <path d="M262 180v42h24M494 304v-46h-44" />
+                    <text x="246" y="327">MCU</text>
+                </g>
+
+                <g class="lab-plot">
+                    <rect x="560" y="304" width="126" height="94" rx="12" />
+                    <path d="M575 380v-54M575 380h93" />
+                    <path d="M581 367l13-13 13 6 14-27 14 16 16-35" />
+                    <text x="574" y="319">MEASURE</text>
+                </g>
+
+                <g class="lab-system">
+                    <circle cx="95" cy="428" r="18" />
+                    <circle cx="176" cy="428" r="18" />
+                    <circle cx="380" cy="439" r="18" />
+                    <circle cx="586" cy="428" r="18" />
+                    <path d="M113 428h45M194 428h168M398 439h170" />
+                    <path d="m148 424 8 4-8 4M352 435l8 4-8 4M558 424l8 4-8 4" />
+                    <text x="72" y="462">INPUT</text>
+                    <text x="151" y="462">NODE</text>
+                    <text x="355" y="472">SYSTEM</text>
+                    <text x="559" y="462">OUTPUT</text>
                 </g>
             </svg>
         </div>

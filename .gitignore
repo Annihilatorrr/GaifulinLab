@@ -27,6 +27,7 @@ secrets.json
 /runtime/
 /uploads/
 /media/
+**/runtime/
 
 # Frontend tooling
 node_modules/
