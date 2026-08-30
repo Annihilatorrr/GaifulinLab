@@ -24,9 +24,9 @@ appsettings.Development.local.json
 secrets.json
 
 # Local runtime data
-runtime/
-uploads/
-media/
+/runtime/
+/uploads/
+/media/
 
 # Frontend tooling
 node_modules/
