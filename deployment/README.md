@@ -1,56 +1,106 @@
-# Raspberry Pi deployment
+# GaifulinLab deployment
 
-The compose stack runs PostgreSQL, the ASP.NET Core application and an Nginx reverse proxy. Both the database and uploaded images use named Docker volumes. The application waits for PostgreSQL, applies EF Core migrations and becomes ready only after the database is reachable.
+Deployment повторяет схему NeonKickWeb: клиентские PowerShell-скрипты доставляют
+checkout по SSH, серверные Bash-скрипты настраивают host PostgreSQL/nginx и
+запускают приложение через Docker Compose.
 
-The images used by the stack are multi-platform and can be built on a 64-bit Raspberry Pi OS (`linux/arm64`).
+## Target
 
-## First deployment
+- user: `v3rt3x`;
+- host: `192.168.50.11`;
+- checkout: `/home/v3rt3x/deployments/gaifulinlab`;
+- SSH key: `C:\Users\pwrfl\.ssh\rbpi0807`;
+- production URL: `https://gaifulinlab.com`.
 
-1. Install Docker Engine with the Compose plugin on the Raspberry Pi.
-2. Clone the repository and enter its root directory.
-3. Copy `.env.example` to `.env` and replace every secret value.
-4. Build the image once, then generate the administrator password hash:
+## Структура
 
-   ```sh
-   docker compose build app
-   read -rsp "Admin password: " ADMIN_PASSWORD; echo
-   export ADMIN_PASSWORD
-   docker compose run --rm --no-deps app --hash-admin-password
-   unset ADMIN_PASSWORD
+```text
+deployment/
+├── client/
+│   ├── common.ps1
+│   ├── sync.ps1
+│   ├── configure-env.ps1
+│   ├── deploy.ps1
+│   ├── apply-migration.ps1
+│   └── setup-certificate.ps1
+├── server/
+│   ├── common.sh
+│   ├── install-host.sh
+│   ├── install-nginx.sh
+│   ├── migrate.sh
+│   ├── deploy.sh
+│   ├── reset-database.sh
+│   └── setup-certificate.sh
+├── nginx-host/host-reverse-proxy.conf
+├── Dockerfile.web
+└── docker-compose.prod-host-nginx.yml
+```
+
+`deployment/.env` содержит безопасные placeholders. Перед первым sync замените
+пароль БД, hash пароля администратора, JWT key и TLS email реальными значениями.
+
+## Первый production setup
+
+DNS `gaifulinlab.com` и `www.gaifulinlab.com` должен указывать на сервер, а
+TCP 80/443 должны быть доступны из интернета.
+
+1. Настройте `deployment/.env` и доставьте checkout:
+
+   ```powershell
+   .\deployment\client\sync.ps1
    ```
 
-5. Put the printed value into `ADMIN_PASSWORD_HASH` in `.env`.
-6. Deploy:
+2. Один раз подготовьте host:
 
-   ```sh
-   chmod +x deployment/deploy.sh
-   ./deployment/deploy.sh
+   ```bash
+   cd /home/v3rt3x/deployments/gaifulinlab
+   ./deployment/server/install-host.sh
    ```
 
-By default Nginx listens on `127.0.0.1:8080`. This is intended for a host-level TLS reverse proxy. Set `HTTP_BIND_ADDRESS=0.0.0.0` only when the service must be reachable directly from the LAN. Do not expose the admin login over unencrypted public HTTP.
+3. Получите сертификат:
 
-The host reverse proxy should forward requests to `http://127.0.0.1:8080` and preserve `Host`, `X-Forwarded-For` and `X-Forwarded-Proto`.
+   ```powershell
+   .\deployment\client\setup-certificate.ps1 -SkipSync
+   ```
 
-## Operations
+4. Примените migration и разверните приложение:
 
-Check the stack and health endpoints:
+   ```powershell
+   .\deployment\client\apply-migration.ps1
+   .\deployment\client\deploy.ps1 -SkipSync
+   ```
 
-```sh
-docker compose ps
-curl --fail http://127.0.0.1:8080/health/live
-curl --fail http://127.0.0.1:8080/health/ready
+## Обычный выпуск
+
+Без изменений схемы БД:
+
+```powershell
+.\deployment\client\deploy.ps1
 ```
 
-View application logs:
+С migrations:
 
-```sh
-docker compose logs --follow app
+```powershell
+.\deployment\client\apply-migration.ps1
+.\deployment\client\deploy.ps1 -SkipSync
 ```
 
-Redeploy after pulling changes:
+`server/deploy.sh` при каждом deploy выполняет
+`ALTER ROLE ... WITH LOGIN PASSWORD ...`, используя
+`GAIFULINLAB_DB_PASSWORD` из `deployment/.env`, и проверяет подключение из
+одноразового PostgreSQL-контейнера до пересборки приложения. Данные PostgreSQL
+при этом не удаляются.
 
-```sh
-./deployment/deploy.sh
+`server/reset-database.sh --confirm-reset-gaifulinlab` — отдельная разрушительная
+аварийная команда. Обычный deploy её никогда не вызывает.
+
+## Диагностика
+
+```bash
+docker compose -p gaifulinlab \
+  --env-file deployment/.env \
+  -f deployment/docker-compose.prod-host-nginx.yml ps
+
+curl --resolve gaifulinlab.com:443:127.0.0.1 https://gaifulinlab.com/health/ready
+sudo nginx -t
 ```
-
-The `postgres_data` and `media_data` volumes survive container replacement. Back them up before destructive Docker maintenance or schema changes.

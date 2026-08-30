@@ -1,17 +1,23 @@
 .git
+.tmp
 .github
 .vs
+.vscode
 .idea
-.config
 **/bin
 **/obj
-**/TestResults
-tests
-deployment/.env
 .env
-.env.*
-!.env.example
-runtime
-uploads
-media
-README.md
+!.env.local.example
+deployment/.env
+!deployment/.env.example
+deployment/certs
+deployment/runtime
+deployment/generated
+deployment/packages
+# Local release installers are uploaded separately and must never enter a
+# Docker build context. Production mounts the server-owned directory instead.
+installers/
+*.user
+*.suo
+*.log
+docs/subagent-docs

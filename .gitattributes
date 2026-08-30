@@ -1,0 +1,4 @@
+*.sh text eol=lf
+*.ps1 text
+*.yml text
+Dockerfile.* text eol=lf
