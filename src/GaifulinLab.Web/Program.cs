@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using GaifulinLab.Application;
 using GaifulinLab.Infrastructure;
 using GaifulinLab.Web.Components;
 using GaifulinLab.Web.Endpoints;
@@ -10,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddRateLimiter(options =>
 {
@@ -49,6 +51,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapAuthEndpoints();
+app.MapAdminArticleEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(GaifulinLab.Web.Client._Imports).Assembly);

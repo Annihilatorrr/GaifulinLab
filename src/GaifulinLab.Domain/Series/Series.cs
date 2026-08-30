@@ -99,4 +99,33 @@ public sealed class Series
         UpdatedAt = DomainRules.AsUtc(updatedAt);
         return link;
     }
+
+    public void RemoveArticle(Guid articleId, DateTimeOffset updatedAt)
+    {
+        var removed = _articles.RemoveAll(link => link.ArticleId == articleId);
+        if (removed > 0)
+        {
+            UpdatedAt = DomainRules.AsUtc(updatedAt);
+        }
+    }
+
+    public ArticleSeries SetArticle(Article article, int position, DateTimeOffset updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(article);
+
+        var existingLink = _articles.SingleOrDefault(link => link.ArticleId == article.Id);
+        if (_articles.Any(link => link.ArticleId != article.Id && link.Position == position))
+        {
+            throw new InvalidOperationException($"Series position {position} is already occupied.");
+        }
+
+        if (existingLink is null)
+        {
+            return AddArticle(article, position, updatedAt);
+        }
+
+        existingLink.ChangePosition(position);
+        UpdatedAt = DomainRules.AsUtc(updatedAt);
+        return existingLink;
+    }
 }

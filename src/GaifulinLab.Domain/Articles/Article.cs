@@ -125,6 +125,36 @@ public sealed class Article
         }
     }
 
+    public void ReplaceTopics(IEnumerable<Topic> topics, DateTimeOffset updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(topics);
+
+        var requestedTopics = topics.DistinctBy(topic => topic.Id).ToArray();
+        _topics.RemoveAll(link => requestedTopics.All(topic => topic.Id != link.TopicId));
+
+        foreach (var topic in requestedTopics)
+        {
+            AssignTopic(topic, updatedAt);
+        }
+
+        Touch(updatedAt);
+    }
+
+    public void ReplaceTags(IEnumerable<Tag> tags, DateTimeOffset updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(tags);
+
+        var requestedTags = tags.DistinctBy(tag => tag.Id).ToArray();
+        _tags.RemoveAll(link => requestedTags.All(tag => tag.Id != link.TagId));
+
+        foreach (var tag in requestedTags)
+        {
+            AssignTag(tag, updatedAt);
+        }
+
+        Touch(updatedAt);
+    }
+
     private ArticleLocalization GetRequiredLocalization(string languageCode) =>
         FindLocalization(languageCode)
         ?? throw new InvalidOperationException($"The article does not have a '{languageCode}' localization.");

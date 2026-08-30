@@ -4,8 +4,13 @@ using System.Net.Http.Json;
 using GaifulinLab.Contracts.Auth;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Infrastructure.Authentication;
+using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace GaifulinLab.Web.Tests.Authentication;
@@ -70,6 +75,7 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         var passwordHash = new AdminPasswordHasher().Hash(AdminPassword);
+        var databaseName = $"gaifulinlab-web-tests-{Guid.NewGuid()}";
 
         builder.UseEnvironment("Testing");
         builder.ConfigureLogging(logging => logging.ClearProviders());
@@ -82,5 +88,12 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("JWT_AUDIENCE", "GaifulinLab.Tests.Client");
         builder.UseSetting("JWT_SIGNING_KEY", "test-signing-key-that-is-at-least-32-bytes-long");
         builder.UseSetting("JWT_LIFETIME_MINUTES", "5");
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
+            services.AddDbContext<AppDbContext>(options =>
+                options.UseInMemoryDatabase(databaseName));
+        });
     }
 }
