@@ -1,0 +1,101 @@
+@inject AdminArticlesClient ArticlesClient
+@inject NavigationManager Navigation
+
+<section class="articles-page" aria-labelledby="articles-title">
+    <header class="page-heading">
+        <div>
+            <span class="eyebrow">Content</span>
+            <h1 id="articles-title">Articles</h1>
+            <p>Create and manage the engineering notes published by Gaifulin Lab.</p>
+        </div>
+        <a class="button button-primary" href="/admin/articles/new">New article</a>
+    </header>
+
+    @if (_loading)
+    {
+        <div class="state surface" role="status">Loading articles…</div>
+    }
+    else if (_error is not null)
+    {
+        <div class="state surface error" role="alert">
+            <h2>Articles could not be loaded</h2>
+            <p>@_error</p>
+            <button class="button button-secondary" type="button" @onclick="LoadAsync">Try again</button>
+        </div>
+    }
+    else if (_articles.Count == 0)
+    {
+        <div class="state surface">
+            <h2>No articles yet</h2>
+            <p>The first draft will appear here after it is created.</p>
+            <a class="button button-primary" href="/admin/articles/new">Create first article</a>
+        </div>
+    }
+    else
+    {
+        <div class="article-list surface">
+            @foreach (var article in _articles)
+            {
+                var primary = article.Localizations.FirstOrDefault();
+                <article class="article-row">
+                    <a class="article-link" href="@($"/admin/articles/{article.Id}")">
+                        <strong>@(string.IsNullOrWhiteSpace(primary?.Title) ? "Untitled article" : primary.Title)</strong>
+                        <span>
+                            @string.Join(" · ", article.Localizations.Select(x => $"{x.LanguageCode.ToUpperInvariant()} — {x.Status}"))
+                        </span>
+                    </a>
+                    <time datetime="@article.UpdatedAt.ToString("O")">Updated @article.UpdatedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                    <button class="delete-button" type="button" disabled="@(_deleting == article.Id)" @onclick="() => DeleteAsync(article.Id)">
+                        @(_deleting == article.Id ? "Deleting…" : "Delete")
+                    </button>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<AdminArticleListItemDto> _articles = [];
+    private bool _loading = true;
+    private string? _error;
+    private Guid? _deleting;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _articles = await ArticlesClient.GetArticlesAsync();
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task DeleteAsync(Guid articleId)
+    {
+        _deleting = articleId;
+        _error = null;
+        try
+        {
+            await ArticlesClient.DeleteAsync(articleId);
+            _articles = _articles.Where(article => article.Id != articleId).ToArray();
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _deleting = null;
+        }
+    }
+}

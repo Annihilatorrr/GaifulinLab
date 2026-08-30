@@ -1,0 +1,15 @@
+@page "/articles"
+
+<PageTitle>Articles · Gaifulin Lab</PageTitle>
+
+<PublicContentIndex Kind="articles" LanguageCode="en" Eyebrow="Writing" Title="Articles"
+                    Description="Engineering notes, experiments and technical deep dives."
+                    EmptyTitle="No articles yet" EmptyDescription="The first published article will appear here."
+                    Topic="@Topic" SeriesFilter="@SeriesFilter" Tag="@Tag"
+                    @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "topic")] public string? Topic { get; set; }
+    [SupplyParameterFromQuery(Name = "series")] public string? SeriesFilter { get; set; }
+    [SupplyParameterFromQuery(Name = "tag")] public string? Tag { get; set; }
+}

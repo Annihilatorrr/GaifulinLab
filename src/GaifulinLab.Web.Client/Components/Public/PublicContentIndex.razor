@@ -1,0 +1,106 @@
+@inject PublicContentClient ContentClient
+
+<main id="main-content" class="site-main public-index">
+    <div class="site-container public-layout">
+        <span class="eyebrow">@Eyebrow</span>
+        <h1>@Title</h1>
+        <p class="description">@Description</p>
+
+        @if (_loading)
+        {
+            <div class="public-state surface" role="status">Loading…</div>
+        }
+        else if (_error)
+        {
+            <div class="public-state surface" role="alert"><h2>Content is unavailable</h2><p>Please try again later.</p></div>
+        }
+        else if (!HasItems)
+        {
+            <div class="public-state surface"><h2>@EmptyTitle</h2><p>@EmptyDescription</p></div>
+        }
+        else if (Kind is "articles" or "archive")
+        {
+            <div class="content-list surface">
+                @foreach (var article in _articles)
+                {
+                    <article class="content-item">
+                        <time datetime="@article.PublishedAt.ToString("O")">@article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                        <h2><a href="@($"/{article.LanguageCode}/articles/{article.Slug}")">@article.Title</a></h2>
+                        @if (!string.IsNullOrWhiteSpace(article.Summary)) { <p>@article.Summary</p> }
+                        <div class="metadata">@string.Join(" · ", article.Tags)</div>
+                    </article>
+                }
+            </div>
+        }
+        else if (Kind == "topics")
+        {
+            <div class="card-grid">
+                @foreach (var topic in _topics)
+                {
+                    <a class="taxonomy-card surface" href="@($"/articles?topic={Uri.EscapeDataString(topic.Slug)}")">
+                        <h2>@topic.Name</h2><p>@topic.Description</p><span>@topic.ArticleCount article(s)</span>
+                    </a>
+                }
+            </div>
+        }
+        else if (Kind == "series")
+        {
+            <div class="card-grid">
+                @foreach (var series in _series)
+                {
+                    <a class="taxonomy-card surface" href="@($"/{series.LanguageCode}/series/{series.Slug}")">
+                        <h2>@series.Title</h2><p>@series.Description</p><span>@series.ArticleCount article(s)</span>
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="tag-list surface">
+                @foreach (var tag in _tags)
+                {
+                    <a href="@($"/articles?tag={Uri.EscapeDataString(tag.Name)}")">#@tag.Name <span>@tag.ArticleCount</span></a>
+                }
+            </div>
+        }
+    </div>
+</main>
+
+@code {
+    [Parameter, EditorRequired] public string Kind { get; set; } = "articles";
+    [Parameter] public string LanguageCode { get; set; } = "en";
+    [Parameter, EditorRequired] public string Eyebrow { get; set; } = "Writing";
+    [Parameter, EditorRequired] public string Title { get; set; } = "Articles";
+    [Parameter, EditorRequired] public string Description { get; set; } = "";
+    [Parameter, EditorRequired] public string EmptyTitle { get; set; } = "No content yet";
+    [Parameter, EditorRequired] public string EmptyDescription { get; set; } = "Published content will appear here.";
+    [SupplyParameterFromQuery(Name = "topic")] public string? Topic { get; set; }
+    [SupplyParameterFromQuery(Name = "series")] public string? SeriesFilter { get; set; }
+    [SupplyParameterFromQuery(Name = "tag")] public string? Tag { get; set; }
+
+    private IReadOnlyList<PublicArticleListItemDto> _articles = [];
+    private IReadOnlyList<PublicTopicDto> _topics = [];
+    private IReadOnlyList<PublicSeriesListItemDto> _series = [];
+    private IReadOnlyList<PublicTagDto> _tags = [];
+    private bool _loading = true;
+    private bool _error;
+    private bool HasItems => Kind switch { "articles" or "archive" => _articles.Count > 0, "topics" => _topics.Count > 0, "series" => _series.Count > 0, _ => _tags.Count > 0 };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _error = false;
+        try
+        {
+            switch (Kind)
+            {
+                case "topics": _topics = await ContentClient.GetTopicsAsync(LanguageCode); break;
+                case "series": _series = await ContentClient.GetSeriesAsync(LanguageCode); break;
+                case "tags": _tags = await ContentClient.GetTagsAsync(LanguageCode); break;
+                default: _articles = await ContentClient.GetArticlesAsync(LanguageCode, Topic, SeriesFilter, Tag); break;
+            }
+        }
+        catch (HttpRequestException) { _error = true; }
+        finally { _loading = false; }
+    }
+}

@@ -1,285 +1,323 @@
 @implements IDisposable
+@inject AdminArticlesClient ArticlesClient
 @inject AdminMarkdownClient MarkdownClient
 @inject AdminMediaClient MediaClient
+@inject NavigationManager Navigation
 
 <div class="article-editor" data-active-pane="@_activePane">
     <header class="editor-toolbar surface">
-        <a class="back-link" href="/admin/articles" aria-label="Back to articles">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m15 18-6-6 6-6" />
-            </svg>
-        </a>
-
+        <a class="back-link" href="/admin/articles" aria-label="Back to articles">←</a>
         <label class="title-field">
             <span class="visually-hidden">Article title</span>
-            <input type="text"
-                   placeholder="Untitled article"
-                   autocomplete="off"
-                   @bind="_title"
-                   @bind:event="oninput" />
+            <input type="text" placeholder="Untitled article" autocomplete="off"
+                   @bind="Current.Title" @bind:event="oninput" disabled="@_loading" />
         </label>
-
-        <span class="draft-badge">Draft</span>
-
+        <span class="draft-badge">@Current.Status</span>
         <div class="editor-actions" aria-label="Article actions">
-            <button class="button button-secondary" type="button" disabled title="Saving will be enabled with the backend">Save</button>
-            <button class="button button-primary" type="button" disabled title="Publishing will be enabled with the backend">Publish</button>
-        </div>
-    </header>
-
-    <details class="article-settings surface">
-        <summary>
-            <span class="settings-title">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" />
-                </svg>
-                Article settings
-            </span>
-            <span class="settings-summary">English · URL · taxonomy</span>
-            <svg class="settings-chevron" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m8 10 4 4 4-4" />
-            </svg>
-        </summary>
-
-        <div class="settings-grid">
-            <div class="settings-field">
-                <span class="field-label">Content language</span>
-                <div class="readonly-value">
-                    <span>English</span>
-                    <span class="language-code">en</span>
-                </div>
-                <span class="field-help">The first version supports English content.</span>
-            </div>
-
-            <label class="settings-field">
-                <span class="field-label">URL slug</span>
-                <span class="slug-field">
-                    <span>/articles/</span>
-                    <input type="text"
-                           placeholder="article-slug"
-                           autocomplete="off"
-                           spellcheck="false"
-                           @bind="_slug"
-                           @bind:event="oninput" />
-                </span>
-                <span class="field-help">Public URLs use a readable slug without an ID.</span>
-            </label>
-
-            <div class="settings-field">
-                <span class="field-label">Topics</span>
-                <div class="selection-empty">No topics created yet.</div>
-                <span class="field-help">An article can belong to several topics.</span>
-            </div>
-
-            <div class="settings-field">
-                <span class="field-label">Series</span>
-                <div class="selection-empty">No series created yet.</div>
-                <span class="field-help">An article can belong to several series.</span>
-            </div>
-
-            <label class="settings-field settings-field-wide">
-                <span class="field-label">Tags</span>
-                <input class="text-field"
-                       type="text"
-                       placeholder="Separate tags with commas"
-                       autocomplete="off"
-                       @bind="_tags"
-                       @bind:event="oninput" />
-                <span class="field-help">Tags will be created when the article is saved.</span>
-            </label>
-        </div>
-    </details>
-
-    <nav class="editor-tabs" aria-label="Editor view">
-        <button type="button"
-                aria-selected="@(_activePane == EditorPane.Edit)"
-                @onclick="() => _activePane = EditorPane.Edit">
-            Edit
-        </button>
-        <button type="button"
-                aria-selected="@(_activePane == EditorPane.Preview)"
-                @onclick="() => _activePane = EditorPane.Preview">
-            Preview
-        </button>
-    </nav>
-
-    <div class="editor-workspace surface">
-        <section class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
-            <header class="pane-heading" id="markdown-heading">
-                <span>Markdown</span>
-                <span class="pane-tools">
-                    <span class="pane-hint">Plain text</span>
-                    <label class="image-upload" aria-disabled="@_imageUploading">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 5v14M5 12h14" />
-                        </svg>
-                        @(_imageUploading ? "Uploading…" : "Add image")
-                        <InputFile OnChange="HandleImageSelected"
-                                   accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp"
-                                   disabled="@_imageUploading" />
-                    </label>
-                </span>
-            </header>
-            @if (_imageUploadError is not null)
+            <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="SaveAsync">Save</button>
+            @if (Current.Status == PublicationStatusDto.Published)
             {
-                <div class="upload-error" role="alert">@_imageUploadError</div>
-            }
-            <label class="visually-hidden" for="article-markdown">Article Markdown</label>
-            <textarea id="article-markdown"
-                      placeholder="Start writing in Markdown…"
-                      spellcheck="true"
-                      value="@_markdown"
-                      @oninput="HandleMarkdownInput"></textarea>
-        </section>
-
-        <section class="editor-pane preview-pane" aria-labelledby="preview-heading" aria-live="polite">
-            <header class="pane-heading" id="preview-heading">
-                <span>Preview</span>
-                <span class="pane-hint">Live</span>
-            </header>
-
-            @if (string.IsNullOrWhiteSpace(_markdown))
-            {
-                <div class="preview-empty">
-                    <svg viewBox="0 0 64 64" aria-hidden="true">
-                        <path d="M12 10h28l12 12v32H12z" />
-                        <path d="M40 10v14h12M21 34h22M21 42h16" />
-                    </svg>
-                    <h2>Nothing to preview yet</h2>
-                    <p>Start writing to see the rendered article.</p>
-                </div>
-            }
-            else if (_previewLoading)
-            {
-                <div class="preview-status" role="status">Rendering preview…</div>
-            }
-            else if (_previewError is not null)
-            {
-                <div class="preview-status preview-error" role="alert">
-                    @_previewError
-                </div>
+                <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="UnpublishAsync">Unpublish</button>
             }
             else
             {
-                <article class="article-preview">
-                    @((MarkupString)_renderedHtml)
-                </article>
+                <button class="button button-primary" type="button" disabled="@IsBusy" @onclick="PublishAsync">Publish</button>
             }
-        </section>
-    </div>
+        </div>
+    </header>
+
+    @if (_loading)
+    {
+        <div class="editor-message surface" role="status">Loading article…</div>
+    }
+    else
+    {
+        @if (_message is not null)
+        {
+            <div class="editor-message surface @(_hasError ? "message-error" : null)" role="@(_hasError ? "alert" : "status")">@_message</div>
+        }
+
+        <nav class="language-tabs surface" aria-label="Article localizations">
+            @foreach (var localization in _localizations.Values)
+            {
+                <button type="button" aria-current="@(localization.LanguageCode == _activeLanguage ? "true" : null)"
+                        @onclick="() => SelectLanguage(localization.LanguageCode)">
+                    @localization.LanguageCode.ToUpperInvariant() <span>@localization.Status</span>
+                </button>
+            }
+            @foreach (var language in SupportedLanguages.Where(language => !_localizations.ContainsKey(language)))
+            {
+                <button class="add-language" type="button" @onclick="() => AddLanguage(language)">+ @language.ToUpperInvariant()</button>
+            }
+        </nav>
+
+        <details class="article-settings surface">
+            <summary>
+                <span class="settings-title">Article settings</span>
+                <span class="settings-summary">@Current.LanguageCode.ToUpperInvariant() · URL · taxonomy</span>
+            </summary>
+            <div class="settings-grid">
+                <div class="settings-field">
+                    <span class="field-label">Content language</span>
+                    <div class="readonly-value"><span>@LanguageName(Current.LanguageCode)</span><span class="language-code">@Current.LanguageCode</span></div>
+                    <span class="field-help">Each localization is a separate version with its own public link.</span>
+                </div>
+                <label class="settings-field">
+                    <span class="field-label">URL slug</span>
+                    <span class="slug-field"><span>/@Current.LanguageCode/articles/</span>
+                        <input type="text" placeholder="article-slug" autocomplete="off" spellcheck="false"
+                               @bind="Current.Slug" @bind:event="oninput" />
+                    </span>
+                </label>
+                <label class="settings-field settings-field-wide">
+                    <span class="field-label">Summary</span>
+                    <textarea class="summary-field" rows="3" placeholder="Short description for article lists"
+                              @bind="Current.Summary" @bind:event="oninput"></textarea>
+                </label>
+                <div class="settings-field">
+                    <span class="field-label">Topics</span>
+                    @if (_taxonomy.Topics.Count == 0)
+                    {
+                        <div class="selection-empty">No topics created yet.</div>
+                    }
+                    else
+                    {
+                        <div class="choice-list">
+                            @foreach (var topic in _taxonomy.Topics)
+                            {
+                                <label><input type="checkbox" checked="@_topicIds.Contains(topic.Id)" @onchange="eventArgs => ToggleTopic(topic.Id, eventArgs)" /> @TaxonomyName(topic.Localizations.Select(x => (x.LanguageCode, x.Name)))</label>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="settings-field">
+                    <span class="field-label">Series</span>
+                    @if (_taxonomy.Series.Count == 0)
+                    {
+                        <div class="selection-empty">No series created yet.</div>
+                    }
+                    else
+                    {
+                        <div class="choice-list">
+                            @foreach (var series in _taxonomy.Series)
+                            {
+                                <label>
+                                    <input type="checkbox" checked="@_series.ContainsKey(series.Id)" @onchange="eventArgs => ToggleSeries(series.Id, eventArgs)" />
+                                    @TaxonomyName(series.Localizations.Select(x => (x.LanguageCode, x.Title)))
+                                    @if (_series.TryGetValue(series.Id, out var position))
+                                    {
+                                        <input class="position-field" type="number" min="1" value="@position" @onchange="eventArgs => SetSeriesPosition(series.Id, eventArgs)" aria-label="Position in series" />
+                                    }
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+                <label class="settings-field settings-field-wide">
+                    <span class="field-label">Tags</span>
+                    <input class="text-field" type="text" placeholder="Separate tags with commas" autocomplete="off"
+                           @bind="_tags" @bind:event="oninput" />
+                </label>
+            </div>
+        </details>
+
+        <nav class="editor-tabs" aria-label="Editor view">
+            <button type="button" aria-selected="@(_activePane == EditorPane.Edit)" @onclick="() => _activePane = EditorPane.Edit">Edit</button>
+            <button type="button" aria-selected="@(_activePane == EditorPane.Preview)" @onclick="() => _activePane = EditorPane.Preview">Preview</button>
+        </nav>
+        <div class="editor-workspace surface">
+            <section class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
+                <header class="pane-heading" id="markdown-heading">
+                    <span>Markdown</span>
+                    <label class="image-upload" aria-disabled="@_imageUploading">
+                        @(_imageUploading ? "Uploading…" : "+ Add image")
+                        <InputFile OnChange="HandleImageSelected" accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" disabled="@_imageUploading" />
+                    </label>
+                </header>
+                @if (_imageUploadError is not null) { <div class="upload-error" role="alert">@_imageUploadError</div> }
+                <label class="visually-hidden" for="article-markdown">Article Markdown</label>
+                <textarea id="article-markdown" placeholder="Start writing in Markdown…" spellcheck="true" value="@Current.Markdown" @oninput="HandleMarkdownInput"></textarea>
+            </section>
+            <section class="editor-pane preview-pane" aria-labelledby="preview-heading" aria-live="polite">
+                <header class="pane-heading" id="preview-heading"><span>Preview</span><span class="pane-hint">Live</span></header>
+                @if (string.IsNullOrWhiteSpace(Current.Markdown))
+                {
+                    <div class="preview-empty"><h2>Nothing to preview yet</h2><p>Start writing to see the rendered article.</p></div>
+                }
+                else if (_previewLoading) { <div class="preview-status" role="status">Rendering preview…</div> }
+                else if (_previewError is not null) { <div class="preview-status preview-error" role="alert">@_previewError</div> }
+                else { <article class="article-preview">@((MarkupString)_renderedHtml)</article> }
+            </section>
+        </div>
+    }
 </div>
 
 @code {
-    private string _markdown = string.Empty;
-    private string _renderedHtml = string.Empty;
+    [Parameter] public Guid? ArticleId { get; set; }
+    private static readonly string[] SupportedLanguages = ["en", "ru"];
+    private readonly Dictionary<string, LocalizationModel> _localizations = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<Guid> _topicIds = [];
+    private readonly Dictionary<Guid, int> _series = [];
+    private AdminTaxonomyDto _taxonomy = new([], [], []);
+    private string _activeLanguage = "en";
+    private string _tags = "";
+    private string _renderedHtml = "";
     private string? _previewError;
     private string? _imageUploadError;
-    private string _title = string.Empty;
-    private string _slug = string.Empty;
-    private string _tags = string.Empty;
-    private EditorPane _activePane = EditorPane.Edit;
-    private CancellationTokenSource? _previewCancellation;
+    private string? _message;
+    private bool _hasError;
+    private bool _loading = true;
+    private bool _saving;
     private bool _previewLoading;
     private bool _imageUploading;
+    private EditorPane _activePane = EditorPane.Edit;
+    private CancellationTokenSource? _previewCancellation;
+    private LocalizationModel Current => _localizations[_activeLanguage];
+    private bool IsBusy => _loading || _saving;
 
-    private async Task HandleMarkdownInput(ChangeEventArgs eventArgs)
+    protected override async Task OnInitializedAsync()
     {
-        _markdown = eventArgs.Value?.ToString() ?? string.Empty;
-        await RefreshPreview();
+        _localizations["en"] = new("en");
+        try
+        {
+            _taxonomy = await ArticlesClient.GetTaxonomyAsync();
+            if (ArticleId is { } articleId)
+            {
+                var article = await ArticlesClient.GetArticleAsync(articleId);
+                _localizations.Clear();
+                foreach (var localization in article.Localizations) _localizations[localization.LanguageCode] = new(localization);
+                _activeLanguage = _localizations.Keys.FirstOrDefault() ?? "en";
+                if (_localizations.Count == 0) _localizations["en"] = new("en");
+                _topicIds.UnionWith(article.TopicIds);
+                foreach (var assignment in article.Series) _series[assignment.SeriesId] = assignment.Position;
+                _tags = string.Join(", ", article.Tags);
+                await RefreshPreview();
+            }
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException) { ShowMessage(exception.Message, true); }
+        finally { _loading = false; }
     }
+
+    private void SelectLanguage(string languageCode) { _activeLanguage = languageCode; _renderedHtml = ""; _ = RefreshPreview(); }
+    private void AddLanguage(string languageCode) { _localizations[languageCode] = new(languageCode); SelectLanguage(languageCode); }
+
+    private Task SaveAsync() => SaveCoreAsync(navigateAfterCreate: true);
+
+    private async Task SaveCoreAsync(bool navigateAfterCreate)
+    {
+        _saving = true;
+        _message = null;
+        try
+        {
+            var wasNew = ArticleId is null;
+            if (ArticleId is null)
+            {
+                var created = await ArticlesClient.CreateArticleAsync(Current.ToCreateRequest());
+                ArticleId = created.ArticleId;
+            }
+            foreach (var localization in _localizations.Values)
+            {
+                if (!wasNew || localization != Current)
+                    await ArticlesClient.UpdateLocalizationAsync(ArticleId.Value, localization.LanguageCode, localization.ToUpdateRequest());
+            }
+            await ArticlesClient.UpdateTaxonomyAsync(ArticleId.Value, new(
+                _topicIds.ToArray(),
+                _series.Select(item => new SeriesAssignmentRequest(item.Key, item.Value)).ToArray(),
+                ParseTags()));
+            ShowMessage("Article saved.", false);
+            if (wasNew && navigateAfterCreate) Navigation.NavigateTo($"/admin/articles/{ArticleId}", replace: true);
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException) { ShowMessage(exception.Message, true); }
+        finally { _saving = false; }
+    }
+
+    private async Task PublishAsync()
+    {
+        var wasNew = ArticleId is null;
+        await SaveCoreAsync(navigateAfterCreate: false);
+        if (_hasError || ArticleId is null) return;
+        _saving = true;
+        try
+        {
+            await ArticlesClient.PublishAsync(ArticleId.Value, Current.LanguageCode);
+            Current.Status = PublicationStatusDto.Published;
+            ShowMessage("Localization published.", false);
+            if (wasNew) Navigation.NavigateTo($"/admin/articles/{ArticleId}", replace: true);
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException) { ShowMessage(exception.Message, true); }
+        finally { _saving = false; }
+    }
+
+    private async Task UnpublishAsync()
+    {
+        if (ArticleId is null) return;
+        _saving = true;
+        try { await ArticlesClient.UnpublishAsync(ArticleId.Value, Current.LanguageCode); Current.Status = PublicationStatusDto.Draft; ShowMessage("Localization returned to draft.", false); }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException) { ShowMessage(exception.Message, true); }
+        finally { _saving = false; }
+    }
+
+    private async Task HandleMarkdownInput(ChangeEventArgs eventArgs) { Current.Markdown = eventArgs.Value?.ToString() ?? ""; await RefreshPreview(); }
 
     private async Task HandleImageSelected(InputFileChangeEventArgs eventArgs)
     {
         var file = eventArgs.File;
         _imageUploading = true;
         _imageUploadError = null;
-
         try
         {
             await using var content = file.OpenReadStream(MediaUploadLimits.MaximumFileSize);
-            var uploaded = await MediaClient.UploadAsync(
-                content,
-                file.Name,
-                file.ContentType);
-            var altText = Path.GetFileNameWithoutExtension(file.Name)
-                .Replace("[", string.Empty, StringComparison.Ordinal)
-                .Replace("]", string.Empty, StringComparison.Ordinal);
-            var separator = string.IsNullOrEmpty(_markdown)
-                ? string.Empty
-                : _markdown.EndsWith('\n') ? "\n" : "\n\n";
-            _markdown += $"{separator}![{altText}]({uploaded.Url})";
+            var uploaded = await MediaClient.UploadAsync(content, file.Name, file.ContentType);
+            var alt = Path.GetFileNameWithoutExtension(file.Name).Replace("[", "", StringComparison.Ordinal).Replace("]", "", StringComparison.Ordinal);
+            var separator = string.IsNullOrEmpty(Current.Markdown) ? "" : Current.Markdown.EndsWith('\n') ? "\n" : "\n\n";
+            Current.Markdown += $"{separator}![{alt}]({uploaded.Url})";
             await RefreshPreview();
         }
-        catch (IOException)
-        {
-            _imageUploadError = "The image is larger than 10 MB.";
-        }
-        catch (MediaUploadException exception)
-        {
-            _imageUploadError = exception.Message;
-        }
-        catch (HttpRequestException)
-        {
-            _imageUploadError = "The image upload is temporarily unavailable.";
-        }
-        finally
-        {
-            _imageUploading = false;
-        }
+        catch (IOException) { _imageUploadError = "The image is larger than 10 MB."; }
+        catch (Exception exception) when (exception is MediaUploadException or HttpRequestException) { _imageUploadError = exception.Message; }
+        finally { _imageUploading = false; }
     }
 
     private async Task RefreshPreview()
     {
         _previewCancellation?.Cancel();
         _previewCancellation?.Dispose();
-        _previewCancellation = null;
-
-        if (string.IsNullOrWhiteSpace(_markdown))
-        {
-            _renderedHtml = string.Empty;
-            _previewError = null;
-            _previewLoading = false;
-            return;
-        }
-
+        if (string.IsNullOrWhiteSpace(Current.Markdown)) { _renderedHtml = ""; _previewError = null; _previewLoading = false; return; }
         var cancellation = new CancellationTokenSource();
         _previewCancellation = cancellation;
         _previewLoading = true;
         _previewError = null;
-        StateHasChanged();
-
         try
         {
             await Task.Delay(300, cancellation.Token);
-            var html = await MarkdownClient.PreviewAsync(_markdown, cancellation.Token);
-            if (_previewCancellation == cancellation)
-            {
-                _renderedHtml = html;
-                _previewLoading = false;
-            }
+            var html = await MarkdownClient.PreviewAsync(Current.Markdown, cancellation.Token);
+            if (_previewCancellation == cancellation) { _renderedHtml = html; _previewLoading = false; }
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
-        {
-        }
-        catch (HttpRequestException)
-        {
-            if (_previewCancellation == cancellation)
-            {
-                _previewError = "Preview is temporarily unavailable.";
-                _previewLoading = false;
-            }
-        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (HttpRequestException) { if (_previewCancellation == cancellation) { _previewError = "Preview is temporarily unavailable."; _previewLoading = false; } }
     }
 
-    public void Dispose()
-    {
-        _previewCancellation?.Cancel();
-        _previewCancellation?.Dispose();
-    }
+    private void ToggleTopic(Guid id, ChangeEventArgs args) { if (args.Value is true) _topicIds.Add(id); else _topicIds.Remove(id); }
+    private void ToggleSeries(Guid id, ChangeEventArgs args) { if (args.Value is true) _series.TryAdd(id, 1); else _series.Remove(id); }
+    private void SetSeriesPosition(Guid id, ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out var value) && value > 0) _series[id] = value; }
+    private string TaxonomyName(IEnumerable<(string LanguageCode, string Name)> names) => names.FirstOrDefault(x => x.LanguageCode == _activeLanguage).Name ?? names.FirstOrDefault().Name ?? "Untitled";
+    private static string LanguageName(string languageCode) => languageCode == "ru" ? "Russian" : "English";
+    private string[] ParseTags() => _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    private void ShowMessage(string message, bool error) { _message = message; _hasError = error; }
+    public void Dispose() { _previewCancellation?.Cancel(); _previewCancellation?.Dispose(); }
 
-    private enum EditorPane
+    private sealed class LocalizationModel
     {
-        Edit,
-        Preview
+        public LocalizationModel(string languageCode) => LanguageCode = languageCode;
+        public LocalizationModel(AdminArticleLocalizationDto dto) { LanguageCode = dto.LanguageCode; Title = dto.Title; Summary = dto.Summary ?? ""; Markdown = dto.Markdown; Slug = dto.Slug ?? ""; Status = dto.Status; }
+        public string LanguageCode { get; }
+        public string Title { get; set; } = "";
+        public string Summary { get; set; } = "";
+        public string Markdown { get; set; } = "";
+        public string Slug { get; set; } = "";
+        public PublicationStatusDto Status { get; set; } = PublicationStatusDto.Draft;
+        public CreateArticleRequest ToCreateRequest() => new(LanguageCode, Title, Summary, Markdown, Slug);
+        public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Markdown, Slug);
     }
+    private enum EditorPane { Edit, Preview }
 }

@@ -1,0 +1,23 @@
+.articles-page { min-height: calc(100vh - 4.75rem); padding-block: var(--space-12); }
+.page-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-6); margin-bottom: var(--space-8); }
+.page-heading h1 { margin: var(--space-2) 0; font-size: var(--text-3xl); }
+.page-heading p { max-width: 42rem; margin: 0; }
+.state { min-height: 20rem; display: grid; place-items: center; align-content: center; gap: var(--space-3); padding: var(--space-8); text-align: center; }
+.state h2, .state p { margin: 0; }
+.state .button { margin-top: var(--space-3); }
+.error { color: var(--color-danger, #b42318); }
+.article-list { overflow: hidden; }
+.article-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-5); }
+.article-row + .article-row { border-top: 1px solid var(--color-border); }
+.article-link { min-width: 0; display: grid; gap: var(--space-1); color: var(--color-text); text-decoration: none; }
+.article-link:hover strong { color: var(--color-accent); }
+.article-link span, time { color: var(--color-text-muted); font-size: var(--text-xs); }
+.delete-button { border: 0; background: transparent; color: var(--color-text-muted); cursor: pointer; }
+.delete-button:hover { color: var(--color-danger, #b42318); }
+@media (max-width: 42rem) {
+    .articles-page { padding-block: var(--space-8); }
+    .page-heading { align-items: stretch; flex-direction: column; }
+    .article-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .article-row time { grid-column: 1; grid-row: 2; }
+    .delete-button { grid-column: 2; grid-row: 1 / 3; }
+}

@@ -1,0 +1,14 @@
+@page "/admin/articles/{ArticleId:guid}"
+@layout AdminLayout
+
+<PageTitle>Edit article · Gaifulin Lab Admin</PageTitle>
+
+<section class="editor-page" aria-labelledby="editor-title">
+    <h1 class="visually-hidden" id="editor-title">Edit article</h1>
+    <ArticleEditor ArticleId="ArticleId" @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+</section>
+
+@code {
+    [Parameter]
+    public Guid ArticleId { get; set; }
+}

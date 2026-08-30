@@ -3,22 +3,4 @@
 
 <PageTitle>Articles · Gaifulin Lab Admin</PageTitle>
 
-<section class="articles-page" aria-labelledby="articles-title">
-    <header class="page-heading">
-        <div>
-            <span class="eyebrow">Content</span>
-            <h1 id="articles-title">Articles</h1>
-            <p>Create and manage the engineering notes published by Gaifulin Lab.</p>
-        </div>
-    </header>
-
-    <div class="empty-state surface">
-        <svg viewBox="0 0 64 64" aria-hidden="true">
-            <path d="M18 8h20l10 10v38H18z" />
-            <path d="M38 8v12h10M25 31h16M25 39h16M25 47h10" />
-        </svg>
-        <h2>No articles yet</h2>
-        <p>The first draft will appear here after it is created.</p>
-        <a class="button button-primary" href="/admin/articles/new">Create first article</a>
-    </div>
-</section>
+<AdminArticleList @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />

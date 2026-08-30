@@ -1,0 +1,11 @@
+@page "/{LanguageCode}/series/{Slug}"
+
+<PageTitle>Series · Gaifulin Lab</PageTitle>
+
+<PublicSeriesView LanguageCode="@LanguageCode" Slug="@Slug"
+                  @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+
+@code {
+    [Parameter] public string LanguageCode { get; set; } = "en";
+    [Parameter] public string Slug { get; set; } = "";
+}

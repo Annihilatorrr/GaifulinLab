@@ -1,0 +1,40 @@
+@inject PublicContentClient ContentClient
+
+<section class="content-overview" aria-label="Gaifulin Lab content">
+    <div class="site-container overview-grid">
+        <section class="overview-column">
+            <header class="overview-heading"><h2>Latest articles</h2><a href="/articles">View all →</a></header>
+            @if (_articles.Count == 0) { <div class="overview-empty"><h3>No articles yet</h3><p>Published engineering notes will appear here.</p></div> }
+            else { @foreach (var article in _articles.Take(3)) { <a class="overview-link surface" href="@($"/{article.LanguageCode}/articles/{article.Slug}")"><strong>@article.Title</strong><span>@article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</span></a> } }
+        </section>
+        <section class="overview-column">
+            <header class="overview-heading"><h2>Browse topics</h2><a href="/topics">All topics →</a></header>
+            @if (_topics.Count == 0) { <div class="overview-empty"><h3>No topics yet</h3><p>Topics will appear after publication.</p></div> }
+            else { @foreach (var topic in _topics.Take(5)) { <a class="overview-link surface" href="@($"/articles?topic={Uri.EscapeDataString(topic.Slug)}")"><strong>@topic.Name</strong><span>@topic.ArticleCount article(s)</span></a> } }
+        </section>
+        <section class="overview-column">
+            <header class="overview-heading"><h2>Featured series</h2><a href="/series">All series →</a></header>
+            @if (_series.Count == 0) { <div class="overview-empty"><h3>No series yet</h3><p>Series will appear after publication.</p></div> }
+            else { @foreach (var series in _series.Take(5)) { <a class="overview-link surface" href="@($"/{series.LanguageCode}/series/{series.Slug}")"><strong>@series.Title</strong><span>@series.ArticleCount article(s)</span></a> } }
+        </section>
+    </div>
+</section>
+
+@code {
+    [Parameter] public string LanguageCode { get; set; } = "en";
+    private IReadOnlyList<PublicArticleListItemDto> _articles = [];
+    private IReadOnlyList<PublicTopicDto> _topics = [];
+    private IReadOnlyList<PublicSeriesListItemDto> _series = [];
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var requests = new Task[] { LoadArticles(), LoadTopics(), LoadSeries() };
+            await Task.WhenAll(requests);
+        }
+        catch (HttpRequestException) { }
+    }
+    private async Task LoadArticles() => _articles = await ContentClient.GetArticlesAsync(LanguageCode);
+    private async Task LoadTopics() => _topics = await ContentClient.GetTopicsAsync(LanguageCode);
+    private async Task LoadSeries() => _series = await ContentClient.GetSeriesAsync(LanguageCode);
+}

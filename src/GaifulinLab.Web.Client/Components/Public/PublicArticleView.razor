@@ -1,0 +1,37 @@
+@inject PublicContentClient ContentClient
+
+<main id="main-content" class="site-main article-page">
+    <div class="site-container article-layout">
+        @if (_loading) { <div role="status">Loading article…</div> }
+        else if (_article is null) { <div class="not-found surface"><h1>Article not found</h1><p>This localization is not published or does not exist.</p><a href="/articles">Back to articles</a></div> }
+        else
+        {
+            <header class="article-header">
+                <time datetime="@_article.PublishedAt.ToString("O")">@_article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                <h1>@_article.Title</h1>
+                @if (!string.IsNullOrWhiteSpace(_article.Summary)) { <p>@_article.Summary</p> }
+                @if (_article.AvailableLocalizations.Count > 1)
+                {
+                    <nav aria-label="Available localizations">
+                        @foreach (var localization in _article.AvailableLocalizations) { <a href="@localization.Url">@localization.LanguageCode.ToUpperInvariant()</a> }
+                    </nav>
+                }
+            </header>
+            <article class="article-body">@((MarkupString)_article.Html)</article>
+        }
+    </div>
+</main>
+
+@code {
+    [Parameter, EditorRequired] public string LanguageCode { get; set; } = "en";
+    [Parameter, EditorRequired] public string Slug { get; set; } = "";
+    private PublicArticleDetailsDto? _article;
+    private bool _loading = true;
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        try { _article = await ContentClient.GetArticleAsync(LanguageCode, Slug); }
+        catch (HttpRequestException) { _article = null; }
+        finally { _loading = false; }
+    }
+}
