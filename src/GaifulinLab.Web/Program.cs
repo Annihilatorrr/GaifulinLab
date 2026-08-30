@@ -1,19 +1,10 @@
 using System.Threading.RateLimiting;
 using GaifulinLab.Application;
 using GaifulinLab.Infrastructure;
-using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Infrastructure.Persistence;
 using GaifulinLab.Web.Components;
 using GaifulinLab.Web.Endpoints;
 using Microsoft.AspNetCore.RateLimiting;
-
-if (args is ["--hash-admin-password"])
-{
-    var password = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
-    ArgumentException.ThrowIfNullOrWhiteSpace(password);
-    Console.WriteLine(new AdminPasswordHasher().Hash(password));
-    return;
-}
 
 var builder = WebApplication.CreateBuilder(args);
 

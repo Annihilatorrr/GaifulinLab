@@ -11,7 +11,7 @@ $script:DeploymentConfiguration = [PSCustomObject]@{
     DefaultRemoteUser = 'v3rt3x'
     DefaultRemoteHost = '192.168.50.11'
     RemoteDirectoryName = 'gaifulinlab'
-    RepositoryMarkerPath = 'src/GaifulinLab.Web/GaifulinLab.Web.csproj'
+    RepositoryMarkerPath = 'src/GaifulinLab.Api/GaifulinLab.Api.csproj'
     RequiredProductionEnvironmentKeys = @(
         'GAIFULINLAB_PUBLIC_ORIGIN',
         'GAIFULINLAB_DB_HOST',

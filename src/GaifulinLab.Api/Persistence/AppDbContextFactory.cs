@@ -2,7 +2,7 @@ using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace GaifulinLab.Web.Persistence;
+namespace GaifulinLab.Api.Persistence;
 
 public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {

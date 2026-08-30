@@ -66,7 +66,7 @@ endpoint — `localhost:5435`. Данные сохраняются в Docker vol
 dotnet tool restore
 dotnet ef database update `
   --project src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj `
-  --startup-project src/GaifulinLab.Web/GaifulinLab.Web.csproj
+  --startup-project src/GaifulinLab.Api/GaifulinLab.Api.csproj
 ```
 
 ## Первый production setup

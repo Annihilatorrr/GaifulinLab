@@ -17,7 +17,7 @@ ENV_FILE="$DEPLOYMENT_DIR/.env"
 # этими общими настройками и поэтому может оставаться одинаковым в приложениях.
 APPLICATION_NAME="GaifulinLab"
 MIGRATION_PROJECT_PATH="src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj"
-MIGRATION_STARTUP_PROJECT_PATH="src/GaifulinLab.Web/GaifulinLab.Web.csproj"
+MIGRATION_STARTUP_PROJECT_PATH="src/GaifulinLab.Api/GaifulinLab.Api.csproj"
 DOTNET_SDK_IMAGE="mcr.microsoft.com/dotnet/sdk:10.0"
 DOTNET_EF_VERSION="10.0.9"
 DB_HOST_ENV_KEY="GAIFULINLAB_DB_HOST"
