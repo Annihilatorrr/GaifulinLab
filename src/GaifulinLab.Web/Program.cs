@@ -10,6 +10,9 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
+var apiBaseAddress = new Uri(
+    new Uri(builder.HostEnvironment.BaseAddress),
+    builder.Configuration["Api:BaseUrl"] ?? "/");
 
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
@@ -31,7 +34,7 @@ builder.Services.AddScoped(serviceProvider =>
 
     return new HttpClient(handler)
     {
-        BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+        BaseAddress = apiBaseAddress
     };
 });
 builder.Services.AddScoped<AdminAuthClient>();

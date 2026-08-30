@@ -93,6 +93,7 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("JWT_SIGNING_KEY", "test-signing-key-that-is-at-least-32-bytes-long");
         builder.UseSetting("JWT_LIFETIME_MINUTES", "5");
         builder.UseSetting("MEDIA_STORAGE_PATH", _mediaStoragePath);
+        builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5172");
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();

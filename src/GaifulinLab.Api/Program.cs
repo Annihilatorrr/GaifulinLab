@@ -21,6 +21,16 @@ builder.Services.AddControllers(options => options.Filters.Add<ApiExceptionFilte
 builder.Services.AddProblemDetails();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+if (corsOrigins.Length > 0)
+{
+    builder.Services.AddCors(options => options.AddPolicy(
+        ApiCorsPolicies.Frontend,
+        policy => policy
+            .WithOrigins(corsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()));
+}
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -52,6 +62,11 @@ if (!app.Environment.IsDevelopment())
 if (app.Configuration.GetValue("HTTPS_REDIRECT_ENABLED", true))
 {
     app.UseHttpsRedirection();
+}
+
+if (corsOrigins.Length > 0)
+{
+    app.UseCors(ApiCorsPolicies.Frontend);
 }
 
 app.UseAuthentication();
