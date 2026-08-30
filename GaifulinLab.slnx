@@ -8,6 +8,7 @@
     <Project Path="src/GaifulinLab.Web/GaifulinLab.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/GaifulinLab.Architecture.Tests/GaifulinLab.Architecture.Tests.csproj" />
     <Project Path="tests/GaifulinLab.Domain.Tests/GaifulinLab.Domain.Tests.csproj" />
     <Project Path="tests/GaifulinLab.Infrastructure.Tests/GaifulinLab.Infrastructure.Tests.csproj" />
     <Project Path="tests/GaifulinLab.Api.Tests/GaifulinLab.Api.Tests.csproj" />
