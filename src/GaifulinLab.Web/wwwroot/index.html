@@ -10,7 +10,36 @@
     <link rel="stylesheet" href="GaifulinLab.Web.styles.css" />
 </head>
 <body>
-    <div id="app">Loading…</div>
+    <div id="app">
+        <div class="app-preloader" role="status" aria-live="polite" aria-label="Loading Gaifulin Lab">
+            <div class="app-preloader__wave" aria-hidden="true">
+                <div class="app-preloader__bars">
+                    <span style="--bar-height: 12%; --bar-delay: -0.08s"></span>
+                    <span style="--bar-height: 24%; --bar-delay: -0.16s"></span>
+                    <span style="--bar-height: 38%; --bar-delay: -0.24s"></span>
+                    <span style="--bar-height: 66%; --bar-delay: -0.32s"></span>
+                    <span style="--bar-height: 44%; --bar-delay: -0.40s"></span>
+                    <span style="--bar-height: 30%; --bar-delay: -0.48s"></span>
+                    <span style="--bar-height: 54%; --bar-delay: -0.56s"></span>
+                    <span style="--bar-height: 86%; --bar-delay: -0.64s"></span>
+                    <span style="--bar-height: 58%; --bar-delay: -0.72s"></span>
+                    <span style="--bar-height: 42%; --bar-delay: -0.80s"></span>
+                    <span style="--bar-height: 68%; --bar-delay: -0.88s"></span>
+                    <span style="--bar-height: 100%; --bar-delay: -0.96s"></span>
+                    <span style="--bar-height: 64%; --bar-delay: -1.04s"></span>
+                    <span style="--bar-height: 46%; --bar-delay: -1.12s"></span>
+                    <span style="--bar-height: 72%; --bar-delay: -1.20s"></span>
+                    <span style="--bar-height: 50%; --bar-delay: -1.28s"></span>
+                    <span style="--bar-height: 34%; --bar-delay: -1.36s"></span>
+                    <span style="--bar-height: 56%; --bar-delay: -1.44s"></span>
+                    <span style="--bar-height: 36%; --bar-delay: -1.52s"></span>
+                    <span style="--bar-height: 22%; --bar-delay: -1.60s"></span>
+                    <span style="--bar-height: 12%; --bar-delay: -1.68s"></span>
+                </div>
+            </div>
+            <p class="app-preloader__label">Loading the lab<span aria-hidden="true">...</span></p>
+        </div>
+    </div>
 
     <div id="blazor-error-ui" data-nosnippet>
         An unhandled error has occurred.

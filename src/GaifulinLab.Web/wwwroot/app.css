@@ -1,6 +1,156 @@
 @import url("css/tokens.css");
 @import url("css/base.css");
 
+#app:has(.app-preloader) {
+    min-height: 100vh;
+}
+
+.app-preloader {
+    display: grid;
+    min-height: 100vh;
+    place-content: center;
+    justify-items: center;
+    gap: clamp(1.5rem, 4vh, 2.5rem);
+    padding: var(--site-gutter);
+    background:
+        radial-gradient(circle at 50% 43%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 30rem),
+        var(--color-background);
+}
+
+.app-preloader__wave {
+    display: flex;
+    width: min(44rem, calc(100vw - (2 * var(--site-gutter))));
+    align-items: center;
+    gap: clamp(0.75rem, 3vw, 2rem);
+    filter: drop-shadow(0 0 0.65rem color-mix(in srgb, var(--color-accent) 26%, transparent));
+}
+
+.app-preloader__wave::before,
+.app-preloader__wave::after {
+    height: 2px;
+    flex: 1;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(90deg, transparent, var(--color-accent), #7d3cff, transparent);
+    background-size: 200% 100%;
+    content: "";
+    animation: preloader-line-flow 1.8s linear infinite;
+}
+
+.app-preloader__wave::after {
+    animation-direction: reverse;
+}
+
+.app-preloader__bars {
+    display: flex;
+    width: clamp(12rem, 47vw, 22rem);
+    height: clamp(3.75rem, 9vw, 5.75rem);
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(0.2rem, 0.55vw, 0.42rem);
+}
+
+.app-preloader__bars span {
+    width: clamp(2px, 0.55vw, 4px);
+    height: var(--bar-height);
+    border-radius: var(--radius-pill);
+    background: linear-gradient(180deg, #2d72ff, #7d3cff);
+    box-shadow: 0 0 0.5rem color-mix(in srgb, var(--color-accent) 35%, transparent);
+    animation: preloader-wave-pulse 1.05s ease-in-out var(--bar-delay) infinite alternate;
+    transform-origin: center;
+}
+
+.app-preloader__label {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.app-preloader__label span {
+    display: inline-block;
+    width: 1.15em;
+    overflow: hidden;
+    vertical-align: bottom;
+    animation: preloader-ellipsis 1.5s steps(4, end) infinite;
+}
+
+@keyframes preloader-wave-pulse {
+    0% {
+        opacity: 0.42;
+        transform: scaleY(0.32);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+}
+
+@keyframes preloader-line-flow {
+    to {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes preloader-ellipsis {
+    from {
+        width: 0;
+    }
+
+    to {
+        width: 1.15em;
+    }
+}
+
+#blazor-error-ui {
+    position: fixed;
+    z-index: 2000;
+    right: var(--site-gutter);
+    bottom: var(--site-gutter);
+    left: var(--site-gutter);
+    display: none;
+    max-width: 42rem;
+    margin-inline: auto;
+    border: 1px solid color-mix(in srgb, var(--color-danger) 34%, var(--color-border));
+    border-radius: var(--radius-md);
+    padding: 0.9rem 3.25rem 0.9rem 1rem;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+}
+
+#blazor-error-ui .reload {
+    margin-left: var(--space-2);
+    font-weight: 700;
+}
+
+#blazor-error-ui .dismiss {
+    position: absolute;
+    top: 50%;
+    right: 0.75rem;
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    cursor: pointer;
+    place-items: center;
+    transform: translateY(-50%);
+}
+
+#blazor-error-ui .dismiss:hover {
+    background: var(--color-surface-subtle);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-preloader__bars span {
+        opacity: 0.82;
+        transform: none;
+    }
+}
+
 .blazor-error-boundary {
     padding: var(--space-4);
     background: var(--color-danger);
