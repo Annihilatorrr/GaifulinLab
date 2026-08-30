@@ -1,5 +1,6 @@
 @implements IDisposable
 @inject AdminMarkdownClient MarkdownClient
+@inject AdminMediaClient MediaClient
 
 <div class="article-editor" data-active-pane="@_activePane">
     <header class="editor-toolbar surface">
@@ -106,8 +107,23 @@
         <section class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
             <header class="pane-heading" id="markdown-heading">
                 <span>Markdown</span>
-                <span class="pane-hint">Plain text</span>
+                <span class="pane-tools">
+                    <span class="pane-hint">Plain text</span>
+                    <label class="image-upload" aria-disabled="@_imageUploading">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        @(_imageUploading ? "Uploading…" : "Add image")
+                        <InputFile OnChange="HandleImageSelected"
+                                   accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp"
+                                   disabled="@_imageUploading" />
+                    </label>
+                </span>
             </header>
+            @if (_imageUploadError is not null)
+            {
+                <div class="upload-error" role="alert">@_imageUploadError</div>
+            }
             <label class="visually-hidden" for="article-markdown">Article Markdown</label>
             <textarea id="article-markdown"
                       placeholder="Start writing in Markdown…"
@@ -157,16 +173,63 @@
     private string _markdown = string.Empty;
     private string _renderedHtml = string.Empty;
     private string? _previewError;
+    private string? _imageUploadError;
     private string _title = string.Empty;
     private string _slug = string.Empty;
     private string _tags = string.Empty;
     private EditorPane _activePane = EditorPane.Edit;
     private CancellationTokenSource? _previewCancellation;
     private bool _previewLoading;
+    private bool _imageUploading;
 
     private async Task HandleMarkdownInput(ChangeEventArgs eventArgs)
     {
         _markdown = eventArgs.Value?.ToString() ?? string.Empty;
+        await RefreshPreview();
+    }
+
+    private async Task HandleImageSelected(InputFileChangeEventArgs eventArgs)
+    {
+        var file = eventArgs.File;
+        _imageUploading = true;
+        _imageUploadError = null;
+
+        try
+        {
+            await using var content = file.OpenReadStream(MediaUploadLimits.MaximumFileSize);
+            var uploaded = await MediaClient.UploadAsync(
+                content,
+                file.Name,
+                file.ContentType);
+            var altText = Path.GetFileNameWithoutExtension(file.Name)
+                .Replace("[", string.Empty, StringComparison.Ordinal)
+                .Replace("]", string.Empty, StringComparison.Ordinal);
+            var separator = string.IsNullOrEmpty(_markdown)
+                ? string.Empty
+                : _markdown.EndsWith('\n') ? "\n" : "\n\n";
+            _markdown += $"{separator}![{altText}]({uploaded.Url})";
+            await RefreshPreview();
+        }
+        catch (IOException)
+        {
+            _imageUploadError = "The image is larger than 10 MB.";
+        }
+        catch (MediaUploadException exception)
+        {
+            _imageUploadError = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            _imageUploadError = "The image upload is temporarily unavailable.";
+        }
+        finally
+        {
+            _imageUploading = false;
+        }
+    }
+
+    private async Task RefreshPreview()
+    {
         _previewCancellation?.Cancel();
         _previewCancellation?.Dispose();
         _previewCancellation = null;

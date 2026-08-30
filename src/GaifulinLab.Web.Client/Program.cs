@@ -1,5 +1,6 @@
 using GaifulinLab.Web.Client.Authentication;
 using GaifulinLab.Web.Client.Content;
+using GaifulinLab.Web.Client.Media;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
@@ -28,5 +29,6 @@ builder.Services.AddScoped(serviceProvider =>
 });
 builder.Services.AddScoped<AdminAuthClient>();
 builder.Services.AddScoped<AdminMarkdownClient>();
+builder.Services.AddScoped<AdminMediaClient>();
 
 await builder.Build().RunAsync();

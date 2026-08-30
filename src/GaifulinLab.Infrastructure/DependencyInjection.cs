@@ -1,7 +1,9 @@
 using GaifulinLab.Application.Content;
+using GaifulinLab.Application.Media;
 using GaifulinLab.Application.Persistence;
 using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Infrastructure.Content;
+using GaifulinLab.Infrastructure.Media;
 using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -28,6 +30,10 @@ public static class DependencyInjection
         services.AddScoped<IAppDbContext>(serviceProvider =>
             serviceProvider.GetRequiredService<AppDbContext>());
         services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
+        services.AddSingleton<IMediaStorage>(_ => new FileSystemMediaStorage(
+            configuration["MEDIA_STORAGE_PATH"]
+            ?? configuration["MediaStorage:RootPath"]
+            ?? Path.Combine(AppContext.BaseDirectory, "media")));
 
         services.AddAdminAuthentication(configuration);
 

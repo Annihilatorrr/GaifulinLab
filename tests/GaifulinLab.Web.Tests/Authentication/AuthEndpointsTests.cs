@@ -72,6 +72,10 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
     public const string AdminLogin = "admin";
     public const string AdminPassword = "correct-horse-battery-staple";
 
+    private readonly string _mediaStoragePath = Path.Combine(
+        Path.GetTempPath(),
+        $"gaifulinlab-web-media-tests-{Guid.NewGuid():N}");
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         var passwordHash = new AdminPasswordHasher().Hash(AdminPassword);
@@ -88,6 +92,7 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("JWT_AUDIENCE", "GaifulinLab.Tests.Client");
         builder.UseSetting("JWT_SIGNING_KEY", "test-signing-key-that-is-at-least-32-bytes-long");
         builder.UseSetting("JWT_LIFETIME_MINUTES", "5");
+        builder.UseSetting("MEDIA_STORAGE_PATH", _mediaStoragePath);
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>();
@@ -95,5 +100,15 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
             services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase(databaseName));
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        if (Directory.Exists(_mediaStoragePath))
+        {
+            Directory.Delete(_mediaStoragePath, recursive: true);
+        }
     }
 }

@@ -291,6 +291,63 @@
     font-weight: 500;
 }
 
+.pane-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.image-upload {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.6rem;
+    background: var(--color-surface-subtle);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: var(--text-xs);
+    font-weight: 700;
+}
+
+.image-upload:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.image-upload[aria-disabled="true"] {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.image-upload svg {
+    width: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 2;
+}
+
+.image-upload ::deep input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.upload-error {
+    border-bottom: 1px solid color-mix(in srgb, #b42318 30%, transparent);
+    padding: var(--space-2) var(--space-5);
+    background: color-mix(in srgb, #b42318 8%, transparent);
+    color: var(--color-danger, #b42318);
+    font-size: var(--text-xs);
+}
+
 #article-markdown {
     width: 100%;
     min-height: 0;
