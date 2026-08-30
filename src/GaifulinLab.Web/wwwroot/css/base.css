@@ -70,6 +70,10 @@ a:hover {
     outline-offset: 3px;
 }
 
+h1[tabindex="-1"]:focus-visible {
+    outline: none;
+}
+
 h1,
 h2,
 h3,
