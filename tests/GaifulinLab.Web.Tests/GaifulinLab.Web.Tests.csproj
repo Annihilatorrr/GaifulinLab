@@ -23,7 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\GaifulinLab.Contracts\GaifulinLab.Contracts.csproj" />
     <ProjectReference Include="..\..\src\GaifulinLab.Infrastructure\GaifulinLab.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\GaifulinLab.Web\GaifulinLab.Web.csproj" />
+    <ProjectReference Include="..\..\src\GaifulinLab.Api\GaifulinLab.Api.csproj" />
   </ItemGroup>
 
 </Project>

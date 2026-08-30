@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using GaifulinLab.Api.Configuration;
+using GaifulinLab.Api.Filters;
 using GaifulinLab.Application;
 using GaifulinLab.Infrastructure;
 using GaifulinLab.Infrastructure.Authentication;
@@ -16,9 +17,8 @@ if (args is ["--hash-admin-password"])
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options => options.Filters.Add<ApiExceptionFilter>());
 builder.Services.AddProblemDetails();
-builder.Services.AddHealthChecks();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddRateLimiter(options =>

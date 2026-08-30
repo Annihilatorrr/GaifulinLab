@@ -8,9 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\GaifulinLab.Application\GaifulinLab.Application.csproj" />
-    <ProjectReference Include="..\GaifulinLab.Contracts\GaifulinLab.Contracts.csproj" />
-    <ProjectReference Include="..\GaifulinLab.Infrastructure\GaifulinLab.Infrastructure.csproj" />
     <ProjectReference Include="..\GaifulinLab.Web.Client\GaifulinLab.Web.Client.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.9" />
   </ItemGroup>
