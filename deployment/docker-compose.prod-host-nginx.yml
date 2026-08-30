@@ -1,11 +1,11 @@
 name: gaifulinlab
 
 services:
-  web:
+  api:
     build:
       context: ..
-      dockerfile: deployment/Dockerfile.web
-    container_name: gaifulinlab-prod-web-host-nginx
+      dockerfile: deployment/Dockerfile.api
+    container_name: gaifulinlab-prod-api-host-nginx
     restart: unless-stopped
     extra_hosts:
       # Linux containers use this alias to reach PostgreSQL installed on the Docker host.
@@ -17,7 +17,7 @@ services:
       ADMIN_LOGIN: ${GAIFULINLAB_ADMIN_LOGIN}
       ADMIN_PASSWORD_HASH: ${GAIFULINLAB_ADMIN_PASSWORD_HASH}
       JWT_ISSUER: ${GAIFULINLAB_JWT_ISSUER:-GaifulinLab}
-      JWT_AUDIENCE: ${GAIFULINLAB_JWT_AUDIENCE:-GaifulinLab.Web.Client}
+      JWT_AUDIENCE: ${GAIFULINLAB_JWT_AUDIENCE:-GaifulinLab.Web}
       JWT_SIGNING_KEY: ${GAIFULINLAB_JWT_SIGNING_KEY:?Set GAIFULINLAB_JWT_SIGNING_KEY in deployment/.env}
       JWT_LIFETIME_MINUTES: ${GAIFULINLAB_JWT_LIFETIME_MINUTES:-30}
       MEDIA_STORAGE_PATH: /app/media
@@ -26,11 +26,22 @@ services:
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
     volumes:
       - ${GAIFULINLAB_MEDIA_HOST_PATH:-./runtime/media}:/app/media
-    # Both binds reach the same ASP.NET host. Host nginx keeps public /api/
-    # routing explicit while the application serves SSR and WebAssembly assets.
+    networks:
+      - gaifulinlab-host-nginx
+
+  web:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.web
+      args:
+        API_BASE_URL: /
+    container_name: gaifulinlab-prod-web-host-nginx
+    restart: unless-stopped
+    depends_on:
+      - api
+    # Bind only to localhost so host nginx remains the public owner of ports 80 and 443.
     ports:
-      - "127.0.0.1:${GAIFULINLAB_HOST_NGINX_BACKEND_HTTP_PORT:-38190}:8080"
-      - "127.0.0.1:${GAIFULINLAB_HOST_NGINX_API_HTTP_PORT:-38191}:8080"
+      - "127.0.0.1:${GAIFULINLAB_HOST_NGINX_BACKEND_HTTP_PORT:-38190}:80"
     networks:
       - gaifulinlab-host-nginx
 

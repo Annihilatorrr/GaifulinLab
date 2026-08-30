@@ -112,7 +112,6 @@ render_nginx_config() {
         -e "s|__GAIFULINLAB_HOST_NGINX_CERT_FILE__|$(deployment_escape_sed "$CERT_FILE")|g" \
         -e "s|__GAIFULINLAB_HOST_NGINX_CERT_KEY__|$(deployment_escape_sed "$CERT_KEY")|g" \
         -e "s|__GAIFULINLAB_HOST_NGINX_BACKEND_HTTP_PORT__|$WEB_PORT|g" \
-        -e "s|__GAIFULINLAB_HOST_NGINX_API_HTTP_PORT__|$API_PORT|g" \
         "$NGINX_TEMPLATE_FILE" > "$NGINX_TEMP_FILE"
 }
 
@@ -194,7 +193,6 @@ DB_PASSWORD="$(deployment_require_env GAIFULINLAB_DB_PASSWORD "$ENV_FILE")"
 PUBLIC_ORIGIN="$(deployment_require_env GAIFULINLAB_PUBLIC_ORIGIN "$ENV_FILE")"
 SERVER_NAMES="$(deployment_require_env GAIFULINLAB_HOST_NGINX_SERVER_NAMES "$ENV_FILE")"
 WEB_PORT="$(deployment_optional_env GAIFULINLAB_HOST_NGINX_BACKEND_HTTP_PORT 38190 "$ENV_FILE")"
-API_PORT="$(deployment_optional_env GAIFULINLAB_HOST_NGINX_API_HTTP_PORT 38191 "$ENV_FILE")"
 CERT_FILE="$(deployment_require_env GAIFULINLAB_HOST_NGINX_CERT_FILE "$ENV_FILE")"
 CERT_KEY="$(deployment_require_env GAIFULINLAB_HOST_NGINX_CERT_KEY "$ENV_FILE")"
 
@@ -209,9 +207,6 @@ MEDIA_HOST_PATH="$(deployment_optional_env GAIFULINLAB_MEDIA_HOST_PATH "$DEPLOYM
 deployment_validate_server_names "$SERVER_NAMES"
 require_port "$DB_PORT" "database port"
 require_port "$WEB_PORT" "web backend port"
-require_port "$API_PORT" "API backend port"
-[[ "$WEB_PORT" != "$API_PORT" ]] \
-    || deployment_fail "Web and API backend ports must differ."
 [[ "$CERT_FILE" = /* && "$CERT_KEY" = /* ]] \
     || deployment_fail "Certificate paths must be absolute."
 [[ "$MEDIA_HOST_PATH" = /* ]] \
@@ -253,8 +248,7 @@ render_nginx_config
 docker compose -p "$COMPOSE_PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \
     up -d --build --remove-orphans
 
-# Опубликовать маршрутизацию только после запуска локального backend-сервиса,
-# затем безопасно применить конфигурацию nginx.
+# Publish the host nginx route only after both private API and Web services start.
 install_nginx_site
 reload_nginx
 

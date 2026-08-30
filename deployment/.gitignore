@@ -16,6 +16,8 @@
 !nginx/*.conf
 !nginx-host/
 !nginx-host/*.conf
+!nginx-web/
+!nginx-web/*.conf
 certs/
 runtime/
 generated/

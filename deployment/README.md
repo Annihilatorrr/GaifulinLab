@@ -33,6 +33,8 @@ deployment/
 │   ├── reset-database.sh
 │   └── setup-certificate.sh
 ├── nginx-host/host-reverse-proxy.conf
+├── nginx-web/gaifulinlab.conf
+├── Dockerfile.api
 ├── Dockerfile.web
 └── docker-compose.prod-host-nginx.yml
 ```
