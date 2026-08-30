@@ -17,6 +17,7 @@ ENV_FILE="$DEPLOYMENT_DIR/.env"
 # этими общими настройками и поэтому может оставаться одинаковым в приложениях.
 APPLICATION_NAME="GaifulinLab"
 MIGRATION_PROJECT_PATH="src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj"
+MIGRATION_STARTUP_PROJECT_PATH="src/GaifulinLab.Web/GaifulinLab.Web.csproj"
 DOTNET_SDK_IMAGE="mcr.microsoft.com/dotnet/sdk:10.0"
 DOTNET_EF_VERSION="10.0.9"
 DB_HOST_ENV_KEY="GAIFULINLAB_DB_HOST"
@@ -125,6 +126,7 @@ require_command docker
 require_command id
 require_file "$ENV_FILE" "Production environment file"
 require_file "$REPOSITORY_DIR/$MIGRATION_PROJECT_PATH" "Migration project"
+require_file "$REPOSITORY_DIR/$MIGRATION_STARTUP_PROJECT_PATH" "Migration startup project"
 docker info >/dev/null 2>&1 \
     || deployment_fail "Docker daemon is unavailable."
 
@@ -134,6 +136,7 @@ load_database_config
 # Версии SDK-образа и EF-инструмента зафиксированы для воспроизводимых миграций.
 MIGRATION_REQUIRES_LICENSE_KEY="$REQUIRES_LICENSE_KEY"
 export MIGRATION_PROJECT_PATH
+export MIGRATION_STARTUP_PROJECT_PATH
 export DOTNET_EF_VERSION
 export MIGRATION_REQUIRES_LICENSE_KEY
 
@@ -153,6 +156,7 @@ DOCKER_ARGUMENTS=(
     --env NUGET_PACKAGES=/tmp/nuget
     --env DOTNET_EF_VERSION
     --env MIGRATION_PROJECT_PATH
+    --env MIGRATION_STARTUP_PROJECT_PATH
     --env MIGRATION_REQUIRES_LICENSE_KEY
     --env MIGRATION_DB_HOST
     --env MIGRATION_DB_PORT
@@ -179,6 +183,7 @@ docker run "${DOCKER_ARGUMENTS[@]}" "$DOTNET_SDK_IMAGE" sh -c '
     : "${MIGRATION_DB_USER:?required}"
     : "${MIGRATION_DB_PASSWORD:?required}"
     : "${MIGRATION_PROJECT_PATH:?required}"
+    : "${MIGRATION_STARTUP_PROJECT_PATH:?required}"
     : "${DOTNET_EF_VERSION:?required}"
 
     # ASP.NET заменяет двойное подчёркивание двоеточием конфигурации, поэтому эта
@@ -198,12 +203,12 @@ docker run "${DOCKER_ARGUMENTS[@]}" "$DOTNET_SDK_IMAGE" sh -c '
     # Restore и build выполняются явно один раз; затем `--no-build` заставляет EF
     # использовать именно полученный результат сборки.
     dotnet tool install --tool-path /tmp/dotnet-tools dotnet-ef --version "$DOTNET_EF_VERSION"
-    dotnet restore "$MIGRATION_PROJECT_PATH"
-    dotnet build "$MIGRATION_PROJECT_PATH" --no-restore
+    dotnet restore "$MIGRATION_STARTUP_PROJECT_PATH"
+    dotnet build "$MIGRATION_STARTUP_PROJECT_PATH" --no-restore
     /tmp/dotnet-tools/dotnet-ef database update \
         --no-build \
         --project "$MIGRATION_PROJECT_PATH" \
-        --startup-project "$MIGRATION_PROJECT_PATH"
+        --startup-project "$MIGRATION_STARTUP_PROJECT_PATH"
 '
 
 echo "$APPLICATION_NAME production migrations completed."

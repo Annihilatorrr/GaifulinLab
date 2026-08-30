@@ -6,7 +6,8 @@ $databaseName = 'gaifulinlab'
 $databaseUser = 'gaifulinlab'
 $databasePassword = 'gaifulinlab'
 $hostAddress = '127.0.0.1'
-$postgresPort = '5432'
+$hostPort = '5435'
+$containerPort = '5432'
 $volumeName = 'gaifulinlab-postgres-dev-data'
 $postgresDataPath = '/var/lib/postgresql/data'
 $restartPolicy = 'unless-stopped'
@@ -16,7 +17,7 @@ docker run --name $containerName `
     -e "POSTGRES_DB=$databaseName" `
     -e "POSTGRES_USER=$databaseUser" `
     -e "POSTGRES_PASSWORD=$databasePassword" `
-    -p "${hostAddress}:${postgresPort}:${postgresPort}" `
+    -p "${hostAddress}:${hostPort}:${containerPort}" `
     -v "${volumeName}:${postgresDataPath}" `
     -d $imageName
 

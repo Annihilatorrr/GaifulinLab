@@ -13,6 +13,10 @@
     <ProjectReference Include="..\GaifulinLab.Infrastructure\GaifulinLab.Infrastructure.csproj" />
     <ProjectReference Include="..\GaifulinLab.Web.Client\GaifulinLab.Web.Client.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>

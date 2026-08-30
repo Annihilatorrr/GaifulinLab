@@ -50,8 +50,18 @@ deployment/
 
 Скрипт выполняет один `docker run` и сразу сообщает об ошибке. Параметры совпадают
 с `appsettings.Development.json`: база, пользователь и пароль — `gaifulinlab`,
-endpoint — `localhost:5432`. Данные сохраняются в Docker volume
+endpoint — `localhost:5435`. Данные сохраняются в Docker volume
 `gaifulinlab-postgres-dev-data`.
+
+Применить migrations, используя connection string из
+`appsettings.Development.json`:
+
+```powershell
+dotnet tool restore
+dotnet ef database update `
+  --project src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj `
+  --startup-project src/GaifulinLab.Web/GaifulinLab.Web.csproj
+```
 
 ## Первый production setup
 
