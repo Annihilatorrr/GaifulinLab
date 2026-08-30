@@ -1,0 +1,37 @@
+.about-layout {
+    max-width: calc(var(--article-width) + (2 * var(--site-gutter)));
+    padding-block: var(--space-16);
+}
+
+.about-layout h1 {
+    margin: var(--space-3) 0 var(--space-4);
+    font-size: var(--text-3xl);
+}
+
+.about-lead {
+    margin-bottom: var(--space-10);
+    font-size: var(--text-lg);
+}
+
+.about-note {
+    padding: var(--space-8);
+}
+
+.about-note h2 {
+    margin-bottom: var(--space-3);
+    font-size: var(--text-xl);
+}
+
+.about-note p {
+    margin: 0;
+}
+
+@media (max-width: 40rem) {
+    .about-layout {
+        padding-block: var(--space-10);
+    }
+
+    .about-note {
+        padding: var(--space-6);
+    }
+}

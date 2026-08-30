@@ -7,6 +7,14 @@
                 Practical writing about software, digital signal processing,
                 embedded systems and everything interesting around them.
             </p>
+
+            <div class="hero-actions">
+                <a class="button button-primary" href="/topics">
+                    Explore topics
+                    <span aria-hidden="true">→</span>
+                </a>
+                <a class="button button-secondary" href="/articles">Browse latest articles</a>
+            </div>
         </div>
 
         <div class="hero-visual" aria-hidden="true">
@@ -17,7 +25,7 @@
                     </pattern>
                     <linearGradient id="hero-signal-gradient" x1="0" y1="0" x2="1" y2="1">
                         <stop offset="0" stop-color="var(--color-accent)" />
-                        <stop offset="1" stop-color="var(--color-accent-secondary)" />
+                        <stop offset="1" stop-color="var(--color-accent-hover)" />
                     </linearGradient>
                 </defs>
 
@@ -53,14 +61,16 @@
                 </g>
 
                 <g class="signal-chain">
-                    <rect x="484" y="236" width="58" height="40" rx="5" />
-                    <rect x="568" y="236" width="58" height="40" rx="5" />
-                    <rect x="652" y="236" width="70" height="40" rx="5" />
-                    <path d="M542 256h26M626 256h26" />
-                    <path d="m561 252 7 4-7 4M645 252l7 4-7 4" />
-                    <text x="500" y="261">ADC</text>
-                    <text x="585" y="261">FIR</text>
-                    <text x="667" y="261">FFT</text>
+                    <rect x="466" y="236" width="50" height="40" rx="5" />
+                    <rect x="532" y="236" width="50" height="40" rx="5" />
+                    <rect x="598" y="236" width="50" height="40" rx="5" />
+                    <rect x="664" y="236" width="78" height="40" rx="5" />
+                    <path d="M516 256h16M582 256h16M648 256h16" />
+                    <path d="m525 252 7 4-7 4M591 252l7 4-7 4M657 252l7 4-7 4" />
+                    <text x="478" y="261">ADC</text>
+                    <text x="548" y="261">FIR</text>
+                    <text x="613" y="261">FFT</text>
+                    <text x="677" y="261">Detector</text>
                 </g>
 
                 <g class="spectrum">

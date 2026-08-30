@@ -12,14 +12,10 @@
     --color-border-strong: #b8c2d3;
     --color-accent: #3155ff;
     --color-accent-hover: #2446e8;
-    --color-accent-secondary: #713cff;
     --color-focus: #3155ff;
-    --color-success: #07864b;
-    --color-warning: #bd6b00;
     --color-danger: #c83232;
 
     --gradient-accent: linear-gradient(135deg, #3155ff 0%, #5839ff 100%);
-    --gradient-subtle: linear-gradient(135deg, #f5f7ff 0%, #f8f5ff 100%);
 
     --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --font-mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", Consolas, monospace;
@@ -29,9 +25,7 @@
     --text-base: 1rem;
     --text-lg: 1.125rem;
     --text-xl: 1.25rem;
-    --text-2xl: clamp(1.5rem, 2vw, 2rem);
     --text-3xl: clamp(2rem, 4vw, 3rem);
-    --text-display: clamp(2.75rem, 6vw, 5.25rem);
 
     --line-tight: 1.08;
     --line-heading: 1.2;
@@ -47,11 +41,9 @@
     --space-10: 2.5rem;
     --space-12: 3rem;
     --space-16: 4rem;
-    --space-20: 5rem;
 
     --radius-sm: 0.375rem;
     --radius-md: 0.625rem;
-    --radius-lg: 0.875rem;
     --radius-pill: 999px;
 
     --shadow-sm: 0 1px 2px rgb(11 19 43 / 0.05);
@@ -80,14 +72,10 @@
     --color-border-strong: #3a4765;
     --color-accent: #7087ff;
     --color-accent-hover: #8da0ff;
-    --color-accent-secondary: #a47cff;
     --color-focus: #8da0ff;
-    --color-success: #45c886;
-    --color-warning: #ffb54a;
     --color-danger: #ff7777;
 
     --gradient-accent: linear-gradient(135deg, #5d76ff 0%, #895eff 100%);
-    --gradient-subtle: linear-gradient(135deg, #121934 0%, #1b1735 100%);
 
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.2);
     --shadow-md: 0 16px 36px rgb(0 0 0 / 0.28);
@@ -108,13 +96,9 @@
         --color-border-strong: #3a4765;
         --color-accent: #7087ff;
         --color-accent-hover: #8da0ff;
-        --color-accent-secondary: #a47cff;
         --color-focus: #8da0ff;
-        --color-success: #45c886;
-        --color-warning: #ffb54a;
         --color-danger: #ff7777;
         --gradient-accent: linear-gradient(135deg, #5d76ff 0%, #895eff 100%);
-        --gradient-subtle: linear-gradient(135deg, #121934 0%, #1b1735 100%);
         --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.2);
         --shadow-md: 0 16px 36px rgb(0 0 0 / 0.28);
     }

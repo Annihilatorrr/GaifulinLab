@@ -1,0 +1,33 @@
+<main id="main-content" class="site-main empty-page">
+    <div class="site-container empty-page-layout">
+        <span class="eyebrow">@Eyebrow</span>
+        <h1>@Title</h1>
+        <p class="empty-page-description">@Description</p>
+
+        <div class="empty-page-state surface">
+            <svg viewBox="0 0 64 64" aria-hidden="true">
+                <circle cx="32" cy="32" r="24" />
+                <path d="M23 32h18M32 23v18" />
+            </svg>
+            <h2>@EmptyTitle</h2>
+            <p>@EmptyDescription</p>
+        </div>
+    </div>
+</main>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Eyebrow { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Description { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string EmptyTitle { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string EmptyDescription { get; set; } = string.Empty;
+}

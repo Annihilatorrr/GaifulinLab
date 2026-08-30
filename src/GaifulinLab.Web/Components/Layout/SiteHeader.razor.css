@@ -27,8 +27,8 @@
 
 .brand-mark {
     position: relative;
-    width: 3.5rem;
-    height: 3.5rem;
+    width: 2.75rem;
+    height: 2.75rem;
     flex: 0 0 auto;
     border: 2px solid var(--color-text);
     font-size: 1.05rem;
@@ -42,13 +42,13 @@
 }
 
 .brand-g {
-    top: 0.65rem;
-    left: 0.62rem;
+    top: 0.45rem;
+    left: 0.45rem;
 }
 
 .brand-l {
-    right: 0.62rem;
-    bottom: 0.58rem;
+    right: 0.45rem;
+    bottom: 0.42rem;
 }
 
 .brand-copy {
@@ -73,6 +73,146 @@
     white-space: nowrap;
 }
 
+.desktop-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(var(--space-5), 2.4vw, var(--space-8));
+    margin-left: auto;
+}
+
+.desktop-nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: 550;
+    text-decoration: none;
+}
+
+.desktop-nav a:hover {
+    color: var(--color-accent);
+}
+
+.desktop-nav svg {
+    width: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+}
+
+.header-actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.search-link {
+    width: 2.75rem;
+    height: 2.75rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--color-text);
+}
+
+.search-link:hover {
+    background: var(--color-surface-subtle);
+    color: var(--color-accent);
+}
+
+.search-link svg {
+    width: 1.45rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.8;
+}
+
+.mobile-menu {
+    position: relative;
+    display: none;
+}
+
+.mobile-menu summary {
+    width: 2.75rem;
+    height: 2.75rem;
+    display: grid;
+    place-content: center;
+    gap: 0.28rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    cursor: pointer;
+    list-style: none;
+}
+
+.mobile-menu summary::-webkit-details-marker {
+    display: none;
+}
+
+.mobile-menu summary span {
+    width: 1.15rem;
+    height: 1.5px;
+    background: var(--color-text);
+}
+
+.mobile-menu nav {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    width: min(16rem, calc(100vw - (2 * var(--site-gutter))));
+    display: grid;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-2);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+}
+
+.mobile-menu nav a {
+    border-radius: var(--radius-sm);
+    padding: var(--space-3);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: 650;
+    text-decoration: none;
+}
+
+.mobile-menu nav a:hover {
+    background: var(--color-surface-accent);
+    color: var(--color-accent);
+}
+
+@media (max-width: 70rem) {
+    .brand-tagline {
+        display: none;
+    }
+
+    .brand-name {
+        font-size: var(--text-lg);
+    }
+}
+
+@media (max-width: 58rem) {
+    .desktop-nav {
+        display: none;
+    }
+
+    .header-actions {
+        margin-left: auto;
+    }
+
+    .mobile-menu {
+        display: block;
+    }
+}
+
 @media (max-width: 40rem) {
     .site-header,
     .header-content {
@@ -80,18 +220,18 @@
     }
 
     .brand-mark {
-        width: 3rem;
-        height: 3rem;
+        width: 2.5rem;
+        height: 2.5rem;
     }
 
     .brand-g {
-        top: 0.55rem;
-        left: 0.5rem;
+        top: 0.4rem;
+        left: 0.4rem;
     }
 
     .brand-l {
-        right: 0.5rem;
-        bottom: 0.5rem;
+        right: 0.4rem;
+        bottom: 0.38rem;
     }
 
     .brand-name {
@@ -99,6 +239,10 @@
     }
 
     .brand-tagline {
+        display: none;
+    }
+
+    .search-link {
         display: none;
     }
 }

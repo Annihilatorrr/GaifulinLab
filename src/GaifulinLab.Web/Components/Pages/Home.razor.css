@@ -1,0 +1,121 @@
+.content-overview {
+    background: var(--color-background);
+}
+
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.overview-column {
+    min-width: 0;
+    padding: var(--space-10) var(--space-8) var(--space-12);
+}
+
+.overview-column:first-child {
+    padding-left: 0;
+}
+
+.overview-column:last-child {
+    padding-right: 0;
+}
+
+.overview-column + .overview-column {
+    border-left: 1px solid var(--color-border);
+}
+
+.overview-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+
+.overview-heading h2 {
+    margin: 0;
+    font-size: var(--text-sm);
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.overview-heading a {
+    flex: 0 0 auto;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    text-decoration: none;
+}
+
+.overview-heading a:hover {
+    color: var(--color-accent);
+}
+
+.overview-empty {
+    min-height: 16rem;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-6);
+    background: var(--color-surface);
+    text-align: center;
+}
+
+.overview-empty svg {
+    width: 3rem;
+    margin-bottom: var(--space-4);
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.6;
+}
+
+.overview-empty h3 {
+    margin-bottom: var(--space-2);
+    font-size: var(--text-base);
+}
+
+.overview-empty p {
+    max-width: 17rem;
+    margin: 0;
+    font-size: var(--text-sm);
+}
+
+@media (max-width: 64rem) {
+    .overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .overview-column,
+    .overview-column:first-child,
+    .overview-column:last-child {
+        padding: var(--space-8) 0;
+    }
+
+    .overview-column + .overview-column {
+        border-top: 1px solid var(--color-border);
+        border-left: 0;
+    }
+
+    .overview-empty {
+        min-height: 13rem;
+    }
+}
+
+@media (max-width: 40rem) {
+    .overview-column,
+    .overview-column:first-child,
+    .overview-column:last-child {
+        padding-block: var(--space-6);
+    }
+
+    .overview-heading {
+        margin-bottom: var(--space-4);
+    }
+
+    .overview-empty {
+        min-height: 11rem;
+    }
+}

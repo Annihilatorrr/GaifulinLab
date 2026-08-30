@@ -12,6 +12,38 @@
             </span>
         </a>
 
-        <ThemeToggle />
+        <nav class="desktop-nav" aria-label="Primary navigation">
+            <a href="/topics">
+                Topics
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+            </a>
+            <a href="/series">Series</a>
+            <a href="/tags">Tags</a>
+            <a href="/archive">Archive</a>
+            <a href="/about">About</a>
+        </nav>
+
+        <div class="header-actions">
+            <a class="search-link" href="/search" aria-label="Search">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="6.5" />
+                    <path d="m16 16 4.5 4.5" />
+                </svg>
+            </a>
+            <ThemeToggle />
+
+            <details class="mobile-menu">
+                <summary aria-label="Open navigation">
+                    <span></span><span></span><span></span>
+                </summary>
+                <nav aria-label="Mobile navigation">
+                    <a href="/topics">Topics</a>
+                    <a href="/series">Series</a>
+                    <a href="/tags">Tags</a>
+                    <a href="/archive">Archive</a>
+                    <a href="/about">About</a>
+                </nav>
+            </details>
+        </div>
     </div>
 </header>
