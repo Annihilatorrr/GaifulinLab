@@ -1,0 +1,17 @@
+.git
+.github
+.vs
+.idea
+.config
+**/bin
+**/obj
+**/TestResults
+tests
+deployment/.env
+.env
+.env.*
+!.env.example
+runtime
+uploads
+media
+README.md
