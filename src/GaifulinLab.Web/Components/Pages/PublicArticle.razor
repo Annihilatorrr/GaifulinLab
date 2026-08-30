@@ -2,8 +2,7 @@
 
 <PageTitle>Article · Gaifulin Lab</PageTitle>
 
-<PublicArticleView LanguageCode="@LanguageCode" Slug="@Slug"
-                   @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+<PublicArticleView LanguageCode="@LanguageCode" Slug="@Slug" />
 
 @code {
     [Parameter] public string LanguageCode { get; set; } = "en";

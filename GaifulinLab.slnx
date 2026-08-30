@@ -5,7 +5,6 @@
     <Project Path="src/GaifulinLab.Contracts/GaifulinLab.Contracts.csproj" />
     <Project Path="src/GaifulinLab.Domain/GaifulinLab.Domain.csproj" />
     <Project Path="src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj" />
-    <Project Path="src/GaifulinLab.Web.Client/GaifulinLab.Web.Client.csproj" />
     <Project Path="src/GaifulinLab.Web/GaifulinLab.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">

@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Components;
 
-namespace GaifulinLab.Web.Client.Authentication;
+namespace GaifulinLab.Web.Authentication;
 
 public sealed class AdminAuthorizationHandler(
     AccessTokenStore tokenStore,

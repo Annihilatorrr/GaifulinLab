@@ -2,7 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components.Authorization;
 
-namespace GaifulinLab.Web.Client.Authentication;
+namespace GaifulinLab.Web.Authentication;
 
 public sealed class TokenAuthenticationStateProvider(AccessTokenStore tokenStore)
     : AuthenticationStateProvider

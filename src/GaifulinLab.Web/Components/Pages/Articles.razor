@@ -5,8 +5,7 @@
 <PublicContentIndex Kind="articles" LanguageCode="en" Eyebrow="Writing" Title="Articles"
                     Description="Engineering notes, experiments and technical deep dives."
                     EmptyTitle="No articles yet" EmptyDescription="The first published article will appear here."
-                    Topic="@Topic" SeriesFilter="@SeriesFilter" Tag="@Tag"
-                    @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+                    Topic="@Topic" SeriesFilter="@SeriesFilter" Tag="@Tag" />
 
 @code {
     [SupplyParameterFromQuery(Name = "topic")] public string? Topic { get; set; }

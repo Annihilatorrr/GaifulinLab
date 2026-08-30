@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Contracts.Taxonomy;
 
-namespace GaifulinLab.Web.Client.Content;
+namespace GaifulinLab.Web.Content;
 
 public sealed class PublicContentClient(HttpClient httpClient)
 {

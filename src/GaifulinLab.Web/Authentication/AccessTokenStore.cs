@@ -1,6 +1,6 @@
 using Microsoft.JSInterop;
 
-namespace GaifulinLab.Web.Client.Authentication;
+namespace GaifulinLab.Web.Authentication;
 
 public sealed class AccessTokenStore(IJSRuntime jsRuntime)
 {

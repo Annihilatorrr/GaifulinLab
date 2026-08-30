@@ -2,8 +2,7 @@
 
 <PageTitle>Series · Gaifulin Lab</PageTitle>
 
-<PublicSeriesView LanguageCode="@LanguageCode" Slug="@Slug"
-                  @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+<PublicSeriesView LanguageCode="@LanguageCode" Slug="@Slug" />
 
 @code {
     [Parameter] public string LanguageCode { get; set; } = "en";

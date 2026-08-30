@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using GaifulinLab.Contracts.Auth;
 
-namespace GaifulinLab.Web.Client.Authentication;
+namespace GaifulinLab.Web.Authentication;
 
 public sealed class AdminAuthClient(
     HttpClient httpClient,

@@ -1,41 +1,43 @@
+using GaifulinLab.Web;
+using GaifulinLab.Web.Articles;
+using GaifulinLab.Web.Authentication;
 using GaifulinLab.Web.Components;
+using GaifulinLab.Web.Content;
+using GaifulinLab.Web.Media;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveWebAssemblyComponents();
+builder.RootComponents.Add<App>("#app");
+builder.RootComponents.Add<HeadOutlet>("head::after");
 
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+builder.Services.AddAuthorizationCore();
+builder.Services.AddScoped<AccessTokenStore>();
+builder.Services.AddScoped<TokenAuthenticationStateProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider>(serviceProvider =>
+    serviceProvider.GetRequiredService<TokenAuthenticationStateProvider>());
+builder.Services.AddScoped(serviceProvider =>
 {
-    app.UseWebAssemblyDebugging();
-}
-else
-{
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-app.UseWhen(
-    context => !context.Request.Path.StartsWithSegments("/_framework"),
-    branch => branch.UseStatusCodePagesWithReExecute(
-        "/not-found",
-        createScopeForStatusCodePages: true));
-if (app.Configuration.GetValue("HTTPS_REDIRECT_ENABLED", true))
-{
-    app.UseHttpsRedirection();
-}
+    var handler = new AdminAuthorizationHandler(
+        serviceProvider.GetRequiredService<AccessTokenStore>(),
+        serviceProvider.GetRequiredService<TokenAuthenticationStateProvider>(),
+        serviceProvider.GetRequiredService<NavigationManager>())
+    {
+        InnerHandler = new HttpClientHandler()
+    };
 
-app.UseAntiforgery();
+    return new HttpClient(handler)
+    {
+        BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+    };
+});
+builder.Services.AddScoped<AdminAuthClient>();
+builder.Services.AddScoped<AdminArticlesClient>();
+builder.Services.AddScoped<AdminMarkdownClient>();
+builder.Services.AddScoped<AdminMediaClient>();
+builder.Services.AddScoped<PublicContentClient>();
 
-app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(GaifulinLab.Web.Client._Imports).Assembly);
-
-app.Run();
-
-public partial class Program;
+await builder.Build().RunAsync();

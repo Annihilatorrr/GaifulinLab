@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using GaifulinLab.Contracts.Content;
 
-namespace GaifulinLab.Web.Client.Content;
+namespace GaifulinLab.Web.Content;
 
 public sealed class AdminMarkdownClient(HttpClient httpClient)
 {

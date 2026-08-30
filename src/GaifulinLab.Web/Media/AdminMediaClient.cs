@@ -4,7 +4,7 @@ using System.Text.Json;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Contracts.Media;
 
-namespace GaifulinLab.Web.Client.Media;
+namespace GaifulinLab.Web.Media;
 
 public sealed class AdminMediaClient(HttpClient httpClient)
 {

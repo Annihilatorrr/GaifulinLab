@@ -4,7 +4,7 @@ using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Contracts.Taxonomy;
 
-namespace GaifulinLab.Web.Client.Articles;
+namespace GaifulinLab.Web.Articles;
 
 public sealed class AdminArticlesClient(HttpClient httpClient)
 {
