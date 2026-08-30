@@ -53,6 +53,12 @@ deployment/
 endpoint — `localhost:5435`. Данные сохраняются в Docker volume
 `gaifulinlab-postgres-dev-data`.
 
+Локальная учётная запись администратора задаётся только в
+`appsettings.Development.json`:
+
+- login: `admin`;
+- password: `gaifulinlab-dev-admin`.
+
 Применить migrations, используя connection string из
 `appsettings.Development.json`:
 
