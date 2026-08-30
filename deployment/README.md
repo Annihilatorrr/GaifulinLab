@@ -42,15 +42,16 @@ deployment/
 
 ## Локальная PostgreSQL
 
-Создать локальный PostgreSQL-контейнер или запустить его повторно:
+Создать локальный PostgreSQL-контейнер:
 
 ```powershell
 .\deployment\client\create_local_db_in_docker.ps1
 ```
 
-Параметры скрипта совпадают с `appsettings.Development.json`: база, пользователь
-и пароль — `gaifulinlab`, endpoint — `localhost:5432`. Данные сохраняются в Docker
-volume `gaifulinlab-postgres-dev-data`.
+Скрипт выполняет один `docker run` и сразу сообщает об ошибке. Параметры совпадают
+с `appsettings.Development.json`: база, пользователь и пароль — `gaifulinlab`,
+endpoint — `localhost:5432`. Данные сохраняются в Docker volume
+`gaifulinlab-postgres-dev-data`.
 
 ## Первый production setup
 
