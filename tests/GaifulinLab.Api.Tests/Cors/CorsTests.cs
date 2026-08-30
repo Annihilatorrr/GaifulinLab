@@ -1,7 +1,7 @@
 using System.Net;
-using GaifulinLab.Web.Tests.Authentication;
+using GaifulinLab.Api.Tests.Authentication;
 
-namespace GaifulinLab.Web.Tests.Cors;
+namespace GaifulinLab.Api.Tests.Cors;
 
 public sealed class CorsTests(AuthWebApplicationFactory factory)
     : IClassFixture<AuthWebApplicationFactory>

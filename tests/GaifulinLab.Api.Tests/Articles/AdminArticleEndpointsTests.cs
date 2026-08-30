@@ -8,10 +8,10 @@ using GaifulinLab.Contracts.Taxonomy;
 using GaifulinLab.Domain.Series;
 using GaifulinLab.Domain.Topics;
 using GaifulinLab.Infrastructure.Persistence;
-using GaifulinLab.Web.Tests.Authentication;
+using GaifulinLab.Api.Tests.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace GaifulinLab.Web.Tests.Articles;
+namespace GaifulinLab.Api.Tests.Articles;
 
 public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory)
     : IClassFixture<AuthWebApplicationFactory>

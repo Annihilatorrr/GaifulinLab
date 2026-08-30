@@ -5,11 +5,11 @@ using GaifulinLab.Contracts.Auth;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Contracts.Media;
 using GaifulinLab.Infrastructure.Persistence;
-using GaifulinLab.Web.Tests.Authentication;
+using GaifulinLab.Api.Tests.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace GaifulinLab.Web.Tests.Media;
+namespace GaifulinLab.Api.Tests.Media;
 
 public sealed class MediaEndpointsTests(AuthWebApplicationFactory factory)
     : IClassFixture<AuthWebApplicationFactory>

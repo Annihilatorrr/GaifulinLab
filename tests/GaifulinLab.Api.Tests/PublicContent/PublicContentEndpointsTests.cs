@@ -6,11 +6,11 @@ using GaifulinLab.Domain.Articles;
 using GaifulinLab.Domain.Tags;
 using GaifulinLab.Domain.Topics;
 using GaifulinLab.Infrastructure.Persistence;
-using GaifulinLab.Web.Tests.Authentication;
+using GaifulinLab.Api.Tests.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using SeriesAggregate = GaifulinLab.Domain.Series.Series;
 
-namespace GaifulinLab.Web.Tests.PublicContent;
+namespace GaifulinLab.Api.Tests.PublicContent;
 
 public sealed class PublicContentEndpointsTests
 {

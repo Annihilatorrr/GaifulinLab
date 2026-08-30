@@ -3,9 +3,9 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using GaifulinLab.Contracts.Auth;
 using GaifulinLab.Contracts.Content;
-using GaifulinLab.Web.Tests.Authentication;
+using GaifulinLab.Api.Tests.Authentication;
 
-namespace GaifulinLab.Web.Tests.Content;
+namespace GaifulinLab.Api.Tests.Content;
 
 public sealed class AdminMarkdownEndpointsTests(AuthWebApplicationFactory factory)
     : IClassFixture<AuthWebApplicationFactory>

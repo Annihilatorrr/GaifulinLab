@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
-using GaifulinLab.Web.Tests.Authentication;
+using GaifulinLab.Api.Tests.Authentication;
 
-namespace GaifulinLab.Web.Tests.Health;
+namespace GaifulinLab.Api.Tests.Health;
 
 public sealed class HealthEndpointsTests(AuthWebApplicationFactory factory)
     : IClassFixture<AuthWebApplicationFactory>

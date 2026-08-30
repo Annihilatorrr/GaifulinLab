@@ -13,7 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace GaifulinLab.Web.Tests.Authentication;
+namespace GaifulinLab.Api.Tests.Authentication;
 
 public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     : IClassFixture<AuthWebApplicationFactory>
@@ -74,12 +74,12 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
 
     private readonly string _mediaStoragePath = Path.Combine(
         Path.GetTempPath(),
-        $"gaifulinlab-web-media-tests-{Guid.NewGuid():N}");
+        $"gaifulinlab-api-media-tests-{Guid.NewGuid():N}");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         var passwordHash = new AdminPasswordHasher().Hash(AdminPassword);
-        var databaseName = $"gaifulinlab-web-tests-{Guid.NewGuid()}";
+        var databaseName = $"gaifulinlab-api-tests-{Guid.NewGuid()}";
 
         builder.UseEnvironment("Testing");
         builder.ConfigureLogging(logging => logging.ClearProviders());
