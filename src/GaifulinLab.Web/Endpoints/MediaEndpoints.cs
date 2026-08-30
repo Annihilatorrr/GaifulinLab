@@ -18,7 +18,7 @@ public static class MediaEndpoints
             .WithTags("Admin Media")
             .RequireAuthorization(AuthorizationPolicies.Admin)
             .DisableAntiforgery()
-            .AddEndpointFilter<AdminApiExceptionFilter>()
+            .AddEndpointFilter<ApiExceptionFilter>()
             .WithMetadata(new RequestSizeLimitAttribute(MaximumRequestSize))
             .Produces<UploadMediaResponse>(StatusCodes.Status201Created)
             .Produces<ApiErrorResponse>(StatusCodes.Status400BadRequest)

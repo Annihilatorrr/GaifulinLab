@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GaifulinLab.Web.Endpoints;
 
-internal sealed class AdminApiExceptionFilter : IEndpointFilter
+internal sealed class ApiExceptionFilter : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(
         EndpointFilterInvocationContext context,

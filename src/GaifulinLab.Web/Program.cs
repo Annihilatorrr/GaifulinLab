@@ -58,6 +58,7 @@ app.MapAuthEndpoints();
 app.MapAdminArticleEndpoints();
 app.MapAdminMarkdownEndpoints();
 app.MapMediaEndpoints();
+app.MapPublicContentEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(GaifulinLab.Web.Client._Imports).Assembly);

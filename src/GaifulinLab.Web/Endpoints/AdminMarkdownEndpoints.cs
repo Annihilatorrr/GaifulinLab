@@ -13,7 +13,7 @@ public static class AdminMarkdownEndpoints
         var group = endpoints.MapGroup("/api/admin/markdown")
             .WithTags("Admin Markdown")
             .RequireAuthorization(AuthorizationPolicies.Admin)
-            .AddEndpointFilter<AdminApiExceptionFilter>();
+            .AddEndpointFilter<ApiExceptionFilter>();
 
         group.MapPost("/preview", Preview)
             .Produces<MarkdownPreviewResponse>()

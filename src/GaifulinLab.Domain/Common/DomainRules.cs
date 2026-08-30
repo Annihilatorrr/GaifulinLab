@@ -2,7 +2,7 @@ using System.Text;
 
 namespace GaifulinLab.Domain.Common;
 
-internal static class DomainRules
+public static class DomainRules
 {
     public static string NormalizeLanguageCode(string languageCode)
     {

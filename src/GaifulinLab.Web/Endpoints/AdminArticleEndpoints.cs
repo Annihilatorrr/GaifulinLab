@@ -21,7 +21,7 @@ public static class AdminArticleEndpoints
         var group = endpoints.MapGroup("/api/admin")
             .WithTags("Admin")
             .RequireAuthorization(AuthorizationPolicies.Admin)
-            .AddEndpointFilter<AdminApiExceptionFilter>();
+            .AddEndpointFilter<ApiExceptionFilter>();
 
         group.MapGet("/articles", GetArticles)
             .Produces<IReadOnlyList<AdminArticleListItemDto>>();
