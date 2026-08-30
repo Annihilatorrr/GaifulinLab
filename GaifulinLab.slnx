@@ -10,5 +10,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/GaifulinLab.Domain.Tests/GaifulinLab.Domain.Tests.csproj" />
     <Project Path="tests/GaifulinLab.Infrastructure.Tests/GaifulinLab.Infrastructure.Tests.csproj" />
+    <Project Path="tests/GaifulinLab.Web.Tests/GaifulinLab.Web.Tests.csproj" />
   </Folder>
 </Solution>

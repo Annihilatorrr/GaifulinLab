@@ -1,0 +1,13 @@
+.sign-out {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.sign-out:hover {
+    color: var(--color-text);
+}

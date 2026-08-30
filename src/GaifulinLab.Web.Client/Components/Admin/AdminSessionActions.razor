@@ -1,0 +1,24 @@
+@inject TokenAuthenticationStateProvider AuthenticationStateProvider
+@inject AdminAuthClient AuthClient
+@inject NavigationManager Navigation
+
+@if (_isAuthenticated)
+{
+    <button class="sign-out" type="button" @onclick="SignOutAsync">Sign out</button>
+}
+
+@code {
+    private bool _isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _isAuthenticated = state.User.Identity?.IsAuthenticated == true;
+    }
+
+    private async Task SignOutAsync()
+    {
+        await AuthClient.LogoutAsync();
+        Navigation.NavigateTo("/admin/login", replace: true);
+    }
+}

@@ -1,5 +1,8 @@
+using System.Threading.RateLimiting;
 using GaifulinLab.Infrastructure;
 using GaifulinLab.Web.Components;
+using GaifulinLab.Web.Endpoints;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,10 +10,21 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
-var postgresConnectionString = builder.Configuration.GetConnectionString("Postgres")
-    ?? throw new InvalidOperationException("Connection string 'Postgres' is not configured.");
-
-builder.Services.AddInfrastructure(postgresConnectionString);
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AuthEndpoints.LoginRateLimitPolicy, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
 
 var app = builder.Build();
 
@@ -28,11 +42,17 @@ else
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapAuthEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(GaifulinLab.Web.Client._Imports).Assembly);
 
 app.Run();
+
+public partial class Program;

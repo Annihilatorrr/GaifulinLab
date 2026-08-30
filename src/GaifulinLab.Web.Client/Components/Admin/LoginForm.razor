@@ -1,0 +1,80 @@
+@using System.ComponentModel.DataAnnotations
+@inject AdminAuthClient AuthClient
+@inject NavigationManager Navigation
+
+<section class="login-page" aria-labelledby="login-title">
+    <div class="login-card surface">
+        <span class="eyebrow">Private workspace</span>
+        <h1 id="login-title">Sign in</h1>
+        <p>Enter the owner credentials to manage Gaifulin Lab.</p>
+
+        <EditForm Model="_credentials" OnValidSubmit="SignInAsync" class="login-form">
+            <DataAnnotationsValidator />
+
+            <div class="field">
+                <label for="admin-login">Login</label>
+                <InputText id="admin-login"
+                           autocomplete="username"
+                           disabled="@_isSubmitting"
+                           @bind-Value="_credentials.Login" />
+                <ValidationMessage For="() => _credentials.Login" />
+            </div>
+
+            <div class="field">
+                <label for="admin-password">Password</label>
+                <InputText id="admin-password"
+                           type="password"
+                           autocomplete="current-password"
+                           disabled="@_isSubmitting"
+                           @bind-Value="_credentials.Password" />
+                <ValidationMessage For="() => _credentials.Password" />
+            </div>
+
+            @if (_errorMessage is not null)
+            {
+                <p class="login-error" role="alert">@_errorMessage</p>
+            }
+
+            <button class="button button-primary login-submit"
+                    type="submit"
+                    disabled="@_isSubmitting">
+                @(_isSubmitting ? "Signing in…" : "Sign in")
+            </button>
+        </EditForm>
+
+        <p class="login-note">There is no public registration or account area.</p>
+    </div>
+</section>
+
+@code {
+    private readonly CredentialsModel _credentials = new();
+    private string? _errorMessage;
+    private bool _isSubmitting;
+
+    private async Task SignInAsync()
+    {
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        var result = await AuthClient.LoginAsync(_credentials.Login, _credentials.Password);
+        _isSubmitting = false;
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("/admin/articles", replace: true);
+            return;
+        }
+
+        _credentials.Password = string.Empty;
+        _errorMessage = result.ErrorMessage;
+    }
+
+    private sealed class CredentialsModel
+    {
+        [Required]
+        public string Login { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}
