@@ -176,9 +176,17 @@
             <section class="editor-pane preview-pane" aria-labelledby="preview-heading" aria-live="polite">
                 <header class="pane-heading" id="preview-heading">
                     <span>Preview</span>
-                    <button class="pdf-button" type="button" disabled="@(!CanPrintPreview)" @onclick="PrintPreviewAsync">
-                        @(_printing ? "Preparing..." : "PDF \u2193")
-                    </button>
+                    <div class="preview-actions">
+                        @if (_previewReady && _previewContentHeight > 0)
+                        {
+                            <output class="preview-metrics" title="Printable A4 content area: 986 px (261 mm)">
+                                PDF: 986 px/page · Preview: @FormatPreviewHeight(_previewContentHeight) px · @PreviewPageCount pages
+                            </output>
+                        }
+                        <button class="pdf-button" type="button" disabled="@(!CanPrintPreview)" @onclick="PrintPreviewAsync">
+                            @(_printing ? "Preparing..." : "PDF \u2193")
+                        </button>
+                    </div>
                 </header>
                 @if (string.IsNullOrWhiteSpace(Current.Markdown))
                 {
@@ -188,14 +196,18 @@
                 else if (_previewError is not null) { <div class="preview-status preview-error" role="alert">@_previewError</div> }
                 else
                 {
-                    <div class="preview-paper">
+                    <div class="preview-paper pdf-article-document">
                         <div class="preview-page-guides" aria-hidden="true"></div>
                         <article class="article-preview" @ref="_previewElement">
-                            <header class="preview-print-header">
+                            <header class="article-header">
+                                @if (Current.PublishedAt is { } publishedAt)
+                                {
+                                    <time datetime="@publishedAt.ToString("O")">@publishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                                }
                                 <h1>@(string.IsNullOrWhiteSpace(Current.Title) ? "Untitled article" : Current.Title)</h1>
                                 @if (!string.IsNullOrWhiteSpace(Current.Summary))
                                 {
-                                    <p>@Current.Summary</p>
+                                    <p class="summary">@Current.Summary</p>
                                 }
                             </header>
                             @((MarkupString)_renderedHtml)
@@ -227,6 +239,7 @@
     private bool _imageUploading;
     private bool _printing;
     private bool _previewReady;
+    private double _previewContentHeight;
     private EditorPane _activePane = EditorPane.Edit;
     private CancellationTokenSource? _previewCancellation;
     private CancellationTokenSource? _messageCancellation;
@@ -246,6 +259,7 @@
         && !string.IsNullOrWhiteSpace(Current.Markdown);
     private bool HasSecondaryActions =>
         ArticleId is not null || Current.Status == PublicationStatusDto.Published || CanOpenPublicArticle;
+    private int PreviewPageCount => Math.Max(1, (int)Math.Ceiling(_previewContentHeight / PdfPageContentHeightPixels));
     private string TypographyStyle =>
         $"--article-line-height: {FormatTypographyValue(_typography.LineHeight)}; --article-block-spacing: {FormatTypographyValue(_typography.BlockSpacing)}rem;";
 
@@ -303,6 +317,10 @@
         if (!_mathTypesetPending)
         {
             _previewReady = true;
+            if (await UpdatePreviewMeasurementAsync())
+            {
+                StateHasChanged();
+            }
             return;
         }
 
@@ -318,6 +336,7 @@
         finally
         {
             _previewReady = true;
+            await UpdatePreviewMeasurementAsync();
             StateHasChanged();
         }
     }
@@ -349,6 +368,7 @@
         _previewElementReady = false;
         _previewReady = false;
         _renderedHtml = "";
+        _previewContentHeight = 0;
         await RefreshPreview();
     }
 
@@ -405,6 +425,7 @@
         {
             await ArticlesClient.PublishAsync(ArticleId.Value, Current.LanguageCode);
             Current.Status = PublicationStatusDto.Published;
+            Current.PublishedAt ??= DateTimeOffset.UtcNow;
             ShowMessage("Localization published.", false);
             if (wasNew) Navigation.NavigateTo($"/admin/articles/{ArticleId}", replace: true);
         }
@@ -551,6 +572,7 @@
             _previewElementReady = false;
             _previewReady = false;
             _renderedHtml = "";
+            _previewContentHeight = 0;
             _previewError = null;
             _previewLoading = false;
             return;
@@ -560,6 +582,7 @@
         await ClearPreviewMathAsync();
         _previewElementReady = false;
         _previewReady = false;
+        _previewContentHeight = 0;
         _previewLoading = true;
         _previewError = null;
         try
@@ -590,6 +613,30 @@
         }
         catch (JSException)
         {
+        }
+    }
+
+    private async Task<bool> UpdatePreviewMeasurementAsync()
+    {
+        if (!_previewElementReady)
+        {
+            return false;
+        }
+
+        try
+        {
+            var measurement = await JS.InvokeAsync<PreviewMeasurement>("articleAssets.measure", _previewElement);
+            if (Math.Abs(measurement.ContentHeight - _previewContentHeight) < 0.5)
+            {
+                return false;
+            }
+
+            _previewContentHeight = measurement.ContentHeight;
+            return true;
+        }
+        catch (JSException)
+        {
+            return false;
         }
     }
 
@@ -624,6 +671,8 @@
         return $"{label} — add translation";
     }
     private string PublicPath => $"/{Current.LanguageCode}/articles/{(string.IsNullOrWhiteSpace(Current.Slug) ? "{slug}" : Current.Slug.Trim())}";
+    private const double PdfPageContentHeightPixels = 986.46;
+    private static string FormatPreviewHeight(double value) => Math.Ceiling(value).ToString("0", CultureInfo.InvariantCulture);
     private bool CanOpenPublicArticle => Current.Status == PublicationStatusDto.Published && !string.IsNullOrWhiteSpace(Current.Slug);
     private string[] ParseTags() => _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
     private void ShowMessage(string message, bool error)
@@ -698,6 +747,7 @@
             Markdown = dto.Markdown;
             Slug = dto.Slug ?? "";
             Status = dto.Status;
+            PublishedAt = dto.PublishedAt;
             SlugIsAutomatic = Status == PublicationStatusDto.Draft
                 && (string.IsNullOrWhiteSpace(Slug)
                     || string.Equals(
@@ -712,8 +762,10 @@
         public string Slug { get; set; } = "";
         public bool SlugIsAutomatic { get; set; }
         public PublicationStatusDto Status { get; set; } = PublicationStatusDto.Draft;
+        public DateTimeOffset? PublishedAt { get; set; }
         public CreateArticleRequest ToCreateRequest() => new(LanguageCode, Title, Summary, Markdown, Slug);
         public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Markdown, Slug);
     }
+    private sealed record PreviewMeasurement(double ContentHeight);
     private enum EditorPane { Edit, Preview }
 }

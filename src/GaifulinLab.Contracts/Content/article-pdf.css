@@ -1,0 +1,151 @@
+.pdf-article-document {
+    color: #071735;
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11pt;
+    line-height: var(--article-line-height, 1.75);
+}
+
+.pdf-article-document,
+.pdf-article-document * {
+    box-sizing: border-box;
+}
+
+.pdf-article-document .article-header {
+    margin-bottom: 1.5rem;
+}
+
+.pdf-article-document .article-header time {
+    color: #5d6e92;
+    font-size: 9pt;
+}
+
+.pdf-article-document h1 {
+    margin: .4rem 0 .7rem;
+    font-size: 26pt;
+    line-height: 1.1;
+}
+
+.pdf-article-document h2 {
+    margin-top: 1.8rem;
+    font-size: 19pt;
+    line-height: 1.2;
+    break-after: avoid-page;
+}
+
+.pdf-article-document h3 {
+    margin-top: 1.5rem;
+    font-size: 15pt;
+    line-height: 1.25;
+    break-after: avoid-page;
+}
+
+.pdf-article-document h4,
+.pdf-article-document h5,
+.pdf-article-document h6 {
+    margin-top: 1.25rem;
+    break-after: avoid-page;
+}
+
+.pdf-article-document .summary {
+    color: #40547c;
+    font-size: 13pt;
+}
+
+.pdf-article-document p,
+.pdf-article-document ul,
+.pdf-article-document ol,
+.pdf-article-document blockquote,
+.pdf-article-document pre,
+.pdf-article-document table,
+.pdf-article-document .math,
+.pdf-article-document mjx-container[display="true"] {
+    margin: 0 0 var(--article-block-spacing, .75rem);
+}
+
+.pdf-article-document ul,
+.pdf-article-document ol {
+    padding-left: 1.45rem;
+}
+
+.pdf-article-document img {
+    display: block;
+    max-width: 100%;
+    max-height: 235mm;
+    height: auto;
+    margin-bottom: var(--article-block-spacing, .75rem);
+    border-radius: 4px;
+    break-inside: avoid-page;
+}
+
+.pdf-article-document pre {
+    overflow: visible;
+    padding: .9rem;
+    border: 1px solid #d6dfef;
+    border-radius: 5px;
+    background: #f5f7fb;
+    white-space: pre-wrap;
+    break-inside: avoid-page;
+}
+
+.pdf-article-document code {
+    font-family: "Courier New", monospace;
+    font-size: .9em;
+}
+
+.pdf-article-document .editor-colors .keyword,
+.pdf-article-document .editor-colors .type,
+.pdf-article-document .editor-colors .preprocessor {
+    color: #6d28d9;
+}
+
+.pdf-article-document .editor-colors .string,
+.pdf-article-document .editor-colors .character,
+.pdf-article-document .editor-colors .regex {
+    color: #a23a00;
+}
+
+.pdf-article-document .editor-colors .number {
+    color: #08745b;
+}
+
+.pdf-article-document .editor-colors .comment {
+    color: #65748b;
+    font-style: italic;
+}
+
+.pdf-article-document blockquote {
+    margin-left: 0;
+    padding-left: 1rem;
+    border-left: 3px solid #5875ff;
+    color: #40547c;
+    break-inside: avoid-page;
+}
+
+.pdf-article-document table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .94em;
+    break-inside: avoid-page;
+}
+
+.pdf-article-document th,
+.pdf-article-document td {
+    padding: .45rem .55rem;
+    border: 1px solid #d6dfef;
+    text-align: left;
+    vertical-align: top;
+}
+
+.pdf-article-document th {
+    background: #f2f5fb;
+}
+
+.pdf-article-document a {
+    color: #2647dd;
+    text-decoration: underline;
+}
+
+.pdf-article-document mjx-container[display="true"] {
+    break-inside: avoid-page;
+}

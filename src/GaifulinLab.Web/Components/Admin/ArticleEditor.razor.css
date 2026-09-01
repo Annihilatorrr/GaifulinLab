@@ -516,7 +516,7 @@
 }
 
 .preview-pane {
-    overflow-x: hidden;
+    overflow-x: auto;
     overflow-y: auto;
     overscroll-behavior: contain;
 }
@@ -555,6 +555,23 @@
 .pdf-button:disabled {
     cursor: wait;
     opacity: 0.55;
+}
+
+.preview-actions {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.preview-metrics {
+    overflow: hidden;
+    color: var(--color-text-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .pane-hint {
@@ -743,16 +760,15 @@
 }
 
 .preview-paper {
-    width: 100%;
-    max-width: var(--article-width);
+    --pdf-page-content-height: 986.46px;
+
+    width: 672.76px;
+    min-height: var(--pdf-page-content-height);
     margin-inline: auto;
     position: relative;
-    container-type: inline-size;
 }
 
 .preview-page-guides {
-    --preview-page-height: 141.4cqi;
-
     position: absolute;
     z-index: 0;
     inset: 0;
@@ -760,116 +776,15 @@
     background: repeating-linear-gradient(
         to bottom,
         transparent 0,
-        transparent calc(var(--preview-page-height) - 1px),
-        color-mix(in srgb, var(--color-border) 80%, transparent) calc(var(--preview-page-height) - 1px),
-        color-mix(in srgb, var(--color-border) 80%, transparent) var(--preview-page-height));
+        transparent calc(var(--pdf-page-content-height) - 1px),
+        color-mix(in srgb, var(--color-border) 80%, transparent) calc(var(--pdf-page-content-height) - 1px),
+        color-mix(in srgb, var(--color-border) 80%, transparent) var(--pdf-page-content-height));
 }
 
 .article-preview {
     width: 100%;
     position: relative;
     z-index: 1;
-    padding: var(--space-8);
-    color: var(--color-text);
-    line-height: var(--article-line-height, 1.75);
-}
-
-.preview-print-header {
-    display: none;
-}
-
-.article-preview ::deep h1,
-.article-preview ::deep h2,
-.article-preview ::deep h3 {
-    margin-block: 1.75em 0.65em;
-}
-
-.article-preview ::deep h1:first-child,
-.article-preview ::deep h2:first-child,
-.article-preview ::deep h3:first-child {
-    margin-top: 0;
-}
-
-.article-preview ::deep h1 {
-    font-size: var(--text-3xl);
-}
-
-.article-preview ::deep h2 {
-    font-size: clamp(1.5rem, 2vw, 2rem);
-}
-
-.article-preview ::deep h3 {
-    font-size: var(--text-xl);
-}
-
-.article-preview ::deep p,
-.article-preview ::deep ul,
-.article-preview ::deep ol,
-.article-preview ::deep blockquote,
-.article-preview ::deep pre,
-.article-preview ::deep table {
-    margin-block: 0 var(--article-block-spacing, .75rem);
-}
-
-.article-preview ::deep p,
-.article-preview ::deep li {
-    color: var(--color-text);
-}
-
-.article-preview ::deep blockquote {
-    margin-inline: 0;
-    border-left: 3px solid var(--color-accent);
-    padding-left: var(--space-5);
-    color: var(--color-text-muted);
-}
-
-.article-preview ::deep code {
-    border-radius: var(--radius-sm);
-    padding: 0.12em 0.35em;
-    background: var(--color-surface-subtle);
-    font-size: 0.9em;
-}
-
-.article-preview ::deep pre {
-    overflow-x: auto;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--space-5);
-    background: var(--color-surface-subtle);
-}
-
-.article-preview ::deep pre code {
-    padding: 0;
-    background: transparent;
-}
-
-.article-preview ::deep table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.article-preview ::deep th,
-.article-preview ::deep td {
-    border: 1px solid var(--color-border);
-    padding: var(--space-2) var(--space-3);
-    text-align: left;
-}
-
-.article-preview ::deep img {
-    height: auto;
-    border-radius: var(--radius-md);
-}
-
-.article-preview ::deep .math,
-.article-preview ::deep mjx-container[display="true"] {
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-}
-
-.article-preview ::deep mjx-container[display="true"] {
-    margin-block: var(--article-block-spacing, .75rem) !important;
-    padding-block: 0;
 }
 
 @media (max-width: 52rem) {
@@ -1007,8 +922,7 @@
     }
 
     #article-markdown,
-    .preview-empty,
-    .article-preview {
+    .preview-empty {
         padding: var(--space-4);
     }
 }
@@ -1049,28 +963,14 @@
     }
 
     .preview-paper {
+        width: auto;
+        min-height: 0;
         max-width: none;
         margin: 0;
     }
 
     .preview-page-guides {
         display: none;
-    }
-
-    .preview-print-header {
-        display: block;
-        margin-bottom: 1.5rem;
-    }
-
-    .preview-print-header h1 {
-        margin: 0 0 0.5rem;
-        font-size: 2rem;
-    }
-
-    .preview-print-header p {
-        margin: 0;
-        color: var(--color-text-muted);
-        font-size: var(--text-lg);
     }
 
     .article-preview ::deep h1,

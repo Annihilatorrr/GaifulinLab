@@ -78,5 +78,17 @@
         mathJax.texReset();
     };
 
-    window.articleAssets = { prepare, download, typesetMath, clearMath };
+    const measure = async (root) => {
+        const images = Array.from(root.querySelectorAll("img"));
+        await Promise.all(images.map((image) => image.complete
+            ? undefined
+            : new Promise((resolve) => {
+                image.addEventListener("load", resolve, { once: true });
+                image.addEventListener("error", resolve, { once: true });
+            })));
+
+        return { contentHeight: Math.ceil(root.scrollHeight) };
+    };
+
+    window.articleAssets = { prepare, download, typesetMath, clearMath, measure };
 })();
