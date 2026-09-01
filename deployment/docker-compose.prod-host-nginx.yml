@@ -1,12 +1,30 @@
 name: gaifulinlab
 
 services:
+  gotenberg:
+    image: gotenberg/gotenberg:8.34.0-chromium
+    container_name: gaifulinlab-prod-gotenberg-host-nginx
+    restart: unless-stopped
+    shm_size: "256mb"
+    command: ["gotenberg", "--api-timeout=40s"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - gaifulinlab-host-nginx
+
   api:
     build:
       context: ..
       dockerfile: deployment/Dockerfile.api
     container_name: gaifulinlab-prod-api-host-nginx
     restart: unless-stopped
+    depends_on:
+      gotenberg:
+        condition: service_healthy
     extra_hosts:
       # Linux containers use this alias to reach PostgreSQL installed on the Docker host.
       - "host.docker.internal:host-gateway"
@@ -21,6 +39,10 @@ services:
       JWT_SIGNING_KEY: ${GAIFULINLAB_JWT_SIGNING_KEY:?Set GAIFULINLAB_JWT_SIGNING_KEY in deployment/.env}
       JWT_LIFETIME_MINUTES: ${GAIFULINLAB_JWT_LIFETIME_MINUTES:-30}
       MEDIA_STORAGE_PATH: /app/media
+      PDF_RENDERER_BASE_URL: http://gotenberg:3000
+      PDF_ARTICLE_BASE_URL: http://web
+      PDF_RENDERER_TIMEOUT_SECONDS: ${GAIFULINLAB_PDF_RENDERER_TIMEOUT_SECONDS:-45}
+      PDF_MAX_CONCURRENT_RENDERS: ${GAIFULINLAB_PDF_MAX_CONCURRENT_RENDERS:-2}
       APPLY_DATABASE_MIGRATIONS: "false"
       HTTPS_REDIRECT_ENABLED: "false"
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"

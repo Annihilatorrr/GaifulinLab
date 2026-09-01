@@ -1,8 +1,8 @@
 # Browser E2E tests
 
 This project verifies the complete article-image flow on the primary running
-site: upload in the editor, Markdown insertion and preview, save, publish, and
-public rendering.
+site: upload in the editor, Markdown insertion and preview, save, publish,
+public rendering, and PDF download.
 
 It is intentionally excluded from `GaifulinLab.slnx`, so the normal unit and
 API test command never builds Docker images or starts a browser.
@@ -10,7 +10,14 @@ API test command never builds Docker images or starts a browser.
 ## Prerequisites
 
 - API and Web projects are running;
+- the local Gotenberg service is running;
 - Chromium for Playwright.
+
+Start the PDF renderer before the API and Web projects:
+
+```powershell
+docker compose -f deployment/docker-compose.pdf-dev.yml up -d
+```
 
 Install Chromium after building the test project:
 

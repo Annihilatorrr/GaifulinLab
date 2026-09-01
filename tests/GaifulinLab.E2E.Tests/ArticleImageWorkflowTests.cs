@@ -18,12 +18,12 @@ public sealed class ArticleImageWorkflowTests : PageTest
     }
 
     [Fact]
-    public async Task UploadImage_SaveAndPublish_ImageIsAvailableOnThePrimarySite()
+    public async Task UploadImage_SavePublishAndDownloadPdf_ContentIsAvailableOnThePrimarySite()
     {
         var (login, password) = _environment.GetAdminCredentials();
         var uniqueId = Guid.NewGuid().ToString("N");
         var title = $"E2E image article {uniqueId}";
-        var slug = $"e2e-image-{uniqueId}";
+        var slug = $"e2e-image-article-{uniqueId}";
         var publicPath = $"/en/articles/{slug}";
 
         await Page.GotoAsync(new Uri(_environment.BaseUri, "/admin/login").ToString());
@@ -36,7 +36,7 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/new$", RegexOptions.CultureInvariant));
 
         await Page.GetByLabel("Article title").FillAsync(title);
-        await Page.GetByPlaceholder("article-slug").FillAsync(slug);
+        await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync(slug);
         await Page.Locator("input[type=file]").SetInputFilesAsync(new FilePayload
         {
             Name = "e2e-diagram.png",
@@ -59,6 +59,7 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article" })).ToBeVisibleAsync();
 
         await AssertPublicImageLoadsAsync(Page, new Uri(_environment.BaseUri, publicPath));
+        await AssertPdfDownloadsAsync(Page, slug);
     }
 
     private static async Task AssertPublicImageLoadsAsync(IPage page, Uri publicArticleUri)
@@ -68,5 +69,20 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await image.WaitForAsync(new() { State = WaitForSelectorState.Visible });
         var width = await image.EvaluateAsync<int>("element => element.naturalWidth");
         Assert.True(width > 0, "The public article image was rendered but could not be loaded.");
+    }
+
+    private static async Task AssertPdfDownloadsAsync(IPage page, string slug)
+    {
+        var download = await page.RunAndWaitForDownloadAsync(
+            () => page.GetByRole(AriaRole.Link, new() { Name = "Download PDF" }).ClickAsync());
+
+        Assert.Equal($"{slug}.pdf", download.SuggestedFilename);
+        var path = await download.PathAsync();
+        Assert.False(string.IsNullOrWhiteSpace(path));
+
+        var header = new byte[5];
+        await using var stream = File.OpenRead(path);
+        Assert.Equal(header.Length, await stream.ReadAsync(header));
+        Assert.Equal("%PDF-"u8.ToArray(), header);
     }
 }

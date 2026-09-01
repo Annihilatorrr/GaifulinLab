@@ -39,3 +39,17 @@
     right: var(--space-3);
     top: var(--space-2);
 }
+
+@media print {
+    .skip-link,
+    .site-shell ::deep .site-header,
+    .site-shell ::deep .site-footer,
+    #blazor-error-ui {
+        display: none !important;
+    }
+
+    .site-shell {
+        display: block;
+        min-height: 0;
+    }
+}

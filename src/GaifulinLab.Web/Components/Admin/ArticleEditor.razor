@@ -4,8 +4,9 @@
 @inject AdminMediaClient MediaClient
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@using System.Globalization
 
-<div class="article-editor" data-active-pane="@_activePane">
+<div class="article-editor" data-active-pane="@_activePane" style="@TypographyStyle">
     <header class="editor-toolbar surface">
         <a class="back-link" href="/admin/articles" aria-label="Back to articles">←</a>
         <label class="language-picker">
@@ -21,7 +22,7 @@
         <label class="title-field">
             <span class="visually-hidden">Article title</span>
             <input type="text" placeholder="Untitled article" autocomplete="off"
-                   @bind="Current.Title" @bind:event="oninput" disabled="@_loading" />
+                   value="@Current.Title" @oninput="HandleTitleInput" disabled="@_loading" />
         </label>
         <span class="draft-badge">@Current.Status</span>
         <div class="editor-actions" aria-label="Article actions">
@@ -76,8 +77,9 @@
                     <span class="field-label">URL slug</span>
                     <span class="slug-field"><span>/@Current.LanguageCode/articles/</span>
                         <input type="text" placeholder="article-slug" autocomplete="off" spellcheck="false"
-                               @bind="Current.Slug" @bind:event="oninput" />
+                               value="@Current.Slug" @oninput="HandleSlugInput" />
                     </span>
+                    <span class="field-help">Suggested from the title until you edit it manually.</span>
                 </label>
                 <label class="settings-field settings-field-wide">
                     <span class="field-label">Summary</span>
@@ -139,10 +141,19 @@
             <section class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
                 <header class="pane-heading" id="markdown-heading">
                     <span>Markdown</span>
+                    <div class="pane-tools">
+                        <details class="typography-control">
+                            <summary>Text spacing</summary>
+                            <div class="typography-control__content">
+                                <label>Lines <input type="range" min="1" max="2.2" step="0.05" value="@FormatTypographyValue(_typography.LineHeight)" @oninput="HandleLineHeightChanged" /><output>@FormatTypographyValue(_typography.LineHeight)</output></label>
+                                <label>Blocks <input type="range" min="0.1" max="1.6" step="0.05" value="@FormatTypographyValue(_typography.BlockSpacing)" @oninput="HandleBlockSpacingChanged" /><output>@FormatTypographyValue(_typography.BlockSpacing)rem</output></label>
+                            </div>
+                        </details>
                     <label class="image-upload" aria-disabled="@_imageUploading">
                         @(_imageUploading ? "Uploading…" : "+ Add image")
                         <InputFile OnChange="HandleImageSelected" accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" disabled="@_imageUploading" />
                     </label>
+                    </div>
                 </header>
                 @if (_imageUploadError is not null) { <div class="upload-error" role="alert">@_imageUploadError</div> }
                 <label class="visually-hidden" for="article-markdown">Article Markdown</label>
@@ -185,8 +196,12 @@
     private ElementReference _previewElement;
     private bool _previewElementReady;
     private bool _mathTypesetPending;
+    private bool _typographyLoaded;
+    private ArticleTypography _typography = ArticleTypography.Default;
     private LocalizationModel Current => _localizations[_activeLanguage];
     private bool IsBusy => _loading || _saving;
+    private string TypographyStyle =>
+        $"--article-line-height: {FormatTypographyValue(_typography.LineHeight)}; --article-block-spacing: {FormatTypographyValue(_typography.BlockSpacing)}rem;";
 
     protected override async Task OnInitializedAsync()
     {
@@ -213,6 +228,23 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!_typographyLoaded)
+        {
+            try
+            {
+                var stored = await JS.InvokeAsync<ArticleTypography>("gaifulinLabTypography.get");
+                _typography = ArticleTypography.FromOptional(stored.LineHeight, stored.BlockSpacing);
+            }
+            catch (JSException)
+            {
+                // Local storage is optional; the default density remains in effect.
+            }
+
+            _typographyLoaded = true;
+            StateHasChanged();
+            return;
+        }
+
         if (_loading
             || _previewLoading
             || _previewError is not null
@@ -303,6 +335,12 @@
 
     private async Task PublishAsync()
     {
+        if (string.IsNullOrWhiteSpace(Current.Title))
+        {
+            ShowMessage("Add a title before publishing.", true);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(Current.Slug))
         {
             ShowMessage("Add a URL slug before publishing.", true);
@@ -334,6 +372,51 @@
     }
 
     private async Task HandleMarkdownInput(ChangeEventArgs eventArgs) { Current.Markdown = eventArgs.Value?.ToString() ?? ""; await RefreshPreview(); }
+
+    private Task HandleLineHeightChanged(ChangeEventArgs eventArgs) =>
+        UpdateTypographyAsync(eventArgs.Value?.ToString(), isLineHeight: true);
+
+    private Task HandleBlockSpacingChanged(ChangeEventArgs eventArgs) =>
+        UpdateTypographyAsync(eventArgs.Value?.ToString(), isLineHeight: false);
+
+    private async Task UpdateTypographyAsync(string? value, bool isLineHeight)
+    {
+        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
+        {
+            return;
+        }
+
+        _typography = isLineHeight
+            ? ArticleTypography.FromOptional(number, _typography.BlockSpacing)
+            : ArticleTypography.FromOptional(_typography.LineHeight, number);
+        try
+        {
+            var stored = await JS.InvokeAsync<ArticleTypography>("gaifulinLabTypography.set", _typography);
+            _typography = ArticleTypography.FromOptional(stored.LineHeight, stored.BlockSpacing);
+        }
+        catch (JSException)
+        {
+            // The current editor can still use the selected value without persistence.
+        }
+    }
+
+    private static string FormatTypographyValue(decimal value) =>
+        value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private void HandleTitleInput(ChangeEventArgs eventArgs)
+    {
+        Current.Title = eventArgs.Value?.ToString() ?? "";
+        if (Current.SlugIsAutomatic)
+        {
+            Current.Slug = SlugSuggestion.FromTitle(Current.Title);
+        }
+    }
+
+    private void HandleSlugInput(ChangeEventArgs eventArgs)
+    {
+        Current.Slug = eventArgs.Value?.ToString() ?? "";
+        Current.SlugIsAutomatic = false;
+    }
 
     private async Task HandleImageSelected(InputFileChangeEventArgs eventArgs)
     {
@@ -443,21 +526,43 @@
 
     private sealed class LocalizationModel
     {
-        public LocalizationModel(string languageCode) => LanguageCode = languageCode;
+        public LocalizationModel(string languageCode)
+        {
+            LanguageCode = languageCode;
+            SlugIsAutomatic = true;
+        }
+
         public LocalizationModel(string languageCode, LocalizationModel source)
         {
             LanguageCode = languageCode;
             Title = source.Title;
             Summary = source.Summary;
             Markdown = source.Markdown;
-            Slug = source.Slug;
+            Slug = SlugSuggestion.FromTitle(Title);
+            SlugIsAutomatic = true;
         }
-        public LocalizationModel(AdminArticleLocalizationDto dto) { LanguageCode = dto.LanguageCode; Title = dto.Title; Summary = dto.Summary ?? ""; Markdown = dto.Markdown; Slug = dto.Slug ?? ""; Status = dto.Status; }
+
+        public LocalizationModel(AdminArticleLocalizationDto dto)
+        {
+            LanguageCode = dto.LanguageCode;
+            Title = dto.Title;
+            Summary = dto.Summary ?? "";
+            Markdown = dto.Markdown;
+            Slug = dto.Slug ?? "";
+            Status = dto.Status;
+            SlugIsAutomatic = Status == PublicationStatusDto.Draft
+                && (string.IsNullOrWhiteSpace(Slug)
+                    || string.Equals(
+                        Slug,
+                        SlugSuggestion.FromTitle(Title),
+                        StringComparison.Ordinal));
+        }
         public string LanguageCode { get; }
         public string Title { get; set; } = "";
         public string Summary { get; set; } = "";
         public string Markdown { get; set; } = "";
         public string Slug { get; set; } = "";
+        public bool SlugIsAutomatic { get; set; }
         public PublicationStatusDto Status { get; set; } = PublicationStatusDto.Draft;
         public CreateArticleRequest ToCreateRequest() => new(LanguageCode, Title, Summary, Markdown, Slug);
         public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Markdown, Slug);

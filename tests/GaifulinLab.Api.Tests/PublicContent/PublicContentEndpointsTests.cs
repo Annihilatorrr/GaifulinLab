@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using GaifulinLab.Application.Common;
+using GaifulinLab.Application.Pdf;
+using GaifulinLab.Contracts.Common;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Contracts.Taxonomy;
 using GaifulinLab.Domain.Articles;
@@ -7,7 +10,9 @@ using GaifulinLab.Domain.Tags;
 using GaifulinLab.Domain.Topics;
 using GaifulinLab.Infrastructure.Persistence;
 using GaifulinLab.Api.Tests.Authentication;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using SeriesAggregate = GaifulinLab.Domain.Series.Series;
 
 namespace GaifulinLab.Api.Tests.PublicContent;
@@ -39,7 +44,7 @@ public sealed class PublicContentEndpointsTests
     public async Task ArticleDetails_ReturnOnlyPublishedIndependentLocalizations()
     {
         await using var factory = new AuthWebApplicationFactory();
-        await SeedContent(factory);
+        await SeedContent(factory.Services);
         using var client = factory.CreateClient();
 
         var article = await client.GetFromJsonAsync<PublicArticleDetailsDto>(
@@ -70,7 +75,7 @@ public sealed class PublicContentEndpointsTests
     public async Task ListsAndTaxonomy_IncludeOnlyPublishedArticlesAndSupportCombinedFilters()
     {
         await using var factory = new AuthWebApplicationFactory();
-        await SeedContent(factory);
+        await SeedContent(factory.Services);
         using var client = factory.CreateClient();
 
         var filtered = await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
@@ -100,9 +105,76 @@ public sealed class PublicContentEndpointsTests
         Assert.Single(allEnglish!);
     }
 
-    private static async Task SeedContent(AuthWebApplicationFactory factory)
+    [Fact]
+    public async Task ArticlePdf_ForPublishedLocalization_ReturnsDownload()
     {
-        using var scope = factory.Services.CreateScope();
+        await using var factory = new AuthWebApplicationFactory();
+        var renderer = new StubArticlePdfRenderer("%PDF-1.7\narticle"u8.ToArray());
+        await using var pdfFactory = WithPdfRenderer(factory, renderer);
+        await SeedContent(pdfFactory.Services);
+        using var client = pdfFactory.CreateClient();
+
+        var response = await client.GetAsync(
+            "/api/public/articles/en/understanding-fft/pdf?lineHeight=1.5&blockSpacing=0.4");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("attachment", response.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.Equal("understanding-fft.pdf", response.Content.Headers.ContentDisposition?.FileNameStar);
+        Assert.True(response.Headers.CacheControl?.Private);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.Equal("%PDF-1.7\narticle"u8.ToArray(), await response.Content.ReadAsByteArrayAsync());
+        var request = Assert.Single(renderer.Requests);
+        Assert.Equal("en", request.LanguageCode);
+        Assert.Equal("understanding-fft", request.Slug);
+        Assert.Equal(new ArticleTypography(1.5m, 0.4m), request.Typography);
+    }
+
+    [Fact]
+    public async Task ArticlePdf_ForDraft_DoesNotCallRenderer()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        var renderer = new StubArticlePdfRenderer("%PDF-1.7"u8.ToArray());
+        await using var pdfFactory = WithPdfRenderer(factory, renderer);
+        await SeedContent(pdfFactory.Services);
+        using var client = pdfFactory.CreateClient();
+
+        var response = await client.GetAsync("/api/public/articles/en/future-draft/pdf");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Empty(renderer.Requests);
+    }
+
+    [Fact]
+    public async Task ArticlePdf_WhenRendererFails_ReturnsServiceUnavailable()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        var renderer = new StubArticlePdfRenderer(
+            exception: new PdfRenderingException("The article PDF renderer is unavailable."));
+        await using var pdfFactory = WithPdfRenderer(factory, renderer);
+        await SeedContent(pdfFactory.Services);
+        using var client = pdfFactory.CreateClient();
+
+        var response = await client.GetAsync(
+            "/api/public/articles/en/understanding-fft/pdf");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+        Assert.Equal("pdf_renderer_unavailable", error?.Code);
+    }
+
+    private static WebApplicationFactory<Program> WithPdfRenderer(
+        AuthWebApplicationFactory factory,
+        IArticlePdfRenderer renderer) =>
+        factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IArticlePdfRenderer>();
+            services.AddSingleton(renderer);
+        }));
+
+    private static async Task SeedContent(IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var now = DateTimeOffset.UtcNow.AddDays(-1);
 
@@ -166,5 +238,24 @@ public sealed class PublicContentEndpointsTests
 
         dbContext.AddRange(article, draft, topic, series, tag);
         await dbContext.SaveChangesAsync();
+    }
+
+    private sealed class StubArticlePdfRenderer(
+        byte[]? pdf = null,
+        Exception? exception = null) : IArticlePdfRenderer
+    {
+        public List<(string LanguageCode, string Slug, ArticleTypography Typography)> Requests { get; } = [];
+
+        public Task<byte[]> RenderAsync(
+            string languageCode,
+            string slug,
+            ArticleTypography typography,
+            CancellationToken cancellationToken)
+        {
+            Requests.Add((languageCode, slug, typography));
+            return exception is null
+                ? Task.FromResult(pdf ?? "%PDF-1.7"u8.ToArray())
+                : Task.FromException<byte[]>(exception);
+        }
     }
 }

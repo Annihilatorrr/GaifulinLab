@@ -1,14 +1,26 @@
 @inject PublicContentClient ContentClient
 @inject IJSRuntime JS
+@using System.Globalization
 
-<main id="main-content" class="site-main article-page">
+<main id="main-content"
+      class="site-main article-page"
+      style="@TypographyStyle"
+      data-pdf-ready="@(_pdfReady ? "true" : "false")">
     <div class="site-container article-layout">
         @if (_loading) { <div role="status">Loading article…</div> }
         else if (_article is null) { <div class="not-found surface"><h1>Article not found</h1><p>This localization is not published or does not exist.</p><a href="/articles">Back to articles</a></div> }
         else
         {
             <header class="article-header">
-                <time datetime="@_article.PublishedAt.ToString("O")">@_article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                <div class="article-meta">
+                    <time datetime="@_article.PublishedAt.ToString("O")">@_article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                    @if (_typographyReady)
+                    {
+                        <a class="article-download" href="@PdfDownloadUrl" download>
+                            @PdfDownloadLabel
+                        </a>
+                    }
+                </div>
                 <h1>@_article.Title</h1>
                 @if (!string.IsNullOrWhiteSpace(_article.Summary)) { <p>@_article.Summary</p> }
                 @if (_article.AvailableLocalizations.Count > 1)
@@ -26,16 +38,34 @@
 @code {
     [Parameter, EditorRequired] public string LanguageCode { get; set; } = "en";
     [Parameter, EditorRequired] public string Slug { get; set; } = "";
+    [Parameter] public decimal? RequestedLineHeight { get; set; }
+    [Parameter] public decimal? RequestedBlockSpacing { get; set; }
     private PublicArticleDetailsDto? _article;
     private bool _loading = true;
     private ElementReference _articleElement;
     private bool _articleElementReady;
     private bool _mathTypesetPending;
+    private bool _pdfReady;
+    private bool _typographyReady;
+    private ArticleTypography _typography = ArticleTypography.Default;
+
+    private string PdfDownloadUrl =>
+        $"/api/public/articles/{Uri.EscapeDataString(LanguageCode)}/{Uri.EscapeDataString(Slug)}/pdf?lineHeight={_typography.LineHeight.ToString(CultureInfo.InvariantCulture)}&blockSpacing={_typography.BlockSpacing.ToString(CultureInfo.InvariantCulture)}";
+    private string TypographyStyle =>
+        $"--article-line-height: {_typography.LineHeight.ToString(CultureInfo.InvariantCulture)}; --article-block-spacing: {_typography.BlockSpacing.ToString(CultureInfo.InvariantCulture)}rem;";
+
+    private string PdfDownloadLabel =>
+        string.Equals(LanguageCode, "ru", StringComparison.OrdinalIgnoreCase)
+            ? "Скачать PDF"
+            : "Download PDF";
 
     protected override async Task OnParametersSetAsync()
     {
         await ClearArticleMathAsync();
         _articleElementReady = false;
+        _pdfReady = false;
+        _typographyReady = RequestedLineHeight.HasValue || RequestedBlockSpacing.HasValue;
+        _typography = ArticleTypography.FromOptional(RequestedLineHeight, RequestedBlockSpacing);
         _loading = true;
         try
         {
@@ -53,9 +83,32 @@
             return;
         }
 
+        if (!_typographyReady)
+        {
+            try
+            {
+                var stored = await JS.InvokeAsync<ArticleTypography>("gaifulinLabTypography.get");
+                _typography = ArticleTypography.FromOptional(stored.LineHeight, stored.BlockSpacing);
+            }
+            catch (JSException)
+            {
+                // Local storage is optional; the default density remains in effect.
+            }
+
+            _typographyReady = true;
+            StateHasChanged();
+            return;
+        }
+
         _articleElementReady = true;
         if (!_mathTypesetPending)
         {
+            if (!_pdfReady)
+            {
+                _pdfReady = true;
+                StateHasChanged();
+            }
+
             return;
         }
 
@@ -69,6 +122,11 @@
         catch (JSException)
         {
             // Raw TeX remains readable if the external renderer is unavailable.
+        }
+        finally
+        {
+            _pdfReady = true;
+            StateHasChanged();
         }
     }
 

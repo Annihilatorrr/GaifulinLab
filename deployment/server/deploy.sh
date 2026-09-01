@@ -167,6 +167,23 @@ wait_for_path() {
     deployment_fail "Health check failed for $path."
 }
 
+wait_for_pdf_renderer() {
+    local attempt
+
+    for (( attempt = 1; attempt <= 30; attempt++ )); do
+        if docker compose -p "$COMPOSE_PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \
+            exec -T gotenberg curl --silent --fail http://localhost:3000/health >/dev/null; then
+            return 0
+        fi
+
+        sleep 2
+    done
+
+    docker compose -p "$COMPOSE_PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \
+        logs --tail 120 gotenberg >&2 || true
+    deployment_fail "Gotenberg PDF renderer health check failed."
+}
+
 # Проверить неизменяемые условия деплоя до изменений PostgreSQL, контейнеров и nginx.
 # Цикл одинаково проверяет наличие каждой внешней программы в PATH.
 for command_name in docker curl sed sudo openssl psql; do
@@ -247,6 +264,9 @@ render_nginx_config
 # `--remove-orphans` удаляет устаревшие сервисы этого Compose-проекта.
 docker compose -p "$COMPOSE_PROJECT" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" \
     up -d --build --remove-orphans
+
+echo "Checking deployment health: Gotenberg PDF renderer"
+wait_for_pdf_renderer
 
 # Publish the host nginx route only after both private API and Web services start.
 install_nginx_site

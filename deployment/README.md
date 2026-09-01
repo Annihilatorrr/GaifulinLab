@@ -55,6 +55,18 @@ deployment/
 endpoint — `localhost:5435`. Данные сохраняются в Docker volume
 `gaifulinlab-postgres-dev-data`.
 
+## Локальный экспорт PDF
+
+Chromium устанавливать на Windows не требуется. Запустите отдельный Gotenberg-контейнер:
+
+```powershell
+docker compose -f deployment/docker-compose.pdf-dev.yml up -d
+```
+
+После этого запускайте API и Web с HTTP-профилями. API обращается к Gotenberg на
+`http://localhost:3000`, а контейнер открывает Web через `http://host.docker.internal:5172`.
+В production тот же контейнер запускается основным Compose-файлом без публикации порта наружу.
+
 Локальная учётная запись администратора задаётся только в
 `appsettings.Development.json`:
 

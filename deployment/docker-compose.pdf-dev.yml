@@ -1,0 +1,12 @@
+name: gaifulinlab-pdf-dev
+
+services:
+  gotenberg:
+    image: gotenberg/gotenberg:8.34.0-chromium
+    restart: unless-stopped
+    shm_size: "256mb"
+    command: ["gotenberg", "--api-timeout=40s"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:3000:3000"

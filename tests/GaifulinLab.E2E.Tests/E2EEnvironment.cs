@@ -13,7 +13,8 @@ public sealed class E2EEnvironment : IAsyncLifetime
         var configuredBaseUrl = Environment.GetEnvironmentVariable("GAIFULINLAB_E2E_BASE_URL")
             ?? DefaultBaseUrl;
         if (!Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var baseUri)
-            || baseUri.Scheme is not (Uri.UriSchemeHttp or Uri.UriSchemeHttps))
+            || (baseUri.Scheme != Uri.UriSchemeHttp
+                && baseUri.Scheme != Uri.UriSchemeHttps))
         {
             throw new InvalidOperationException(
                 "GAIFULINLAB_E2E_BASE_URL must be an absolute HTTP or HTTPS URL.");

@@ -2,9 +2,16 @@
 
 <PageTitle>Article · Gaifulin Lab</PageTitle>
 
-<PublicArticleView LanguageCode="@LanguageCode" Slug="@Slug" />
+<PublicArticleView LanguageCode="@LanguageCode"
+                   Slug="@Slug"
+                   RequestedLineHeight="@LineHeight"
+                   RequestedBlockSpacing="@BlockSpacing" />
 
 @code {
     [Parameter] public string LanguageCode { get; set; } = "en";
     [Parameter] public string Slug { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "lineHeight")]
+    public decimal? LineHeight { get; set; }
+    [SupplyParameterFromQuery(Name = "blockSpacing")]
+    public decimal? BlockSpacing { get; set; }
 }
