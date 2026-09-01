@@ -62,6 +62,20 @@ public sealed class PublicContentClientTests
             requestUri?.PathAndQuery);
     }
 
+    [Fact]
+    public void ResolveApiUrl_UsesTheApiOriginForRelativeUrls()
+    {
+        using var httpClient = new HttpClient
+        {
+            BaseAddress = new Uri("http://localhost:5180/")
+        };
+        var client = new PublicContentClient(httpClient);
+
+        var url = client.ResolveApiUrl("/api/public/pdf-exports/123/download");
+
+        Assert.Equal("http://localhost:5180/api/public/pdf-exports/123/download", url);
+    }
+
     private static HttpResponseMessage JsonResponse<T>(T value, HttpStatusCode statusCode) =>
         new(statusCode)
         {

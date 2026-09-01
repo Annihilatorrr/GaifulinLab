@@ -163,7 +163,9 @@
                 if (string.Equals(export.Status, "completed", StringComparison.OrdinalIgnoreCase)
                     && !string.IsNullOrWhiteSpace(export.DownloadUrl))
                 {
-                    await JS.InvokeVoidAsync("articleAssets.download", export.DownloadUrl);
+                    await JS.InvokeVoidAsync(
+                        "articleAssets.download",
+                        ContentClient.ResolveApiUrl(export.DownloadUrl));
                     return;
                 }
 

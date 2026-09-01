@@ -9,6 +9,9 @@ public sealed class PublicContentClient(HttpClient httpClient)
 {
     public string AssetBaseUrl => httpClient.BaseAddress!.AbsoluteUri;
 
+    public string ResolveApiUrl(string relativeOrAbsoluteUrl) =>
+        new Uri(httpClient.BaseAddress!, relativeOrAbsoluteUrl).AbsoluteUri;
+
     public async Task<PdfExportStatusDto> CreateArticlePdfExportAsync(
         string languageCode,
         string slug,
