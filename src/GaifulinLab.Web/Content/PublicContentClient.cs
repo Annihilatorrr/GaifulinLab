@@ -5,8 +5,23 @@ using GaifulinLab.Contracts.Taxonomy;
 
 namespace GaifulinLab.Web.Content;
 
-public sealed class PublicContentClient(HttpClient httpClient)
+public sealed class PublicContentClient(HttpClient httpClient, Uri pdfApiBaseAddress)
 {
+    public string AssetBaseUrl => httpClient.BaseAddress!.AbsoluteUri;
+    public string PdfAssetBaseUrl => pdfApiBaseAddress.AbsoluteUri;
+
+    public string GetArticlePdfUrl(
+        string languageCode,
+        string slug,
+        ArticleTypography typography)
+    {
+        var relativeUri =
+            $"api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}/pdf" +
+            $"?lineHeight={typography.LineHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
+            $"&blockSpacing={typography.BlockSpacing.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        return new Uri(httpClient.BaseAddress!, relativeUri).AbsoluteUri;
+    }
+
     public Task<IReadOnlyList<PublicArticleListItemDto>> GetArticlesAsync(
         string languageCode,
         string? topic = null,
@@ -29,10 +44,17 @@ public sealed class PublicContentClient(HttpClient httpClient)
     public Task<PublicArticleDetailsDto?> GetArticleAsync(
         string languageCode,
         string slug,
+        bool forPdf = false,
         CancellationToken cancellationToken = default) =>
-        GetOptionalAsync<PublicArticleDetailsDto>(
-            $"/api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}",
-            cancellationToken);
+        forPdf
+            ? GetOptionalAsync<PublicArticleDetailsDto>(
+                new Uri(
+                    pdfApiBaseAddress,
+                    $"api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}"),
+                cancellationToken)
+            : GetOptionalAsync<PublicArticleDetailsDto>(
+                $"/api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}",
+                cancellationToken);
 
     public Task<IReadOnlyList<PublicTopicDto>> GetTopicsAsync(
         string languageCode,
@@ -74,6 +96,19 @@ public sealed class PublicContentClient(HttpClient httpClient)
     private async Task<T?> GetOptionalAsync<T>(string uri, CancellationToken cancellationToken)
     {
         var response = await httpClient.GetAsync(uri, cancellationToken);
+        return await ReadOptionalAsync<T>(response, cancellationToken);
+    }
+
+    private async Task<T?> GetOptionalAsync<T>(Uri uri, CancellationToken cancellationToken)
+    {
+        var response = await httpClient.GetAsync(uri, cancellationToken);
+        return await ReadOptionalAsync<T>(response, cancellationToken);
+    }
+
+    private static async Task<T?> ReadOptionalAsync<T>(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return default;

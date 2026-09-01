@@ -30,10 +30,10 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await Page.Locator("#admin-login").FillAsync(login);
         await Page.Locator("#admin-password").FillAsync(password);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
-        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles$", RegexOptions.CultureInvariant));
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles$"));
 
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
-        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/new$", RegexOptions.CultureInvariant));
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/new$"));
 
         await Page.GetByLabel("Article title").FillAsync(title);
         await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync(slug);
@@ -47,14 +47,14 @@ public sealed class ArticleImageWorkflowTests : PageTest
         var markdown = Page.Locator("#article-markdown");
         await Expect(markdown).ToHaveValueAsync(new Regex(
             "!\\[e2e-diagram\\]\\(/media/[0-9a-f-]{36}\\)",
-            RegexOptions.CultureInvariant));
+            RegexOptions.None));
 
         var previewImage = Page.Locator("article.article-preview img");
         await Expect(previewImage).ToBeVisibleAsync();
         await Expect(previewImage).ToHaveAttributeAsync("src", new Regex("^/media/[0-9a-f-]{36}$"));
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$", RegexOptions.CultureInvariant));
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
         await Page.GetByRole(AriaRole.Button, new() { Name = "Publish" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article" })).ToBeVisibleAsync();
 
@@ -67,16 +67,28 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await page.GotoAsync(publicArticleUri.ToString());
         var image = page.Locator("article.article-body img");
         await image.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await page.WaitForFunctionAsync(
+            "image => image.complete && image.naturalWidth > 0",
+            await image.ElementHandleAsync());
         var width = await image.EvaluateAsync<int>("element => element.naturalWidth");
         Assert.True(width > 0, "The public article image was rendered but could not be loaded.");
     }
 
     private static async Task AssertPdfDownloadsAsync(IPage page, string slug)
     {
+        var responseTask = page.WaitForResponseAsync(response =>
+            response.Request.Method == "GET"
+            && response.Url.Contains("/api/public/articles/", StringComparison.Ordinal)
+            && response.Url.Contains("/pdf", StringComparison.Ordinal));
         var download = await page.RunAndWaitForDownloadAsync(
             () => page.GetByRole(AriaRole.Link, new() { Name = "Download PDF" }).ClickAsync());
+        var response = await responseTask;
 
         Assert.Equal($"{slug}.pdf", download.SuggestedFilename);
+        Assert.StartsWith(
+            "application/pdf",
+            response.Headers["content-type"],
+            StringComparison.OrdinalIgnoreCase);
         var path = await download.PathAsync();
         Assert.False(string.IsNullOrWhiteSpace(path));
 
