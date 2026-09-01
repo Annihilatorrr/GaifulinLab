@@ -74,13 +74,8 @@ internal sealed class PlaywrightArticlePdfRenderer(
             await page.EvaluateAsync("""
                 async () => {
                     await document.fonts.ready;
-                    if (!window.MathJax?.startup?.promise) {
+                    if (!window.MathJax) {
                         throw new Error('MathJax did not initialize.');
-                    }
-
-                    await window.MathJax.startup.promise;
-                    if (typeof window.MathJax.typesetPromise !== 'function') {
-                        throw new Error('MathJax typesetting API did not initialize.');
                     }
 
                     await window.MathJax.typesetPromise();

@@ -1,5 +1,5 @@
 (() => {
-    const mathJaxUrl = "https://cdn.jsdelivr.net/npm/mathjax@4.0.0/tex-chtml.js";
+    const mathJaxUrl = "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js";
     let mathJaxLoadPromise;
 
     const prepare = (root, apiBaseUrl) => {
@@ -29,23 +29,14 @@
             const script = document.createElement("script");
             script.src = mathJaxUrl;
             script.async = true;
-            script.onload = async () => {
+            script.onload = () => {
                 const mathJax = window.MathJax;
-                if (!mathJax?.startup?.promise) {
+                if (!mathJax?.typesetPromise) {
                     reject(new Error("MathJax did not initialize."));
                     return;
                 }
 
-                try {
-                    await mathJax.startup.promise;
-                    if (typeof mathJax.typesetPromise !== "function") {
-                        throw new Error("MathJax typesetting API did not initialize.");
-                    }
-
-                    resolve(mathJax);
-                } catch (error) {
-                    reject(error);
-                }
+                Promise.resolve(mathJax.startup?.promise).then(() => resolve(mathJax), reject);
             };
             script.onerror = () => reject(new Error("MathJax could not be loaded."));
             document.head.appendChild(script);
