@@ -50,7 +50,7 @@ public static class DependencyInjection
             TimeSpan.FromSeconds(pdfTimeoutSeconds),
             maximumConcurrentPdfRenders,
             configuration["PDF_MATHJAX_PATH"]
-            ?? Path.Combine(AppContext.BaseDirectory, "pdf-assets", "mathjax", "es5", "tex-chtml.js")));
+            ?? Path.Combine(AppContext.BaseDirectory, "pdf-assets", "mathjax", "es5", "tex-svg.js")));
         services.AddSingleton<IArticlePdfRenderer, PlaywrightArticlePdfRenderer>();
 
         if (configuration.GetValue("PDF_WORKER_ENABLED", false))

@@ -26,6 +26,12 @@ internal sealed class PlaywrightArticlePdfRenderer(
     private static readonly Regex MediaSource = new(
         "src=\\\"/media/(?<id>[0-9a-fA-F-]{36})\\\"",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex DisplayMath = new(
+        "<div class=\\\"math\\\">(?<formula>.*?)</div>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+    private static readonly Regex IntegralWithoutExplicitLimits = new(
+        @"\\int(?!\\(?:limits|nolimits))",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly SemaphoreSlim _renderSlots = new(settings.MaximumConcurrentRenders);
     private readonly SemaphoreSlim _browserLock = new(1, 1);
@@ -73,6 +79,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
                     }
 
                     await window.MathJax.typesetPromise();
+                    await document.fonts.ready;
                     document.documentElement.dataset.pdfReady = 'true';
                 }
                 """);
@@ -118,6 +125,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
         CancellationToken cancellationToken)
     {
         var articleHtml = markdownRenderer.Render(document.Markdown);
+        articleHtml = ForceDisplayIntegralLimits(articleHtml);
         articleHtml = await EmbedInternalMediaAsync(articleHtml, cancellationToken);
         var title = WebUtility.HtmlEncode(document.Title);
         var summary = string.IsNullOrWhiteSpace(document.Summary)
@@ -158,7 +166,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
                     th, td { padding: .45rem .55rem; border: 1px solid #d6dfef; text-align: left; vertical-align: top; }
                     th { background: #f2f5fb; }
                     a { color: #2647dd; text-decoration: underline; }
-                    mjx-container[display="true"] { max-width: 100%; overflow: hidden; break-inside: avoid-page; }
+                    mjx-container[display="true"] { break-inside: avoid-page; }
                 </style>
                 <script>
                     window.MathJax = { startup: { typeset: false } };
@@ -226,6 +234,14 @@ internal sealed class PlaywrightArticlePdfRenderer(
             return replacements.TryGetValue(mediaId, out var replacement) ? replacement : match.Value;
         });
     }
+
+    internal static string ForceDisplayIntegralLimits(string html) =>
+        DisplayMath.Replace(html, match =>
+        {
+            var formula = match.Groups["formula"].Value;
+            var normalizedFormula = IntegralWithoutExplicitLimits.Replace(formula, @"\int\limits");
+            return match.Value.Replace(formula, normalizedFormula, StringComparison.Ordinal);
+        });
 
     private async Task<IBrowser> GetBrowserAsync(CancellationToken cancellationToken)
     {
