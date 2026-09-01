@@ -24,18 +24,51 @@
             <input type="text" placeholder="Untitled article" autocomplete="off"
                    value="@Current.Title" @oninput="HandleTitleInput" disabled="@_loading" />
         </label>
+        <div class="article-path" aria-label="Public article path" title="@PublicPath">
+            <code>@PublicPath</code>
+            @if (CanOpenPublicArticle)
+            {
+                <a href="@PublicPath" target="_blank" rel="noopener" aria-label="Open published article in a new tab">&#x2197;</a>
+            }
+        </div>
         <span class="draft-badge">@Current.Status</span>
         <div class="editor-actions" aria-label="Article actions">
             <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="SaveAsync">Save</button>
-            @if (Current.Status == PublicationStatusDto.Published)
-            {
-                <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="UnpublishAsync">Unpublish</button>
-            }
-            else
+            @if (Current.Status != PublicationStatusDto.Published)
             {
                 <button class="button button-primary" type="button" disabled="@IsBusy" @onclick="PublishAsync">Publish</button>
             }
+            @if (HasSecondaryActions)
+            {
+                <details class="article-action-menu">
+                    <summary aria-label="More article actions" title="More actions">&hellip;</summary>
+                    <div class="article-action-menu__content" aria-label="More article actions">
+                        @if (CanOpenPublicArticle)
+                        {
+                            <a href="@PublicPath" target="_blank" rel="noopener">Open article</a>
+                        }
+                        @if (Current.Status == PublicationStatusDto.Published)
+                        {
+                            <button type="button" disabled="@IsBusy" @onclick="UnpublishAsync">Unpublish</button>
+                        }
+                        @if (ArticleId is not null)
+                        {
+                            <button class="danger-action" type="button" disabled="@IsBusy" @onclick="DeleteAsync">Delete article</button>
+                        }
+                    </div>
+                </details>
+            }
         </div>
+        @if (_message is not null)
+        {
+            <div class="editor-notice @(_hasError ? "message-error" : null)" role="@(_hasError ? "alert" : "status")">
+                <span>@_message</span>
+                @if (_hasError)
+                {
+                    <button type="button" @onclick="ClearMessage" aria-label="Dismiss message">&times;</button>
+                }
+            </div>
+        }
     </header>
 
     @if (_loading)
@@ -44,28 +77,9 @@
     }
     else
     {
-        @if (_message is not null)
-        {
-            <div class="editor-message surface @(_hasError ? "message-error" : null)" role="@(_hasError ? "alert" : "status")">@_message</div>
-        }
-
-        <div class="article-route surface" aria-label="Public article path">
-            <span>Public path</span>
-            <code>@PublicPath</code>
-            @if (CanOpenPublicArticle)
-            {
-                <a href="@PublicPath" target="_blank" rel="noopener">Open article</a>
-            }
-            else
-            {
-                <span class="route-hint">Available after publishing</span>
-            }
-        </div>
-
         <details class="article-settings surface">
             <summary>
                 <span class="settings-title">Article settings</span>
-                <span class="settings-summary">@Current.LanguageCode.ToUpperInvariant() · URL · taxonomy</span>
             </summary>
             <div class="settings-grid">
                 <div class="settings-field">
@@ -160,14 +174,34 @@
                 <textarea id="article-markdown" placeholder="Start writing in Markdown…" spellcheck="true" value="@Current.Markdown" @oninput="HandleMarkdownInput"></textarea>
             </section>
             <section class="editor-pane preview-pane" aria-labelledby="preview-heading" aria-live="polite">
-                <header class="pane-heading" id="preview-heading"><span>Preview</span><span class="pane-hint">Live</span></header>
+                <header class="pane-heading" id="preview-heading">
+                    <span>Preview</span>
+                    <button class="pdf-button" type="button" disabled="@(!CanPrintPreview)" @onclick="PrintPreviewAsync">
+                        @(_printing ? "Preparing..." : "PDF \u2193")
+                    </button>
+                </header>
                 @if (string.IsNullOrWhiteSpace(Current.Markdown))
                 {
                     <div class="preview-empty"><h2>Nothing to preview yet</h2><p>Start writing to see the rendered article.</p></div>
                 }
                 else if (_previewLoading) { <div class="preview-status" role="status">Rendering preview…</div> }
                 else if (_previewError is not null) { <div class="preview-status preview-error" role="alert">@_previewError</div> }
-                else { <article class="article-preview" @ref="_previewElement">@((MarkupString)_renderedHtml)</article> }
+                else
+                {
+                    <div class="preview-paper">
+                        <div class="preview-page-guides" aria-hidden="true"></div>
+                        <article class="article-preview" @ref="_previewElement">
+                            <header class="preview-print-header">
+                                <h1>@(string.IsNullOrWhiteSpace(Current.Title) ? "Untitled article" : Current.Title)</h1>
+                                @if (!string.IsNullOrWhiteSpace(Current.Summary))
+                                {
+                                    <p>@Current.Summary</p>
+                                }
+                            </header>
+                            @((MarkupString)_renderedHtml)
+                        </article>
+                    </div>
+                }
             </section>
         </div>
     }
@@ -191,8 +225,11 @@
     private bool _saving;
     private bool _previewLoading;
     private bool _imageUploading;
+    private bool _printing;
+    private bool _previewReady;
     private EditorPane _activePane = EditorPane.Edit;
     private CancellationTokenSource? _previewCancellation;
+    private CancellationTokenSource? _messageCancellation;
     private ElementReference _previewElement;
     private bool _previewElementReady;
     private bool _mathTypesetPending;
@@ -200,6 +237,15 @@
     private ArticleTypography _typography = ArticleTypography.Default;
     private LocalizationModel Current => _localizations[_activeLanguage];
     private bool IsBusy => _loading || _saving;
+    private bool CanPrintPreview =>
+        !_loading
+        && !_previewLoading
+        && !_printing
+        && _previewReady
+        && _previewError is null
+        && !string.IsNullOrWhiteSpace(Current.Markdown);
+    private bool HasSecondaryActions =>
+        ArticleId is not null || Current.Status == PublicationStatusDto.Published || CanOpenPublicArticle;
     private string TypographyStyle =>
         $"--article-line-height: {FormatTypographyValue(_typography.LineHeight)}; --article-block-spacing: {FormatTypographyValue(_typography.BlockSpacing)}rem;";
 
@@ -256,6 +302,7 @@
         _previewElementReady = true;
         if (!_mathTypesetPending)
         {
+            _previewReady = true;
             return;
         }
 
@@ -267,6 +314,11 @@
         catch (JSException)
         {
             // Raw TeX remains readable if the external renderer is unavailable.
+        }
+        finally
+        {
+            _previewReady = true;
+            StateHasChanged();
         }
     }
 
@@ -292,9 +344,10 @@
         }
 
         _activeLanguage = languageCode;
-        _message = null;
+        ClearMessage();
         await ClearPreviewMathAsync();
         _previewElementReady = false;
+        _previewReady = false;
         _renderedHtml = "";
         await RefreshPreview();
     }
@@ -304,8 +357,7 @@
     private async Task SaveCoreAsync(bool navigateAfterCreate)
     {
         _saving = true;
-        _message = null;
-        _hasError = false;
+        ClearMessage();
         try
         {
             var wasNew = ArticleId is null;
@@ -367,6 +419,60 @@
         try { await ArticlesClient.UnpublishAsync(ArticleId.Value, Current.LanguageCode); Current.Status = PublicationStatusDto.Draft; ShowMessage("Localization returned to draft.", false); }
         catch (Exception exception) when (exception is AdminApiException or HttpRequestException) { ShowMessage(exception.Message, true); }
         finally { _saving = false; }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (ArticleId is null)
+        {
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            "Delete this article? This cannot be undone.");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _saving = true;
+        ClearMessage();
+        try
+        {
+            await ArticlesClient.DeleteAsync(ArticleId.Value);
+            Navigation.NavigateTo("/admin/articles", replace: true);
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            ShowMessage(exception.Message, true);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task PrintPreviewAsync()
+    {
+        if (!CanPrintPreview)
+        {
+            return;
+        }
+
+        _printing = true;
+        try
+        {
+            await JS.InvokeVoidAsync("window.print");
+        }
+        catch (JSException)
+        {
+            ShowMessage("The print dialog could not be opened.", true);
+        }
+        finally
+        {
+            _printing = false;
+        }
     }
 
     private async Task HandleMarkdownInput(ChangeEventArgs eventArgs) { Current.Markdown = eventArgs.Value?.ToString() ?? ""; await RefreshPreview(); }
@@ -443,6 +549,7 @@
         {
             await ClearPreviewMathAsync();
             _previewElementReady = false;
+            _previewReady = false;
             _renderedHtml = "";
             _previewError = null;
             _previewLoading = false;
@@ -452,6 +559,7 @@
         _previewCancellation = cancellation;
         await ClearPreviewMathAsync();
         _previewElementReady = false;
+        _previewReady = false;
         _previewLoading = true;
         _previewError = null;
         try
@@ -518,8 +626,51 @@
     private string PublicPath => $"/{Current.LanguageCode}/articles/{(string.IsNullOrWhiteSpace(Current.Slug) ? "{slug}" : Current.Slug.Trim())}";
     private bool CanOpenPublicArticle => Current.Status == PublicationStatusDto.Published && !string.IsNullOrWhiteSpace(Current.Slug);
     private string[] ParseTags() => _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-    private void ShowMessage(string message, bool error) { _message = message; _hasError = error; }
-    public void Dispose() { _previewCancellation?.Cancel(); _previewCancellation?.Dispose(); }
+    private void ShowMessage(string message, bool error)
+    {
+        ClearMessage();
+        _message = message;
+        _hasError = error;
+
+        if (!error)
+        {
+            _messageCancellation = new CancellationTokenSource();
+            _ = DismissSuccessMessageAsync(_messageCancellation.Token);
+        }
+    }
+
+    private void ClearMessage()
+    {
+        _messageCancellation?.Cancel();
+        _messageCancellation?.Dispose();
+        _messageCancellation = null;
+        _message = null;
+        _hasError = false;
+    }
+
+    private async Task DismissSuccessMessageAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2.5), cancellationToken);
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                _message = null;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        _previewCancellation?.Cancel();
+        _previewCancellation?.Dispose();
+        _messageCancellation?.Cancel();
+        _messageCancellation?.Dispose();
+    }
 
     private sealed class LocalizationModel
     {

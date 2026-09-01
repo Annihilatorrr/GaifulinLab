@@ -1,10 +1,6 @@
 .admin-shell {
     min-height: 100vh;
-    background:
-        linear-gradient(var(--color-border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--color-border) 1px, transparent 1px),
-        var(--color-surface-subtle);
-    background-size: 3rem 3rem;
+    background: var(--color-surface-subtle);
 }
 
 .admin-header {
@@ -14,12 +10,12 @@
 
 .admin-header-inner {
     width: 100%;
-    min-height: 4.75rem;
+    min-height: 2.75rem;
     display: flex;
     max-width: calc(var(--site-width) + (2 * var(--site-gutter)));
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-6);
+    gap: var(--space-4);
     margin-inline: auto;
     padding-left: max(var(--site-gutter), env(safe-area-inset-left));
     padding-right: max(var(--site-gutter), env(safe-area-inset-right));
@@ -40,8 +36,8 @@
 
 .admin-mark {
     display: grid;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2rem;
+    height: 2rem;
     flex: 0 0 auto;
     place-items: center;
     border: 1.5px solid var(--color-text);
@@ -72,7 +68,7 @@
     display: flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-3);
 }
 
 .view-site {
@@ -96,7 +92,7 @@
 
 @media (max-width: 40rem) {
     .admin-header-inner {
-        min-height: 4.25rem;
+        min-height: 2.75rem;
         gap: var(--space-3);
     }
 
@@ -107,5 +103,21 @@
     .admin-brand-name,
     .view-site {
         display: none;
+    }
+}
+
+@media print {
+    .admin-shell {
+        background: #fff;
+    }
+
+    .admin-header,
+    .skip-link {
+        display: none !important;
+    }
+
+    .admin-main {
+        max-width: none;
+        padding-inline: 0;
     }
 }
