@@ -4,8 +4,7 @@
 
 <main id="main-content"
       class="site-main article-page"
-      style="@TypographyStyle"
-      data-pdf-ready="@(_pdfReady ? "true" : "false")">
+      style="@TypographyStyle">
     <div class="site-container article-layout">
         @if (_loading) { <div role="status">Loading article…</div> }
         else if (_article is null) { <div class="not-found surface"><h1>Article not found</h1><p>This localization is not published or does not exist.</p><a href="/articles">Back to articles</a></div> }
@@ -16,11 +15,15 @@
                     <time datetime="@_article.PublishedAt.ToString("O")">@_article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
                     @if (_typographyReady)
                     {
-                        <a class="article-download" href="@PdfDownloadUrl" download>
+                        <button class="article-download" @onclick="DownloadPdfAsync" disabled="@_pdfExportInProgress">
                             @PdfDownloadLabel
-                        </a>
+                        </button>
                     }
                 </div>
+                @if (_pdfExportError is not null)
+                {
+                    <p class="article-download-error" role="alert">@_pdfExportError</p>
+                }
                 <h1>@_article.Title</h1>
                 @if (!string.IsNullOrWhiteSpace(_article.Summary)) { <p>@_article.Summary</p> }
                 @if (_article.AvailableLocalizations.Count > 1)
@@ -40,24 +43,26 @@
     [Parameter, EditorRequired] public string Slug { get; set; } = "";
     [Parameter] public decimal? RequestedLineHeight { get; set; }
     [Parameter] public decimal? RequestedBlockSpacing { get; set; }
-    [Parameter] public bool IsPdfRender { get; set; }
     private PublicArticleDetailsDto? _article;
     private bool _loading = true;
     private ElementReference _articleElement;
     private bool _articleElementReady;
     private bool _mathTypesetPending;
-    private bool _pdfReady;
     private bool _articleAssetsPrepared;
     private bool _typographyReady;
+    private bool _pdfExportInProgress;
+    private string? _pdfExportError;
     private ArticleTypography _typography = ArticleTypography.Default;
 
-    private string PdfDownloadUrl =>
-        ContentClient.GetArticlePdfUrl(LanguageCode, Slug, _typography);
     private string TypographyStyle =>
         $"--article-line-height: {_typography.LineHeight.ToString(CultureInfo.InvariantCulture)}; --article-block-spacing: {_typography.BlockSpacing.ToString(CultureInfo.InvariantCulture)}rem;";
 
     private string PdfDownloadLabel =>
-        string.Equals(LanguageCode, "ru", StringComparison.OrdinalIgnoreCase)
+        _pdfExportInProgress
+            ? string.Equals(LanguageCode, "ru", StringComparison.OrdinalIgnoreCase)
+                ? "Готовим PDF…"
+                : "Preparing PDF…"
+            : string.Equals(LanguageCode, "ru", StringComparison.OrdinalIgnoreCase)
             ? "Скачать PDF"
             : "Download PDF";
 
@@ -65,14 +70,15 @@
     {
         await ClearArticleMathAsync();
         _articleElementReady = false;
-        _pdfReady = false;
         _articleAssetsPrepared = false;
         _typographyReady = RequestedLineHeight.HasValue || RequestedBlockSpacing.HasValue;
         _typography = ArticleTypography.FromOptional(RequestedLineHeight, RequestedBlockSpacing);
         _loading = true;
         try
         {
-            _article = await ContentClient.GetArticleAsync(LanguageCode, Slug, IsPdfRender);
+            _article = await ContentClient.GetArticleAsync(
+                LanguageCode,
+                Slug);
             _mathTypesetPending = _article is not null;
         }
         catch (HttpRequestException) { _article = null; }
@@ -86,16 +92,7 @@
             return;
         }
 
-        if (_article is null)
-        {
-            if (IsPdfRender && !_pdfReady)
-            {
-                _pdfReady = true;
-                StateHasChanged();
-            }
-
-            return;
-        }
+        if (_article is null) return;
 
         if (!_articleAssetsPrepared)
         {
@@ -104,7 +101,7 @@
                 await JS.InvokeVoidAsync(
                     "articleAssets.prepare",
                     _articleElement,
-                    IsPdfRender ? ContentClient.PdfAssetBaseUrl : ContentClient.AssetBaseUrl);
+                    ContentClient.AssetBaseUrl);
             }
             catch (JSException)
             {
@@ -136,21 +133,13 @@
         _articleElementReady = true;
         if (!_mathTypesetPending)
         {
-            if (!_pdfReady)
-            {
-                _pdfReady = true;
-                StateHasChanged();
-            }
-
             return;
         }
 
         _mathTypesetPending = false;
         try
         {
-            await JS.InvokeVoidAsync("MathJax.typesetClear", new[] { _articleElement });
-            await JS.InvokeVoidAsync("MathJax.texReset");
-            await JS.InvokeVoidAsync("MathJax.typesetPromise", new[] { _articleElement });
+            await JS.InvokeVoidAsync("articleAssets.typesetMath", _articleElement);
         }
         catch (JSException)
         {
@@ -158,7 +147,45 @@
         }
         finally
         {
-            _pdfReady = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DownloadPdfAsync()
+    {
+        _pdfExportInProgress = true;
+        _pdfExportError = null;
+        try
+        {
+            var export = await ContentClient.CreateArticlePdfExportAsync(LanguageCode, Slug, _typography);
+            for (var attempt = 0; attempt < 60; attempt++)
+            {
+                if (string.Equals(export.Status, "completed", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(export.DownloadUrl))
+                {
+                    await JS.InvokeVoidAsync("articleAssets.download", export.DownloadUrl);
+                    return;
+                }
+
+                if (string.Equals(export.Status, "failed", StringComparison.OrdinalIgnoreCase))
+                {
+                    _pdfExportError = export.ErrorMessage ?? "The PDF export failed.";
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1));
+                export = await ContentClient.GetPdfExportAsync(export.Id);
+            }
+
+            _pdfExportError = "The PDF export is taking longer than expected. Please try again.";
+        }
+        catch (HttpRequestException)
+        {
+            _pdfExportError = "Unable to start the PDF export.";
+        }
+        finally
+        {
+            _pdfExportInProgress = false;
             StateHasChanged();
         }
     }
@@ -172,8 +199,7 @@
 
         try
         {
-            await JS.InvokeVoidAsync("MathJax.typesetClear", new[] { _articleElement });
-            await JS.InvokeVoidAsync("MathJax.texReset");
+            await JS.InvokeVoidAsync("articleAssets.clearMath", _articleElement);
         }
         catch (JSException)
         {

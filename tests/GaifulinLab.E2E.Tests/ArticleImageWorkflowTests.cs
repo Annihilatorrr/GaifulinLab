@@ -76,14 +76,21 @@ public sealed class ArticleImageWorkflowTests : PageTest
 
     private static async Task AssertPdfDownloadsAsync(IPage page, string slug)
     {
+        var queuedResponseTask = page.WaitForResponseAsync(response =>
+            response.Request.Method == "POST"
+            && response.Url.Contains("/api/public/articles/", StringComparison.Ordinal)
+            && response.Url.Contains("/pdf-exports", StringComparison.Ordinal));
         var responseTask = page.WaitForResponseAsync(response =>
             response.Request.Method == "GET"
-            && response.Url.Contains("/api/public/articles/", StringComparison.Ordinal)
-            && response.Url.Contains("/pdf", StringComparison.Ordinal));
+            && response.Url.Contains("/api/public/pdf-exports/", StringComparison.Ordinal)
+            && response.Url.Contains("/download", StringComparison.Ordinal));
         var download = await page.RunAndWaitForDownloadAsync(
-            () => page.GetByRole(AriaRole.Link, new() { Name = "Download PDF" }).ClickAsync());
+            () => page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" }).ClickAsync(),
+            new PageRunAndWaitForDownloadOptions { Timeout = 90_000 });
+        var queuedResponse = await queuedResponseTask;
         var response = await responseTask;
 
+        Assert.Equal(202, queuedResponse.Status);
         Assert.Equal($"{slug}.pdf", download.SuggestedFilename);
         Assert.StartsWith(
             "application/pdf",

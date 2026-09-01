@@ -1,5 +1,6 @@
 using GaifulinLab.Domain.Articles;
 using GaifulinLab.Domain.Media;
+using GaifulinLab.Domain.Pdf;
 using GaifulinLab.Domain.Series;
 using GaifulinLab.Domain.Tags;
 using GaifulinLab.Domain.Topics;
@@ -31,6 +32,8 @@ public interface IAppDbContext
     DbSet<Tag> Tags { get; }
 
     DbSet<MediaAsset> MediaAssets { get; }
+
+    DbSet<PdfExportJob> PdfExportJobs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

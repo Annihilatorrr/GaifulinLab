@@ -2,7 +2,7 @@ namespace GaifulinLab.E2E.Tests;
 
 public sealed class E2EEnvironment : IAsyncLifetime
 {
-    private const string DefaultBaseUrl = "https://localhost:7069";
+    private const string DefaultBaseUrl = "http://localhost:5172";
 
     public Uri BaseUri { get; private set; } = null!;
     private string AdminLogin { get; set; } = null!;

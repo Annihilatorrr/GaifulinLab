@@ -5,21 +5,34 @@ using GaifulinLab.Contracts.Taxonomy;
 
 namespace GaifulinLab.Web.Content;
 
-public sealed class PublicContentClient(HttpClient httpClient, Uri pdfApiBaseAddress)
+public sealed class PublicContentClient(HttpClient httpClient)
 {
     public string AssetBaseUrl => httpClient.BaseAddress!.AbsoluteUri;
-    public string PdfAssetBaseUrl => pdfApiBaseAddress.AbsoluteUri;
 
-    public string GetArticlePdfUrl(
+    public async Task<PdfExportStatusDto> CreateArticlePdfExportAsync(
         string languageCode,
         string slug,
-        ArticleTypography typography)
+        ArticleTypography typography,
+        CancellationToken cancellationToken = default)
     {
-        var relativeUri =
-            $"api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}/pdf" +
+        var uri =
+            $"/api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}/pdf-exports" +
             $"?lineHeight={typography.LineHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
             $"&blockSpacing={typography.BlockSpacing.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
-        return new Uri(httpClient.BaseAddress!, relativeUri).AbsoluteUri;
+        using var response = await httpClient.PostAsync(uri, content: null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PdfExportStatusDto>(cancellationToken)
+            ?? throw new HttpRequestException("The server returned an empty PDF export response.");
+    }
+
+    public async Task<PdfExportStatusDto> GetPdfExportAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync($"/api/public/pdf-exports/{id}", cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PdfExportStatusDto>(cancellationToken)
+            ?? throw new HttpRequestException("The server returned an empty PDF export response.");
     }
 
     public Task<IReadOnlyList<PublicArticleListItemDto>> GetArticlesAsync(
@@ -44,17 +57,10 @@ public sealed class PublicContentClient(HttpClient httpClient, Uri pdfApiBaseAdd
     public Task<PublicArticleDetailsDto?> GetArticleAsync(
         string languageCode,
         string slug,
-        bool forPdf = false,
         CancellationToken cancellationToken = default) =>
-        forPdf
-            ? GetOptionalAsync<PublicArticleDetailsDto>(
-                new Uri(
-                    pdfApiBaseAddress,
-                    $"api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}"),
-                cancellationToken)
-            : GetOptionalAsync<PublicArticleDetailsDto>(
-                $"/api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}",
-                cancellationToken);
+        GetOptionalAsync<PublicArticleDetailsDto>(
+            $"/api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}",
+            cancellationToken);
 
     public Task<IReadOnlyList<PublicTopicDto>> GetTopicsAsync(
         string languageCode,
@@ -99,12 +105,6 @@ public sealed class PublicContentClient(HttpClient httpClient, Uri pdfApiBaseAdd
         return await ReadOptionalAsync<T>(response, cancellationToken);
     }
 
-    private async Task<T?> GetOptionalAsync<T>(Uri uri, CancellationToken cancellationToken)
-    {
-        var response = await httpClient.GetAsync(uri, cancellationToken);
-        return await ReadOptionalAsync<T>(response, cancellationToken);
-    }
-
     private static async Task<T?> ReadOptionalAsync<T>(
         HttpResponseMessage response,
         CancellationToken cancellationToken)
@@ -125,4 +125,5 @@ public sealed class PublicContentClient(HttpClient httpClient, Uri pdfApiBaseAdd
             parameters.Add($"{name}={Uri.EscapeDataString(value)}");
         }
     }
+
 }

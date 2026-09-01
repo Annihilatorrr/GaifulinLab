@@ -37,12 +37,6 @@ public static class DependencyInjection
             ?? configuration["MediaStorage:RootPath"]
             ?? Path.Combine(AppContext.BaseDirectory, "media")));
 
-        var pdfRendererBaseUri = GetAbsoluteHttpUri(
-            configuration["PDF_RENDERER_BASE_URL"] ?? "http://localhost:3000",
-            "PDF_RENDERER_BASE_URL");
-        var pdfArticleBaseUri = GetAbsoluteHttpUri(
-            configuration["PDF_ARTICLE_BASE_URL"] ?? "https://localhost:7069",
-            "PDF_ARTICLE_BASE_URL");
         var pdfTimeoutSeconds = Math.Clamp(
             configuration.GetValue("PDF_RENDERER_TIMEOUT_SECONDS", 45),
             5,
@@ -53,35 +47,31 @@ public static class DependencyInjection
             8);
 
         services.AddSingleton(new ArticlePdfRendererSettings(
-            EnsureTrailingSlash(pdfArticleBaseUri),
-            maximumConcurrentPdfRenders));
-        services.AddHttpClient(GotenbergArticlePdfRenderer.HttpClientName, client =>
+            TimeSpan.FromSeconds(pdfTimeoutSeconds),
+            maximumConcurrentPdfRenders,
+            configuration["PDF_MATHJAX_PATH"]
+            ?? Path.Combine(AppContext.BaseDirectory, "pdf-assets", "mathjax", "es5", "tex-chtml.js")));
+        services.AddSingleton<IArticlePdfRenderer, PlaywrightArticlePdfRenderer>();
+
+        if (configuration.GetValue("PDF_WORKER_ENABLED", false))
         {
-            client.BaseAddress = EnsureTrailingSlash(pdfRendererBaseUri);
-            client.Timeout = TimeSpan.FromSeconds(pdfTimeoutSeconds);
-            client.DefaultRequestHeaders.Accept.Add(
-                new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/pdf"));
-        });
-        services.AddSingleton<IArticlePdfRenderer, GotenbergArticlePdfRenderer>();
+            var pollIntervalMilliseconds = Math.Clamp(
+                configuration.GetValue("PDF_WORKER_POLL_INTERVAL_MILLISECONDS", 1_000),
+                100,
+                10_000);
+            var leaseSeconds = Math.Clamp(
+                configuration.GetValue("PDF_WORKER_LEASE_SECONDS", 120),
+                pdfTimeoutSeconds + 15,
+                600);
+            services.AddSingleton(new PdfExportWorkerSettings(
+                TimeSpan.FromMilliseconds(pollIntervalMilliseconds),
+                TimeSpan.FromSeconds(leaseSeconds)));
+            services.AddHostedService<PdfExportWorker>();
+        }
 
         services.AddAdminAuthentication(configuration);
 
         return services;
     }
 
-    private static Uri GetAbsoluteHttpUri(string value, string settingName)
-    {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-        {
-            throw new InvalidOperationException($"{settingName} must be an absolute HTTP(S) URL.");
-        }
-
-        return uri;
-    }
-
-    private static Uri EnsureTrailingSlash(Uri uri) =>
-        uri.AbsoluteUri.EndsWith("/", StringComparison.Ordinal)
-            ? uri
-            : new Uri(uri.AbsoluteUri + "/");
 }

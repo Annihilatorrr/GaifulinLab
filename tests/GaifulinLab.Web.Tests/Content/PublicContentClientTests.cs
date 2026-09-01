@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Web.Content;
 
@@ -7,45 +8,65 @@ namespace GaifulinLab.Web.Tests.Content;
 public sealed class PublicContentClientTests
 {
     [Fact]
-    public void GetArticlePdfUrl_UsesConfiguredApiOriginAndEscapesRouteValues()
+    public async Task CreateArticlePdfExportAsync_PostsTypographyAndReturnsQueuedExport()
     {
-        using var httpClient = new HttpClient
+        HttpRequestMessage? request = null;
+        var exportId = Guid.NewGuid();
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(message =>
         {
-            BaseAddress = new Uri("http://localhost:5180/")
-        };
-        var client = new PublicContentClient(httpClient, new Uri("http://host.docker.internal:5180/"));
-
-        var url = client.GetArticlePdfUrl(
-            "en",
-            "article with spaces",
-            new ArticleTypography(1.5m, 0.4m));
-
-        Assert.Equal(
-            "http://localhost:5180/api/public/articles/en/article%20with%20spaces/pdf?lineHeight=1.5&blockSpacing=0.4",
-            url);
-    }
-
-    [Fact]
-    public async Task GetArticleAsync_ForPdf_UsesTheContainerReachableApiOrigin()
-    {
-        Uri? requestUri = null;
-        using var httpClient = new HttpClient(new StubHttpMessageHandler(request =>
-        {
-            requestUri = request.RequestUri;
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
+            request = message;
+            return JsonResponse(new PdfExportStatusDto(exportId, "queued", null, null), HttpStatusCode.Accepted);
         }))
         {
             BaseAddress = new Uri("http://localhost:5180/")
         };
-        var client = new PublicContentClient(httpClient, new Uri("http://host.docker.internal:5180/"));
+        var client = new PublicContentClient(httpClient);
 
-        var article = await client.GetArticleAsync("en", "test article", forPdf: true);
+        var export = await client.CreateArticlePdfExportAsync(
+            "en",
+            "article with spaces",
+            new ArticleTypography(1.5m, 0.4m));
 
-        Assert.Null(article);
+        Assert.Equal(exportId, export.Id);
+        Assert.Equal(HttpMethod.Post, request?.Method);
         Assert.Equal(
-            "http://host.docker.internal:5180/api/public/articles/en/test%20article",
-            requestUri?.AbsoluteUri);
+            "/api/public/articles/en/article%20with%20spaces/pdf-exports?lineHeight=1.5&blockSpacing=0.4",
+            request?.RequestUri?.PathAndQuery);
     }
+
+    [Fact]
+    public async Task GetPdfExportAsync_GetsExportStatus()
+    {
+        Uri? requestUri = null;
+        var exportId = Guid.NewGuid();
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(message =>
+        {
+            requestUri = message.RequestUri;
+            return JsonResponse(new PdfExportStatusDto(
+                exportId,
+                "completed",
+                null,
+                $"/api/public/pdf-exports/{exportId}/download"),
+                HttpStatusCode.OK);
+        }))
+        {
+            BaseAddress = new Uri("http://localhost:5180/")
+        };
+        var client = new PublicContentClient(httpClient);
+
+        var export = await client.GetPdfExportAsync(exportId);
+
+        Assert.Equal("completed", export.Status);
+        Assert.Equal(
+            $"/api/public/pdf-exports/{exportId}",
+            requestUri?.PathAndQuery);
+    }
+
+    private static HttpResponseMessage JsonResponse<T>(T value, HttpStatusCode statusCode) =>
+        new(statusCode)
+        {
+            Content = JsonContent.Create(value)
+        };
 
     private sealed class StubHttpMessageHandler(
         Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler

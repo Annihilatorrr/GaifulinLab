@@ -262,9 +262,7 @@
         _mathTypesetPending = false;
         try
         {
-            await JS.InvokeVoidAsync("MathJax.typesetClear", new[] { _previewElement });
-            await JS.InvokeVoidAsync("MathJax.texReset");
-            await JS.InvokeVoidAsync("MathJax.typesetPromise", new[] { _previewElement });
+            await JS.InvokeVoidAsync("articleAssets.typesetMath", _previewElement);
         }
         catch (JSException)
         {
@@ -480,8 +478,7 @@
 
         try
         {
-            await JS.InvokeVoidAsync("MathJax.typesetClear", new[] { _previewElement });
-            await JS.InvokeVoidAsync("MathJax.texReset");
+            await JS.InvokeVoidAsync("articleAssets.clearMath", _previewElement);
         }
         catch (JSException)
         {

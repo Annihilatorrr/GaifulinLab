@@ -1,6 +1,7 @@
 using GaifulinLab.Application.Content;
 using Ganss.Xss;
 using Markdig;
+using Nodsoft.Markdig.SyntaxHighlighting;
 using System.Text;
 
 namespace GaifulinLab.Infrastructure.Content;
@@ -10,6 +11,7 @@ public sealed class MarkdownRenderer : IMarkdownRenderer
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .UseMathematics()
+        .UseSyntaxHighlighting()
         .Build();
 
     private readonly HtmlSanitizer _sanitizer = CreateSanitizer();

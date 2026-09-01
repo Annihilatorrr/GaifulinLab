@@ -107,6 +107,28 @@ samp {
     font-family: var(--font-mono);
 }
 
+/* Classes are emitted by the Markdown renderer for fenced code blocks. */
+.editor-colors .keyword,
+.editor-colors .type,
+.editor-colors .preprocessor {
+    color: var(--color-code-keyword);
+}
+
+.editor-colors .string,
+.editor-colors .character,
+.editor-colors .regex {
+    color: var(--color-code-string);
+}
+
+.editor-colors .number {
+    color: var(--color-code-number);
+}
+
+.editor-colors .comment {
+    color: var(--color-code-comment);
+    font-style: italic;
+}
+
 button {
     min-width: 2.75rem;
     min-height: 2.75rem;

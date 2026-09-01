@@ -1,6 +1,7 @@
 using GaifulinLab.Application.Persistence;
 using GaifulinLab.Domain.Articles;
 using GaifulinLab.Domain.Media;
+using GaifulinLab.Domain.Pdf;
 using GaifulinLab.Domain.Series;
 using GaifulinLab.Domain.Tags;
 using GaifulinLab.Domain.Topics;
@@ -33,6 +34,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Tag> Tags => Set<Tag>();
 
     public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+
+    public DbSet<PdfExportJob> PdfExportJobs => Set<PdfExportJob>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

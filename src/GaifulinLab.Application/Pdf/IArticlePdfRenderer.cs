@@ -5,8 +5,15 @@ namespace GaifulinLab.Application.Pdf;
 public interface IArticlePdfRenderer
 {
     Task<byte[]> RenderAsync(
-        string languageCode,
-        string slug,
+        ArticlePdfDocument document,
         ArticleTypography typography,
         CancellationToken cancellationToken);
 }
+
+public sealed record ArticlePdfDocument(
+    string LanguageCode,
+    string Slug,
+    string Title,
+    string? Summary,
+    string Markdown,
+    DateTimeOffset? PublishedAt);

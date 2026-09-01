@@ -1,0 +1,288 @@
+using System.Net;
+using System.Text;
+using System.Text.RegularExpressions;
+using GaifulinLab.Application.Common;
+using GaifulinLab.Application.Content;
+using GaifulinLab.Application.Media;
+using GaifulinLab.Application.Pdf;
+using GaifulinLab.Contracts.Articles;
+using GaifulinLab.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Playwright;
+
+namespace GaifulinLab.Infrastructure.Pdf;
+
+internal sealed class PlaywrightArticlePdfRenderer(
+    IMarkdownRenderer markdownRenderer,
+    IMediaStorage mediaStorage,
+    IServiceScopeFactory scopeFactory,
+    ArticlePdfRendererSettings settings,
+    ILogger<PlaywrightArticlePdfRenderer> logger) : IArticlePdfRenderer, IAsyncDisposable
+{
+    private const int MaximumPdfSizeBytes = 50 * 1024 * 1024;
+    private const long MaximumEmbeddedMediaBytes = 10 * 1024 * 1024;
+    private static readonly Regex MediaSource = new(
+        "src=\\\"/media/(?<id>[0-9a-fA-F-]{36})\\\"",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private readonly SemaphoreSlim _renderSlots = new(settings.MaximumConcurrentRenders);
+    private readonly SemaphoreSlim _browserLock = new(1, 1);
+    private IPlaywright? _playwright;
+    private IBrowser? _browser;
+
+    public async Task<byte[]> RenderAsync(
+        ArticlePdfDocument document,
+        ArticleTypography typography,
+        CancellationToken cancellationToken)
+    {
+        await _renderSlots.WaitAsync(cancellationToken);
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(settings.Timeout);
+            var token = timeout.Token;
+            var html = await BuildHtmlAsync(document, typography, token);
+            var browser = await GetBrowserAsync(token);
+
+            await using var context = await browser.NewContextAsync();
+            await context.RouteAsync("**/*", route =>
+            {
+                var uri = new Uri(route.Request.Url);
+                return uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps
+                    ? route.AbortAsync()
+                    : route.ContinueAsync();
+            });
+            var page = await context.NewPageAsync();
+            await page.EmulateMediaAsync(new PageEmulateMediaOptions { Media = Microsoft.Playwright.Media.Print });
+            await page.SetContentAsync(html, new PageSetContentOptions { WaitUntil = WaitUntilState.Load });
+
+            if (!File.Exists(settings.MathJaxPath))
+            {
+                throw new PdfRenderingException(
+                    $"The local MathJax asset was not found at '{settings.MathJaxPath}'.");
+            }
+
+            await page.AddScriptTagAsync(new PageAddScriptTagOptions { Path = settings.MathJaxPath });
+            await page.EvaluateAsync("""
+                async () => {
+                    await document.fonts.ready;
+                    if (!window.MathJax) {
+                        throw new Error('MathJax did not initialize.');
+                    }
+
+                    await window.MathJax.typesetPromise();
+                    document.documentElement.dataset.pdfReady = 'true';
+                }
+                """);
+
+            var pdf = await page.PdfAsync(new PagePdfOptions
+            {
+                Format = "A4",
+                PrintBackground = true,
+                PreferCSSPageSize = true
+            });
+
+            if (pdf.Length < 5 || !pdf.AsSpan(0, 5).SequenceEqual("%PDF-"u8))
+            {
+                throw new PdfRenderingException("The PDF renderer returned an invalid document.");
+            }
+
+            if (pdf.Length > MaximumPdfSizeBytes)
+            {
+                throw new PdfRenderingException("The generated article PDF is too large.");
+            }
+
+            return pdf;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new PdfRenderingException("The article PDF renderer timed out.");
+        }
+        catch (PlaywrightException exception)
+        {
+            logger.LogWarning(exception, "Chromium failed while rendering article PDF {LanguageCode}/{Slug}.", document.LanguageCode, document.Slug);
+            await ResetBrowserAsync();
+            throw new PdfRenderingException("The article PDF renderer is unavailable.", exception);
+        }
+        finally
+        {
+            _renderSlots.Release();
+        }
+    }
+
+    private async Task<string> BuildHtmlAsync(
+        ArticlePdfDocument document,
+        ArticleTypography typography,
+        CancellationToken cancellationToken)
+    {
+        var articleHtml = markdownRenderer.Render(document.Markdown);
+        articleHtml = await EmbedInternalMediaAsync(articleHtml, cancellationToken);
+        var title = WebUtility.HtmlEncode(document.Title);
+        var summary = string.IsNullOrWhiteSpace(document.Summary)
+            ? string.Empty
+            : $"<p class=\"summary\">{WebUtility.HtmlEncode(document.Summary)}</p>";
+        var publishedAt = document.PublishedAt is { } date
+            ? $"<time>{WebUtility.HtmlEncode(date.ToLocalTime().ToString("d MMM yyyy"))}</time>"
+            : string.Empty;
+
+        var template = """
+            <!doctype html>
+            <html lang="__LANGUAGE__">
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    @page { size: A4; margin: 18mm 16mm; }
+                    :root { color-scheme: light; }
+                    * { box-sizing: border-box; }
+                    body { margin: 0; color: #071735; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: __LINE_HEIGHT__; }
+                    .article-header { margin-bottom: 1.5rem; }
+                    .article-header time { color: #5d6e92; font-size: 9pt; }
+                    h1 { margin: .4rem 0 .7rem; font-size: 26pt; line-height: 1.1; }
+                    h2 { margin-top: 1.8rem; font-size: 19pt; line-height: 1.2; break-after: avoid-page; }
+                    h3 { margin-top: 1.5rem; font-size: 15pt; line-height: 1.25; break-after: avoid-page; }
+                    h4, h5, h6 { margin-top: 1.25rem; break-after: avoid-page; }
+                    .summary { color: #40547c; font-size: 13pt; }
+                    p, ul, ol, blockquote, pre, table, .math, mjx-container[display="true"] { margin: 0 0 __BLOCK_SPACING__rem; }
+                    ul, ol { padding-left: 1.45rem; }
+                    img { display: block; max-width: 100%; max-height: 235mm; height: auto; margin-bottom: __BLOCK_SPACING__rem; border-radius: 4px; break-inside: avoid-page; }
+                    pre { overflow: visible; padding: .9rem; border: 1px solid #d6dfef; border-radius: 5px; background: #f5f7fb; white-space: pre-wrap; break-inside: avoid-page; }
+                    code { font-family: "Courier New", monospace; font-size: .9em; }
+                    .editor-colors .keyword, .editor-colors .type, .editor-colors .preprocessor { color: #6d28d9; }
+                    .editor-colors .string, .editor-colors .character, .editor-colors .regex { color: #a23a00; }
+                    .editor-colors .number { color: #08745b; }
+                    .editor-colors .comment { color: #65748b; font-style: italic; }
+                    blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid #5875ff; color: #40547c; break-inside: avoid-page; }
+                    table { width: 100%; border-collapse: collapse; font-size: .94em; break-inside: avoid-page; }
+                    th, td { padding: .45rem .55rem; border: 1px solid #d6dfef; text-align: left; vertical-align: top; }
+                    th { background: #f2f5fb; }
+                    a { color: #2647dd; text-decoration: underline; }
+                    mjx-container[display="true"] { max-width: 100%; overflow: hidden; break-inside: avoid-page; }
+                </style>
+                <script>
+                    window.MathJax = { startup: { typeset: false } };
+                </script>
+            </head>
+            <body>
+                <main>
+                    <header class="article-header">__PUBLISHED_AT__<h1>__TITLE__</h1>__SUMMARY__</header>
+                    <article class="article-body">__ARTICLE_HTML__</article>
+                </main>
+            </body>
+            </html>
+            """;
+        return template
+            .Replace("__LANGUAGE__", WebUtility.HtmlEncode(document.LanguageCode), StringComparison.Ordinal)
+            .Replace("__LINE_HEIGHT__", typography.LineHeight.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("__BLOCK_SPACING__", typography.BlockSpacing.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("__PUBLISHED_AT__", publishedAt, StringComparison.Ordinal)
+            .Replace("__TITLE__", title, StringComparison.Ordinal)
+            .Replace("__SUMMARY__", summary, StringComparison.Ordinal)
+            .Replace("__ARTICLE_HTML__", articleHtml, StringComparison.Ordinal);
+    }
+
+    private async Task<string> EmbedInternalMediaAsync(string html, CancellationToken cancellationToken)
+    {
+        var mediaIds = MediaSource.Matches(html)
+            .Select(match => Guid.TryParse(match.Groups["id"].Value, out var id) ? id : Guid.Empty)
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToArray();
+        if (mediaIds.Length == 0)
+        {
+            return html;
+        }
+
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var assets = await dbContext.MediaAssets
+            .AsNoTracking()
+            .Where(asset => mediaIds.Contains(asset.Id))
+            .ToDictionaryAsync(asset => asset.Id, cancellationToken);
+        var replacements = new Dictionary<Guid, string>();
+
+        foreach (var mediaId in mediaIds)
+        {
+            if (!assets.TryGetValue(mediaId, out var asset) || asset.Size > MaximumEmbeddedMediaBytes)
+            {
+                continue;
+            }
+
+            await using var content = await mediaStorage.OpenReadAsync(asset.RelativePath, cancellationToken);
+            if (content is null)
+            {
+                continue;
+            }
+
+            await using var buffer = new MemoryStream();
+            await content.CopyToAsync(buffer, cancellationToken);
+            replacements[mediaId] = $"src=\"data:{asset.ContentType};base64,{Convert.ToBase64String(buffer.ToArray())}\"";
+        }
+
+        return MediaSource.Replace(html, match =>
+        {
+            var mediaId = Guid.Parse(match.Groups["id"].Value);
+            return replacements.TryGetValue(mediaId, out var replacement) ? replacement : match.Value;
+        });
+    }
+
+    private async Task<IBrowser> GetBrowserAsync(CancellationToken cancellationToken)
+    {
+        if (_browser is { IsConnected: true })
+        {
+            return _browser;
+        }
+
+        await _browserLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_browser is { IsConnected: true })
+            {
+                return _browser;
+            }
+
+            _playwright ??= await Playwright.CreateAsync();
+            _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+            {
+                Headless = true,
+                Args = ["--disable-dev-shm-usage", "--no-sandbox"]
+            });
+            return _browser;
+        }
+        finally
+        {
+            _browserLock.Release();
+        }
+    }
+
+    private async Task ResetBrowserAsync()
+    {
+        await _browserLock.WaitAsync();
+        try
+        {
+            if (_browser is not null)
+            {
+                await _browser.DisposeAsync();
+                _browser = null;
+            }
+        }
+        finally
+        {
+            _browserLock.Release();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await ResetBrowserAsync();
+        _playwright?.Dispose();
+        _renderSlots.Dispose();
+        _browserLock.Dispose();
+    }
+}
+
+internal sealed record ArticlePdfRendererSettings(
+    TimeSpan Timeout,
+    int MaximumConcurrentRenders,
+    string MathJaxPath);

@@ -15,69 +15,58 @@ checkout по SSH, серверные Bash-скрипты настраивают
 ## Структура
 
 ```text
+scripts/
+└── start-local.ps1                    # единственная команда локального запуска
+
+docker-compose.local.yml               # только Chromium PDF-worker для Visual Studio
+
 deployment/
-├── client/
+├── client/                            # PowerShell-команды для управления production
 │   ├── common.ps1
-│   ├── create_local_db_in_docker.ps1
 │   ├── sync.ps1
 │   ├── configure-env.ps1
 │   ├── deploy.ps1
 │   ├── apply-migration.ps1
-│   └── setup-certificate.ps1
-├── server/
+│   ├── setup-certificate.ps1
+│   └── backup-*.ps1
+├── server/                            # Bash-команды, выполняемые на production host
 │   ├── common.sh
 │   ├── install-host.sh
 │   ├── install-nginx.sh
 │   ├── migrate.sh
 │   ├── deploy.sh
 │   ├── reset-database.sh
-│   └── setup-certificate.sh
+│   ├── setup-certificate.sh
+│   └── backup-*.sh
 ├── nginx-host/host-reverse-proxy.conf
 ├── nginx-web/gaifulinlab.conf
 ├── Dockerfile.api
 ├── Dockerfile.web
+├── Dockerfile.pdf-worker
 └── docker-compose.prod-host-nginx.yml
 ```
 
 `deployment/.env` содержит безопасные placeholders. Перед первым sync замените
 пароль БД, hash пароля администратора, JWT key и TLS email реальными значениями.
 
-## Локальная PostgreSQL
+## Локальная разработка
 
-Создать локальный PostgreSQL-контейнер:
+API, Web и PostgreSQL запускаются обычным способом из Visual Studio. Docker локально
+нужен только для Chromium PDF-worker:
 
 ```powershell
-.\deployment\client\create_local_db_in_docker.ps1
+.\scripts\start-local.ps1
 ```
 
-Скрипт выполняет один `docker run` и сразу сообщает об ошибке. Параметры совпадают
-с `appsettings.Development.json`: база, пользователь и пароль — `gaifulinlab`,
-endpoint — `localhost:5435`. Данные сохраняются в Docker volume
-`gaifulinlab-postgres-dev-data`.
+Команда собирает и запускает `pdf-worker`. Он подключается через
+`host.docker.internal:5435` к той же локальной PostgreSQL, что API из Visual Studio,
+и разделяет с ним каталог `runtime/media`. Вторую БД, migrations, API или Web она не
+создаёт и не запускает. Chromium на Windows не требуется: он содержится в Docker image
+worker.
 
-## Локальный экспорт PDF
-
-Chromium устанавливать на Windows не требуется. Запустите отдельный Gotenberg-контейнер:
-
-```powershell
-docker compose -f deployment/docker-compose.pdf-dev.yml up -d
-```
-
-После этого запускайте API и Web с HTTP-профилями. API обращается к Gotenberg на
-`http://localhost:3000`, а контейнер открывает Web через `http://host.docker.internal:5172`.
-В production тот же контейнер запускается основным Compose-файлом без публикации порта наружу.
-
-Локальная учётная запись администратора задаётся только в
-`appsettings.Development.json`:
-
-- login: `admin`;
-- password: configured separately; only its hash is stored in `appsettings.Development.json`.
-
-Применить migrations, используя connection string из
-`appsettings.Development.json`:
+Миграции локальной БД применяются отдельно, когда это требуется:
 
 ```powershell
-dotnet tool restore
 dotnet ef database update `
   --project src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj `
   --startup-project src/GaifulinLab.Api/GaifulinLab.Api.csproj
@@ -125,8 +114,8 @@ TCP 80/443 должны быть доступны из интернета.
   обновляет серверный `deployment/.env` путями к выданному сертификату.
 - `apply-migration.ps1` запускает одноразовый .NET SDK-контейнер и применяет EF
   Core migrations. После завершения контейнер удаляется; API и Web не запускаются.
-- `deploy.ps1` выполняет финальный выпуск: собирает образы API и Web, запускает
-  их через Docker Compose, устанавливает постоянную HTTPS-конфигурацию host nginx
+- `deploy.ps1` выполняет финальный выпуск: собирает образы API, Web и PDF-worker,
+  запускает их через Docker Compose, устанавливает постоянную HTTPS-конфигурацию host nginx
   и проверяет `/health/live` и `/health/ready`.
 
 Поэтому финальный `deploy.ps1` обязателен даже после успешной migration: без него

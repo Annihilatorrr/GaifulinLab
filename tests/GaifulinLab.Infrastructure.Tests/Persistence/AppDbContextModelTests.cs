@@ -1,5 +1,6 @@
 using GaifulinLab.Domain.Articles;
 using GaifulinLab.Domain.Media;
+using GaifulinLab.Domain.Pdf;
 using GaifulinLab.Domain.Series;
 using GaifulinLab.Domain.Tags;
 using GaifulinLab.Domain.Topics;
@@ -30,7 +31,8 @@ public sealed class AppDbContextModelTests
             typeof(SeriesLocalization),
             typeof(ArticleSeries),
             typeof(Tag),
-            typeof(MediaAsset)
+            typeof(MediaAsset),
+            typeof(PdfExportJob)
         };
 
         Assert.All(expectedEntityTypes, entityType =>
@@ -73,6 +75,7 @@ public sealed class AppDbContextModelTests
         Assert.Contains("ck_article_localizations_status", script);
         Assert.Contains("ck_article_series_position_positive", script);
         Assert.Contains("media_assets", script);
+        Assert.Contains("pdf_export_jobs", script);
     }
 
     private static AppDbContext CreateContext()

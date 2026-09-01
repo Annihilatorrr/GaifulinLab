@@ -5,8 +5,7 @@
 <PublicArticleView LanguageCode="@LanguageCode"
                    Slug="@Slug"
                    RequestedLineHeight="@LineHeight"
-                   RequestedBlockSpacing="@BlockSpacing"
-                   IsPdfRender="@IsPdfRender" />
+                   RequestedBlockSpacing="@BlockSpacing" />
 
 @code {
     [Parameter] public string LanguageCode { get; set; } = "en";
@@ -15,7 +14,4 @@
     public decimal? LineHeight { get; set; }
     [SupplyParameterFromQuery(Name = "blockSpacing")]
     public decimal? BlockSpacing { get; set; }
-    [SupplyParameterFromQuery(Name = "pdf")]
-    public string? PdfMode { get; set; }
-    private bool IsPdfRender => string.Equals(PdfMode, "1", StringComparison.Ordinal);
 }

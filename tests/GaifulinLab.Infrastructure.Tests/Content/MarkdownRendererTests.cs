@@ -76,4 +76,25 @@ public sealed class MarkdownRendererTests
         Assert.Contains("literal \\(code\\)", html);
         Assert.Contains("literal \\[fenced code\\]", html);
     }
+
+    [Fact]
+    public void Render_HighlightsFencedCSharpCode()
+    {
+        const string markdown = """
+            ```csharp
+            double Energy(double mass)
+            {
+                const double c = 299792458.0;
+                return mass * c * c;
+            }
+            ```
+            """;
+
+        var html = _renderer.Render(markdown);
+
+        Assert.Contains("<span class=\"", html);
+        Assert.Contains("class=\"keyword\"", html);
+        Assert.Contains("const", html);
+        Assert.Contains("return", html);
+    }
 }

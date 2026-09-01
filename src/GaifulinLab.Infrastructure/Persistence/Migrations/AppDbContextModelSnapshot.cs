@@ -198,6 +198,94 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("GaifulinLab.Domain.Pdf.PdfExportJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ArticleLocalizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("BlockSpacing")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("LineHeight")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Markdown")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long?>("OutputSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RelativePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeaseExpiresAt")
+                        .HasDatabaseName("ix_pdf_export_jobs_lease");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("ix_pdf_export_jobs_queue");
+
+                    b.ToTable("pdf_export_jobs", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pdf_export_jobs_attempt_count_positive", "\"AttemptCount\" >= 0");
+
+                            t.HasCheckConstraint("ck_pdf_export_jobs_status", "\"Status\" IN ('Queued', 'Processing', 'Completed', 'Failed')");
+                        });
+                });
+
             modelBuilder.Entity("GaifulinLab.Domain.Series.ArticleSeries", b =>
                 {
                     b.Property<Guid>("SeriesId")

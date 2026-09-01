@@ -1,6 +1,7 @@
 using GaifulinLab.Api.Configuration;
+using GaifulinLab.Application.Common;
 using GaifulinLab.Application.Articles.Public.GetPublicArticle;
-using GaifulinLab.Application.Pdf;
+using GaifulinLab.Application.Media;
 using GaifulinLab.Application.Articles.Public.GetPublicArticles;
 using GaifulinLab.Application.Taxonomy.Public.GetPublicSeries;
 using GaifulinLab.Application.Taxonomy.Public.GetPublicSeriesDetails;
@@ -9,7 +10,12 @@ using GaifulinLab.Application.Taxonomy.Public.GetPublicTopics;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Contracts.Taxonomy;
+using GaifulinLab.Domain.Articles;
+using GaifulinLab.Domain.Common;
+using GaifulinLab.Domain.Pdf;
+using GaifulinLab.Infrastructure.Persistence;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -21,7 +27,8 @@ namespace GaifulinLab.Api.Controllers;
 [Route("api/public")]
 public sealed class PublicContentController(
     ISender sender,
-    IArticlePdfRenderer articlePdfRenderer) : ControllerBase
+    AppDbContext dbContext,
+    IMediaStorage mediaStorage) : ControllerBase
 {
     [HttpGet("articles")]
     [ProducesResponseType<IReadOnlyList<PublicArticleListItemDto>>(StatusCodes.Status200OK)]
@@ -46,32 +53,80 @@ public sealed class PublicContentController(
         CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetPublicArticleQuery(languageCode, slug), cancellationToken));
 
-    [HttpGet("articles/{languageCode}/{slug}/pdf")]
+    [HttpPost("articles/{languageCode}/{slug}/pdf-exports")]
     [EnableRateLimiting(ApiRateLimitPolicies.ArticlePdf)]
-    [Produces("application/pdf")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<PdfExportStatusDto>(StatusCodes.Status202Accepted)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> DownloadArticlePdf(
+    public async Task<ActionResult<PdfExportStatusDto>> CreateArticlePdfExport(
         string languageCode,
         string slug,
         [FromQuery] decimal? lineHeight,
         [FromQuery] decimal? blockSpacing,
         CancellationToken cancellationToken)
     {
-        var article = await sender.Send(
-            new GetPublicArticleQuery(languageCode, slug),
-            cancellationToken);
-        var pdf = await articlePdfRenderer.RenderAsync(
-            article.LanguageCode,
-            article.Slug,
-            ArticleTypography.FromOptional(lineHeight, blockSpacing),
-            cancellationToken);
+        var normalizedLanguageCode = DomainRules.NormalizeLanguageCode(languageCode);
+        var normalizedSlug = DomainRules.NormalizeSlug(slug);
+        var localization = await dbContext.ArticleLocalizations
+            .SingleOrDefaultAsync(candidate =>
+                candidate.LanguageCode == normalizedLanguageCode
+                && candidate.Slug == normalizedSlug
+                && candidate.Status == PublicationStatus.Published,
+                cancellationToken)
+            ?? throw new ResourceNotFoundException("Published article", $"{normalizedLanguageCode}/{normalizedSlug}");
+        var typography = ArticleTypography.FromOptional(lineHeight, blockSpacing);
+        var job = PdfExportJob.Create(
+            localization,
+            typography.LineHeight,
+            typography.BlockSpacing,
+            DateTimeOffset.UtcNow);
+        dbContext.PdfExportJobs.Add(job);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return AcceptedAtAction(nameof(GetPdfExport), new { job.Id }, ToStatusDto(job));
+    }
+
+    [HttpGet("pdf-exports/{id:guid}")]
+    [ProducesResponseType<PdfExportStatusDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PdfExportStatusDto>> GetPdfExport(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var job = await dbContext.PdfExportJobs
+            .AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken)
+            ?? throw new ResourceNotFoundException("PDF export", id.ToString());
+        return Ok(ToStatusDto(job));
+    }
+
+    [HttpGet("pdf-exports/{id:guid}/download")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DownloadPdfExport(Guid id, CancellationToken cancellationToken)
+    {
+        var job = await dbContext.PdfExportJobs
+            .AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken)
+            ?? throw new ResourceNotFoundException("PDF export", id.ToString());
+        if (job.Status != PdfExportStatus.Completed || job.RelativePath is null)
+        {
+            return Conflict(new ApiErrorResponse("pdf_export_not_ready", "The PDF export is not ready yet."));
+        }
+
+        var content = await mediaStorage.OpenReadAsync(job.RelativePath, cancellationToken);
+        if (content is null)
+        {
+            throw new ResourceNotFoundException("PDF export file", id.ToString());
+        }
 
         Response.Headers.CacheControl = "private, no-store";
-        return File(pdf, "application/pdf", $"{article.Slug}.pdf");
+        return new FileStreamResult(content, "application/pdf")
+        {
+            FileDownloadName = $"{job.Slug}.pdf"
+        };
     }
 
     [HttpGet("topics/{languageCode}")]
@@ -109,4 +164,13 @@ public sealed class PublicContentController(
         string languageCode,
         CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetPublicTagsQuery(languageCode), cancellationToken));
+
+    private PdfExportStatusDto ToStatusDto(PdfExportJob job) =>
+        new(
+            job.Id,
+            job.Status.ToString().ToLowerInvariant(),
+            job.ErrorMessage,
+            job.Status == PdfExportStatus.Completed
+                ? $"/api/public/pdf-exports/{job.Id}/download"
+                : null);
 }

@@ -9,14 +9,16 @@ API test command never builds Docker images or starts a browser.
 
 ## Prerequisites
 
-- API and Web projects are running;
-- the local Gotenberg service is running;
+- API and Web projects are running from Visual Studio;
+- the local PDF worker is running;
 - Chromium for Playwright.
 
-Start the PDF renderer before the API and Web projects:
+Start the worker before the API and Web projects. Chromium runs only inside this
+worker container; it uses the same local PostgreSQL database and `runtime/media`
+folder as the API.
 
 ```powershell
-docker compose -f deployment/docker-compose.pdf-dev.yml up -d
+.\scripts\start-local.ps1
 ```
 
 Install Chromium after building the test project:
@@ -34,11 +36,11 @@ the repository.
 Run the E2E suite explicitly:
 
 ```powershell
-$env:GAIFULINLAB_E2E_BASE_URL = 'https://localhost:7069'
+$env:GAIFULINLAB_E2E_BASE_URL = 'http://localhost:5172'
 $env:GAIFULINLAB_E2E_ADMIN_LOGIN = 'admin'
 $env:GAIFULINLAB_E2E_ADMIN_PASSWORD = 'your-admin-password'
 dotnet test tests/GaifulinLab.E2E.Tests/GaifulinLab.E2E.Tests.csproj
 ```
 
-The default URL is `https://localhost:7069` when
+The default URL is `http://localhost:5172` when
 `GAIFULINLAB_E2E_BASE_URL` is not set.
