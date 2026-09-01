@@ -1,5 +1,5 @@
 (() => {
-    const mathJaxUrl = "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js";
+    const mathJaxUrl = "https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-chtml.js";
     let mathJaxLoadPromise;
 
     const prepare = (root, apiBaseUrl) => {
