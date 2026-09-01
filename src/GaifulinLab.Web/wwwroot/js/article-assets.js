@@ -29,14 +29,27 @@
             const script = document.createElement("script");
             script.src = mathJaxUrl;
             script.async = true;
-            script.onload = () => {
+            script.onload = async () => {
                 const mathJax = window.MathJax;
-                if (!mathJax?.typesetPromise) {
+                if (!mathJax?.startup?.promise) {
                     reject(new Error("MathJax did not initialize."));
                     return;
                 }
 
-                Promise.resolve(mathJax.startup?.promise).then(() => resolve(mathJax), reject);
+                try {
+                    if (typeof mathJax.typesetPromise !== "function") {
+                        mathJax.startup.defaultReady();
+                    }
+
+                    await mathJax.startup.promise;
+                    if (typeof mathJax.typesetPromise !== "function") {
+                        throw new Error("MathJax typesetting API did not initialize.");
+                    }
+
+                    resolve(mathJax);
+                } catch (error) {
+                    reject(error);
+                }
             };
             script.onerror = () => reject(new Error("MathJax could not be loaded."));
             document.head.appendChild(script);

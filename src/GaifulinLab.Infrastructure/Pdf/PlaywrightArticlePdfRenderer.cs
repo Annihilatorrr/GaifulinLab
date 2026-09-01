@@ -53,29 +53,81 @@ internal sealed class PlaywrightArticlePdfRenderer(
             var browser = await GetBrowserAsync(token);
 
             await using var context = await browser.NewContextAsync();
-            await context.RouteAsync("**/*", route =>
+            var mathJaxAssetsPath = Path.GetFullPath(settings.MathJaxAssetsPath);
+            if (!Directory.Exists(mathJaxAssetsPath))
             {
-                var uri = new Uri(route.Request.Url);
-                return uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps
-                    ? route.AbortAsync()
-                    : route.ContinueAsync();
-            });
-            var page = await context.NewPageAsync();
-            await page.EmulateMediaAsync(new PageEmulateMediaOptions { Media = Microsoft.Playwright.Media.Print });
-            await page.SetContentAsync(html, new PageSetContentOptions { WaitUntil = WaitUntilState.Load });
+                throw new PdfRenderingException(
+                    $"The local MathJax assets were not found at '{settings.MathJaxAssetsPath}'.");
+            }
 
-            if (!File.Exists(settings.MathJaxPath))
+            var mathJaxAssetsRoot = mathJaxAssetsPath.EndsWith(Path.DirectorySeparatorChar)
+                ? mathJaxAssetsPath
+                : $"{mathJaxAssetsPath}{Path.DirectorySeparatorChar}";
+            var mathJaxPath = Path.GetFullPath(settings.MathJaxPath);
+            if (!File.Exists(mathJaxPath))
             {
                 throw new PdfRenderingException(
                     $"The local MathJax asset was not found at '{settings.MathJaxPath}'.");
             }
 
-            await page.AddScriptTagAsync(new PageAddScriptTagOptions { Path = settings.MathJaxPath });
+            if (!mathJaxPath.StartsWith(mathJaxAssetsRoot, StringComparison.Ordinal))
+            {
+                throw new PdfRenderingException(
+                    $"The local MathJax asset must be located under '{settings.MathJaxAssetsPath}'.");
+            }
+
+            var mathJaxScriptUrl = $"https://mathjax.local/{Path.GetRelativePath(mathJaxAssetsPath, mathJaxPath).Replace(Path.DirectorySeparatorChar, '/')}";
+            await context.RouteAsync("**/*", async route =>
+            {
+                var uri = new Uri(route.Request.Url);
+                if (string.Equals(uri.Host, "mathjax.local", StringComparison.OrdinalIgnoreCase))
+                {
+                    var relativePath = uri.AbsolutePath.TrimStart('/');
+                    var assetPath = Path.GetFullPath(Path.Combine(
+                        mathJaxAssetsPath,
+                        relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+                    if (!assetPath.StartsWith(mathJaxAssetsRoot, StringComparison.Ordinal)
+                        || !File.Exists(assetPath))
+                    {
+                        await route.AbortAsync();
+                        return;
+                    }
+
+                    await route.FulfillAsync(new RouteFulfillOptions { Path = assetPath });
+                    return;
+                }
+
+                if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                {
+                    await route.AbortAsync();
+                    return;
+                }
+
+                await route.ContinueAsync();
+            });
+            var page = await context.NewPageAsync();
+            await page.EmulateMediaAsync(new PageEmulateMediaOptions { Media = Microsoft.Playwright.Media.Print });
+            await page.SetContentAsync(html, new PageSetContentOptions { WaitUntil = WaitUntilState.Load });
+
+            await page.AddScriptTagAsync(new PageAddScriptTagOptions
+            {
+                Url = mathJaxScriptUrl
+            });
             await page.EvaluateAsync("""
                 async () => {
                     await document.fonts.ready;
-                    if (!window.MathJax) {
+                    if (!window.MathJax?.startup?.promise) {
                         throw new Error('MathJax did not initialize.');
+                    }
+
+                    if (typeof window.MathJax.typesetPromise !== 'function') {
+                        window.MathJax.startup.defaultReady();
+                    }
+
+                    await window.MathJax.startup.promise;
+                    if (typeof window.MathJax.typesetPromise !== 'function') {
+                        throw new Error('MathJax typesetting API did not initialize.');
                     }
 
                     await window.MathJax.typesetPromise();
@@ -169,7 +221,13 @@ internal sealed class PlaywrightArticlePdfRenderer(
                     mjx-container[display="true"] { break-inside: avoid-page; }
                 </style>
                 <script>
-                    window.MathJax = { startup: { typeset: false } };
+                    window.MathJax = {
+                        startup: { typeset: false },
+                        output: {
+                            font: 'mathjax-newcm',
+                            fontPath: 'https://mathjax.local/%%FONT%%-font'
+                        }
+                    };
                 </script>
             </head>
             <body>
@@ -301,4 +359,5 @@ internal sealed class PlaywrightArticlePdfRenderer(
 internal sealed record ArticlePdfRendererSettings(
     TimeSpan Timeout,
     int MaximumConcurrentRenders,
-    string MathJaxPath);
+    string MathJaxPath,
+    string MathJaxAssetsPath);

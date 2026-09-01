@@ -46,11 +46,14 @@ public static class DependencyInjection
             1,
             8);
 
+        var mathJaxAssetsPath = configuration["PDF_MATHJAX_ASSETS_PATH"]
+            ?? Path.Combine(AppContext.BaseDirectory, "pdf-assets");
         services.AddSingleton(new ArticlePdfRendererSettings(
             TimeSpan.FromSeconds(pdfTimeoutSeconds),
             maximumConcurrentPdfRenders,
             configuration["PDF_MATHJAX_PATH"]
-            ?? Path.Combine(AppContext.BaseDirectory, "pdf-assets", "mathjax", "tex-svg.js")));
+            ?? Path.Combine(mathJaxAssetsPath, "mathjax", "tex-chtml.js"),
+            mathJaxAssetsPath));
         services.AddSingleton<IArticlePdfRenderer, PlaywrightArticlePdfRenderer>();
 
         if (configuration.GetValue("PDF_WORKER_ENABLED", false))
