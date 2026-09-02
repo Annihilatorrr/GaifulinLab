@@ -7,7 +7,7 @@
 @using System.Globalization
 
 <div class="article-editor" data-active-pane="@_activePane" style="@TypographyStyle">
-    <header class="editor-toolbar surface">
+    <header class="editor-toolbar">
         <a class="back-link" href="/admin/articles" aria-label="Back to articles">←</a>
         <label class="language-picker">
             <span class="visually-hidden">Article language</span>
@@ -19,56 +19,50 @@
                 }
             </select>
         </label>
-        <label class="title-field">
-            <span class="visually-hidden">Article title</span>
-            <input type="text" placeholder="Untitled article" autocomplete="off"
-                   value="@Current.Title" @oninput="HandleTitleInput" disabled="@_loading" />
-        </label>
-        <div class="article-path" aria-label="Public article path" title="@PublicPath">
-            <code>@PublicPath</code>
-            @if (CanOpenPublicArticle)
-            {
-                <a href="@PublicPath" target="_blank" rel="noopener" aria-label="Open published article in a new tab">&#x2197;</a>
-            }
+        <div class="article-identity">
+            <label class="title-field">
+                <span class="visually-hidden">Article title</span>
+                <input type="text" placeholder="Untitled article" autocomplete="off"
+                       value="@Current.Title" @oninput="HandleTitleInput" disabled="@_loading" />
+            </label>
+            <label class="toolbar-slug">
+                <span class="visually-hidden">URL slug</span>
+                <span aria-hidden="true">/@Current.LanguageCode/articles/</span>
+                <input type="text" placeholder="article-slug" autocomplete="off" spellcheck="false"
+                       value="@Current.Slug" @oninput="HandleSlugInput" disabled="@_loading" />
+            </label>
         </div>
-        <span class="draft-badge">@Current.Status</span>
+        <span class="publication-status @(Current.Status == PublicationStatusDto.Published ? "is-published" : "is-draft")">@Current.Status</span>
         <div class="editor-actions" aria-label="Article actions">
-            <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="SaveAsync">Save</button>
-            @if (Current.Status != PublicationStatusDto.Published)
-            {
-                <button class="button button-primary" type="button" disabled="@IsBusy" @onclick="PublishAsync">Publish</button>
-            }
-            @if (HasSecondaryActions)
-            {
-                <details class="article-action-menu">
-                    <summary aria-label="More article actions" title="More actions">&hellip;</summary>
-                    <div class="article-action-menu__content" aria-label="More article actions">
-                        @if (CanOpenPublicArticle)
-                        {
-                            <a href="@PublicPath" target="_blank" rel="noopener">Open article</a>
-                        }
-                        @if (Current.Status == PublicationStatusDto.Published)
-                        {
-                            <button type="button" disabled="@IsBusy" @onclick="UnpublishAsync">Unpublish</button>
-                        }
-                        @if (ArticleId is not null)
-                        {
-                            <button class="danger-action" type="button" disabled="@IsBusy" @onclick="DeleteAsync">Delete article</button>
-                        }
-                    </div>
-                </details>
-            }
-        </div>
-        @if (_message is not null)
-        {
-            <div class="editor-notice @(_hasError ? "message-error" : null)" role="@(_hasError ? "alert" : "status")">
-                <span>@_message</span>
-                @if (_hasError)
+            <div class="save-action">
+                <button class="button button-primary" type="button" disabled="@(!CanSave)" @onclick="SaveAsync">@SaveButtonLabel</button>
+                <span class="save-status @SaveStatusClass" role="status">@SaveStatusText</span>
+                @if (_message is not null)
                 {
-                    <button type="button" @onclick="ClearMessage" aria-label="Dismiss message">&times;</button>
+                    <span class="toolbar-message @(_hasError ? "message-error" : null)"
+                          role="@(_hasError ? "alert" : "status")">@_message</span>
                 }
             </div>
-        }
+            @if (Current.Status != PublicationStatusDto.Published)
+            {
+                <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="PublishAsync">Publish</button>
+            }
+            <details class="action-menu">
+                <summary class="action-menu-trigger button button-secondary" aria-label="More article actions">⋯</summary>
+                <div class="action-menu-content">
+                    @if (CanOpenPublicArticle)
+                    {
+                        <a href="@PublicPath" target="_blank" rel="noopener">Open article</a>
+                    }
+                    else
+                    {
+                        <span aria-disabled="true">Open article</span>
+                    }
+                    <button type="button" disabled="@(IsBusy || Current.Status != PublicationStatusDto.Published)" @onclick="UnpublishAsync">Unpublish</button>
+                    <button class="danger-action" type="button" disabled="@(IsBusy || ArticleId is null)" @onclick="DeleteAsync">Delete article</button>
+                </div>
+            </details>
+        </div>
     </header>
 
     @if (_loading)
@@ -77,115 +71,132 @@
     }
     else
     {
-        <details class="article-settings surface">
-            <summary>
-                <span class="settings-title">Article settings</span>
-            </summary>
-            <div class="settings-grid">
-                <div class="settings-field">
-                    <span class="field-label">Content language</span>
-                    <div class="readonly-value"><span>@LanguageName(Current.LanguageCode)</span><span class="language-code">@Current.LanguageCode</span></div>
-                    <span class="field-help">Each localization is a separate version with its own public link.</span>
-                </div>
-                <label class="settings-field">
-                    <span class="field-label">URL slug</span>
-                    <span class="slug-field"><span>/@Current.LanguageCode/articles/</span>
-                        <input type="text" placeholder="article-slug" autocomplete="off" spellcheck="false"
-                               value="@Current.Slug" @oninput="HandleSlugInput" />
-                    </span>
-                    <span class="field-help">Suggested from the title until you edit it manually.</span>
-                </label>
-                <label class="settings-field settings-field-wide">
-                    <span class="field-label">Summary</span>
-                    <textarea class="summary-field" rows="3" placeholder="Short description for article lists"
-                              @bind="Current.Summary" @bind:event="oninput"></textarea>
-                </label>
-                <div class="settings-field">
-                    <span class="field-label">Topics</span>
-                    @if (_taxonomy.Topics.Count == 0)
-                    {
-                        <div class="selection-empty">No topics created yet.</div>
-                    }
-                    else
-                    {
-                        <div class="choice-list">
-                            @foreach (var topic in _taxonomy.Topics)
-                            {
-                                <label><input type="checkbox" checked="@_topicIds.Contains(topic.Id)" @onchange="eventArgs => ToggleTopic(topic.Id, eventArgs)" /> @TaxonomyName(topic.Localizations.Select(x => (x.LanguageCode, x.Name)))</label>
-                            }
-                        </div>
-                    }
-                </div>
-                <div class="settings-field">
-                    <span class="field-label">Series</span>
-                    @if (_taxonomy.Series.Count == 0)
-                    {
-                        <div class="selection-empty">No series created yet.</div>
-                    }
-                    else
-                    {
-                        <div class="choice-list">
-                            @foreach (var series in _taxonomy.Series)
-                            {
-                                <label>
-                                    <input type="checkbox" checked="@_series.ContainsKey(series.Id)" @onchange="eventArgs => ToggleSeries(series.Id, eventArgs)" />
-                                    @TaxonomyName(series.Localizations.Select(x => (x.LanguageCode, x.Title)))
-                                    @if (_series.TryGetValue(series.Id, out var position))
-                                    {
-                                        <input class="position-field" type="number" min="1" value="@position" @onchange="eventArgs => SetSeriesPosition(series.Id, eventArgs)" aria-label="Position in series" />
-                                    }
-                                </label>
-                            }
-                        </div>
-                    }
-                </div>
-                <label class="settings-field settings-field-wide">
-                    <span class="field-label">Tags</span>
-                    <input class="text-field" type="text" placeholder="Separate tags with commas" autocomplete="off"
-                           @bind="_tags" @bind:event="oninput" />
-                </label>
+        <section class="article-settings" aria-label="Article metadata">
+            <label class="metadata-summary">
+                <span class="visually-hidden">Summary</span>
+                <textarea class="summary-field" rows="1" placeholder="Add summary…"
+                          value="@Current.Summary" @oninput="HandleSummaryInput"></textarea>
+            </label>
+            <div class="metadata-controls">
+                <details class="metadata-popover">
+                    <summary>@(ParseTags().Length == 0 ? "+ Tags" : $"Tags ({ParseTags().Length})")</summary>
+                    <div class="metadata-popover-content">
+                        <label class="metadata-input">
+                            <span>Tags</span>
+                            <input class="text-field" type="text" placeholder="Separate tags with commas" autocomplete="off"
+                                   value="@_tags" @oninput="HandleTagsInput" />
+                        </label>
+                    </div>
+                </details>
+
+                <details class="metadata-popover">
+                    <summary>@(_topicIds.Count == 0 ? "+ Topic" : $"Topics ({_topicIds.Count})")</summary>
+                    <div class="metadata-popover-content">
+                        @if (_taxonomy.Topics.Count == 0)
+                        {
+                            <span class="taxonomy-empty">No topics created yet.</span>
+                        }
+                        else
+                        {
+                            <div class="choice-list">
+                                @foreach (var topic in _taxonomy.Topics)
+                                {
+                                    <label><input type="checkbox" checked="@_topicIds.Contains(topic.Id)" @onchange="eventArgs => ToggleTopic(topic.Id, eventArgs)" /> @TaxonomyName(topic.Localizations.Select(x => (x.LanguageCode, x.Name)))</label>
+                                }
+                            </div>
+                        }
+                    </div>
+                </details>
+
+                <details class="metadata-popover">
+                    <summary>@(_series.Count == 0 ? "+ Series" : $"Series ({_series.Count})")</summary>
+                    <div class="metadata-popover-content">
+                        @if (_taxonomy.Series.Count == 0)
+                        {
+                            <span class="taxonomy-empty">No series created yet.</span>
+                        }
+                        else
+                        {
+                            <div class="choice-list">
+                                @foreach (var series in _taxonomy.Series)
+                                {
+                                    <label>
+                                        <input type="checkbox" checked="@_series.ContainsKey(series.Id)" @onchange="eventArgs => ToggleSeries(series.Id, eventArgs)" />
+                                        @TaxonomyName(series.Localizations.Select(x => (x.LanguageCode, x.Title)))
+                                        @if (_series.TryGetValue(series.Id, out var position))
+                                        {
+                                            <input class="position-field" type="number" min="1" value="@position" @onchange="eventArgs => SetSeriesPosition(series.Id, eventArgs)" aria-label="Position in series" />
+                                        }
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+                </details>
             </div>
-        </details>
+
+            @if (ParseTags().Length > 0 || _topicIds.Count > 0 || _series.Count > 0)
+            {
+                <div class="metadata-chip-row" aria-label="Selected article metadata">
+                    @foreach (var tag in ParseTags())
+                    {
+                        <button class="metadata-chip" type="button" @onclick="() => RemoveTag(tag)" aria-label="Remove tag @tag">@tag <span aria-hidden="true">&times;</span></button>
+                    }
+                    @foreach (var topic in _taxonomy.Topics.Where(item => _topicIds.Contains(item.Id)))
+                    {
+                        var name = TaxonomyName(topic.Localizations.Select(x => (x.LanguageCode, x.Name)));
+                        <button class="metadata-chip" type="button" @onclick="() => RemoveTopic(topic.Id)" aria-label="Remove topic @name">@name <span aria-hidden="true">&times;</span></button>
+                    }
+                    @foreach (var series in _taxonomy.Series.Where(item => _series.ContainsKey(item.Id)))
+                    {
+                        var title = TaxonomyName(series.Localizations.Select(x => (x.LanguageCode, x.Title)));
+                        <button class="metadata-chip" type="button" @onclick="() => RemoveSeries(series.Id)" aria-label="Remove series @title">@title <span aria-hidden="true">&times;</span></button>
+                    }
+                </div>
+            }
+        </section>
 
         <nav class="editor-tabs" aria-label="Editor view">
             <button type="button" aria-selected="@(_activePane == EditorPane.Edit)" @onclick="() => _activePane = EditorPane.Edit">Edit</button>
+            @if (!_isCompactLayout)
+            {
+                <button class="split-mode" type="button" aria-selected="@(_activePane == EditorPane.Split)" @onclick="() => _activePane = EditorPane.Split">Split</button>
+            }
             <button type="button" aria-selected="@(_activePane == EditorPane.Preview)" @onclick="() => _activePane = EditorPane.Preview">Preview</button>
         </nav>
-        <div class="editor-workspace surface">
-            <section class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
+        <div class="editor-workspace" @ref="_workspaceElement">
+            <section id="markdown-pane" class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
                 <header class="pane-heading" id="markdown-heading">
                     <span>Markdown</span>
                     <div class="pane-tools">
-                        <details class="typography-control">
-                            <summary>Text spacing</summary>
-                            <div class="typography-control__content">
-                                <label>Lines <input type="range" min="1" max="2.2" step="0.05" value="@FormatTypographyValue(_typography.LineHeight)" @oninput="HandleLineHeightChanged" /><output>@FormatTypographyValue(_typography.LineHeight)</output></label>
-                                <label>Blocks <input type="range" min="0.1" max="1.6" step="0.05" value="@FormatTypographyValue(_typography.BlockSpacing)" @oninput="HandleBlockSpacingChanged" /><output>@FormatTypographyValue(_typography.BlockSpacing)rem</output></label>
-                            </div>
-                        </details>
-                    <label class="image-upload" aria-disabled="@_imageUploading">
-                        @(_imageUploading ? "Uploading…" : "+ Add image")
-                        <InputFile OnChange="HandleImageSelected" accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" disabled="@_imageUploading" />
-                    </label>
+                        <label class="image-upload" aria-disabled="@_imageUploading">
+                            @(_imageUploading ? "Uploading…" : "+ Add image")
+                            <InputFile OnChange="HandleImageSelected" accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" disabled="@_imageUploading" />
+                        </label>
                     </div>
                 </header>
                 @if (_imageUploadError is not null) { <div class="upload-error" role="alert">@_imageUploadError</div> }
                 <label class="visually-hidden" for="article-markdown">Article Markdown</label>
                 <textarea id="article-markdown" placeholder="Start writing in Markdown…" spellcheck="true" value="@Current.Markdown" @oninput="HandleMarkdownInput"></textarea>
             </section>
-            <section class="editor-pane preview-pane" aria-labelledby="preview-heading" aria-live="polite">
+            <div class="editor-splitter" role="separator" aria-orientation="vertical" aria-controls="markdown-pane preview-pane"
+                 aria-valuemin="30" aria-valuemax="70" aria-valuenow="@FormatTypographyValue(_editorSplit)" aria-valuetext="@EditorSplitValueText"
+                 tabindex="0" @onpointerdown="StartSplitterAsync" @onkeydown="HandleSplitterKeyDownAsync"
+                 @ondblclick="ResetSplitterAsync">
+                <span aria-hidden="true"></span>
+            </div>
+            <section id="preview-pane" class="editor-pane preview-pane" aria-labelledby="preview-heading" aria-live="polite">
                 <header class="pane-heading" id="preview-heading">
                     <span>Preview</span>
-                    <div class="preview-actions">
-                        @if (_previewReady && _previewContentHeight > 0)
-                        {
-                            <output class="preview-metrics" title="Printable A4 content area: 986 px (261 mm)">
-                                PDF: 986 px/page · Preview: @FormatPreviewHeight(_previewContentHeight) px · @PreviewPageCount pages
-                            </output>
-                        }
-                        <button class="pdf-button" type="button" disabled="@(!CanPrintPreview)" @onclick="PrintPreviewAsync">
-                            @(_printing ? "Preparing..." : "PDF \u2193")
-                        </button>
+                    <div class="preview-tools">
+                        <span class="preview-live"><span aria-hidden="true"></span>Live</span>
+                        <details class="preview-settings">
+                            <summary>Preview settings</summary>
+                            <div class="preview-settings__content">
+                                <label>Line spacing <input type="range" min="1" max="2.2" step="0.05" value="@FormatTypographyValue(_typography.LineHeight)" @oninput="HandleLineHeightChanged" /><output>@FormatTypographyValue(_typography.LineHeight)</output></label>
+                                <label>Paragraph spacing <input type="range" min="0.1" max="1.6" step="0.05" value="@FormatTypographyValue(_typography.BlockSpacing)" @oninput="HandleBlockSpacingChanged" /><output>@FormatTypographyValue(_typography.BlockSpacing)rem</output></label>
+                            </div>
+                        </details>
                     </div>
                 </header>
                 @if (string.IsNullOrWhiteSpace(Current.Markdown))
@@ -194,26 +205,7 @@
                 }
                 else if (_previewLoading) { <div class="preview-status" role="status">Rendering preview…</div> }
                 else if (_previewError is not null) { <div class="preview-status preview-error" role="alert">@_previewError</div> }
-                else
-                {
-                    <div class="preview-paper pdf-article-document">
-                        <div class="preview-page-guides" aria-hidden="true"></div>
-                        <article class="article-preview" @ref="_previewElement">
-                            <header class="article-header">
-                                @if (Current.PublishedAt is { } publishedAt)
-                                {
-                                    <time datetime="@publishedAt.ToString("O")">@publishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
-                                }
-                                <h1>@(string.IsNullOrWhiteSpace(Current.Title) ? "Untitled article" : Current.Title)</h1>
-                                @if (!string.IsNullOrWhiteSpace(Current.Summary))
-                                {
-                                    <p class="summary">@Current.Summary</p>
-                                }
-                            </header>
-                            @((MarkupString)_renderedHtml)
-                        </article>
-                    </div>
-                }
+                else { <article class="article-preview" @ref="_previewElement">@((MarkupString)_renderedHtml)</article> }
             </section>
         </div>
     }
@@ -235,33 +227,46 @@
     private bool _hasError;
     private bool _loading = true;
     private bool _saving;
+    private bool _isDirty;
+    private bool _saveFailed;
+    private bool _autosavePending;
+    private long _changeVersion;
     private bool _previewLoading;
     private bool _imageUploading;
-    private bool _printing;
-    private bool _previewReady;
-    private double _previewContentHeight;
-    private EditorPane _activePane = EditorPane.Edit;
+    private EditorPane _activePane = EditorPane.Split;
+    private decimal _editorSplit = 50m;
     private CancellationTokenSource? _previewCancellation;
-    private CancellationTokenSource? _messageCancellation;
+    private ElementReference _workspaceElement;
     private ElementReference _previewElement;
     private bool _previewElementReady;
     private bool _mathTypesetPending;
     private bool _typographyLoaded;
+    private bool _editorSplitLoaded;
+    private bool _shortcutsAttached;
+    private bool _responsiveLayoutAttached;
+    private bool _isCompactLayout;
+    private CancellationTokenSource? _messageCancellation;
+    private CancellationTokenSource? _autosaveCancellation;
+    private DotNetObjectReference<ArticleEditor>? _splitterReference;
     private ArticleTypography _typography = ArticleTypography.Default;
+    private DateTimeOffset? _savedAt;
     private LocalizationModel Current => _localizations[_activeLanguage];
     private bool IsBusy => _loading || _saving;
-    private bool CanPrintPreview =>
-        !_loading
-        && !_previewLoading
-        && !_printing
-        && _previewReady
-        && _previewError is null
-        && !string.IsNullOrWhiteSpace(Current.Markdown);
-    private bool HasSecondaryActions =>
-        ArticleId is not null || Current.Status == PublicationStatusDto.Published || CanOpenPublicArticle;
-    private int PreviewPageCount => Math.Max(1, (int)Math.Ceiling(_previewContentHeight / PdfPageContentHeightPixels));
+    private bool CanSave => !IsBusy && (ArticleId is null || _isDirty || _saveFailed);
+    private string SaveButtonLabel => _saving ? "Saving…" : _saveFailed ? "Retry" : _isDirty ? "Save changes" : "Save";
+    private string SaveStatusClass => _saving ? "is-saving" : _saveFailed ? "is-error" : _isDirty ? "is-dirty" : "is-saved";
+    private string SaveStatusText => _saving
+        ? "Saving…"
+        : _saveFailed
+            ? "Save failed"
+            : _isDirty
+                ? "Unsaved changes"
+                : _savedAt is { } savedAt
+                    ? $"Saved {savedAt.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)}"
+                    : ArticleId is null ? "Not saved" : "All changes saved";
     private string TypographyStyle =>
-        $"--article-line-height: {FormatTypographyValue(_typography.LineHeight)}; --article-block-spacing: {FormatTypographyValue(_typography.BlockSpacing)}rem;";
+        $"--article-line-height: {FormatTypographyValue(_typography.LineHeight)}; --article-block-spacing: {FormatTypographyValue(_typography.BlockSpacing)}rem; --editor-split: {FormatTypographyValue(_editorSplit)}%; --editor-preview-split: {FormatTypographyValue(100m - _editorSplit)}%;";
+    private string EditorSplitValueText => $"{FormatTypographyValue(_editorSplit)}% Markdown, {FormatTypographyValue(100m - _editorSplit)}% Preview";
 
     protected override async Task OnInitializedAsync()
     {
@@ -305,6 +310,50 @@
             return;
         }
 
+        if (!_editorSplitLoaded)
+        {
+            try
+            {
+                _editorSplit = ClampEditorSplit(await JS.InvokeAsync<decimal>("gaifulinLabEditorSplitter.get"));
+            }
+            catch (JSException)
+            {
+                // Local storage is optional; the even split remains in effect.
+            }
+
+            _editorSplitLoaded = true;
+            StateHasChanged();
+            return;
+        }
+
+        if (!_shortcutsAttached)
+        {
+            _splitterReference ??= DotNetObjectReference.Create(this);
+            try
+            {
+                await JS.InvokeVoidAsync("gaifulinLabEditorShortcuts.attach", _splitterReference);
+                _shortcutsAttached = true;
+            }
+            catch (JSException)
+            {
+                // Ctrl/Cmd+S is an enhancement; the Save button remains available.
+            }
+        }
+
+        if (!_responsiveLayoutAttached)
+        {
+            _splitterReference ??= DotNetObjectReference.Create(this);
+            try
+            {
+                await JS.InvokeVoidAsync("gaifulinLabEditorResponsive.attach", _splitterReference);
+                _responsiveLayoutAttached = true;
+            }
+            catch (JSException)
+            {
+                // The CSS layout remains usable when resize notifications are unavailable.
+            }
+        }
+
         if (_loading
             || _previewLoading
             || _previewError is not null
@@ -316,11 +365,6 @@
         _previewElementReady = true;
         if (!_mathTypesetPending)
         {
-            _previewReady = true;
-            if (await UpdatePreviewMeasurementAsync())
-            {
-                StateHasChanged();
-            }
             return;
         }
 
@@ -332,12 +376,6 @@
         catch (JSException)
         {
             // Raw TeX remains readable if the external renderer is unavailable.
-        }
-        finally
-        {
-            _previewReady = true;
-            await UpdatePreviewMeasurementAsync();
-            StateHasChanged();
         }
     }
 
@@ -366,18 +404,45 @@
         ClearMessage();
         await ClearPreviewMathAsync();
         _previewElementReady = false;
-        _previewReady = false;
         _renderedHtml = "";
-        _previewContentHeight = 0;
         await RefreshPreview();
     }
 
     private Task SaveAsync() => SaveCoreAsync(navigateAfterCreate: true);
 
-    private async Task SaveCoreAsync(bool navigateAfterCreate)
+    [JSInvokable]
+    public Task SaveArticleAsync() => CanSave ? SaveAsync() : Task.CompletedTask;
+
+    [JSInvokable]
+    public Task SetCompactLayoutAsync(bool isCompactLayout)
     {
+        if (_isCompactLayout == isCompactLayout)
+        {
+            return Task.CompletedTask;
+        }
+
+        _isCompactLayout = isCompactLayout;
+        if (_isCompactLayout && _activePane == EditorPane.Split)
+        {
+            _activePane = EditorPane.Edit;
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SaveCoreAsync(bool navigateAfterCreate, bool isAutomaticSave = false)
+    {
+        var saveVersion = _changeVersion;
+        if (!isAutomaticSave)
+        {
+            CancelAutosaveDelay();
+        }
+
+        _autosavePending = false;
         _saving = true;
         ClearMessage();
+        _hasError = false;
+        _saveFailed = false;
         try
         {
             var wasNew = ArticleId is null;
@@ -396,11 +461,27 @@
                 _series.Select(item => new SeriesAssignmentRequest(item.Key, item.Value)).ToArray(),
                 ParseTags()));
             await ReloadLocalizationsAsync();
-            ShowMessage("Article saved.", false);
+            if (_changeVersion == saveVersion)
+            {
+                _isDirty = false;
+            }
+            _savedAt = DateTimeOffset.Now;
             if (wasNew && navigateAfterCreate) Navigation.NavigateTo($"/admin/articles/{ArticleId}", replace: true);
         }
-        catch (Exception exception) when (exception is AdminApiException or HttpRequestException) { ShowMessage(exception.Message, true); }
-        finally { _saving = false; }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            _saveFailed = true;
+            _autosavePending = false;
+            ShowMessage(exception.Message, true);
+        }
+        finally
+        {
+            _saving = false;
+            if (!_saveFailed && _autosavePending && _isDirty && ArticleId is not null)
+            {
+                QueueAutosave();
+            }
+        }
     }
 
     private async Task PublishAsync()
@@ -425,7 +506,6 @@
         {
             await ArticlesClient.PublishAsync(ArticleId.Value, Current.LanguageCode);
             Current.Status = PublicationStatusDto.Published;
-            Current.PublishedAt ??= DateTimeOffset.UtcNow;
             ShowMessage("Localization published.", false);
             if (wasNew) Navigation.NavigateTo($"/admin/articles/{ArticleId}", replace: true);
         }
@@ -444,15 +524,8 @@
 
     private async Task DeleteAsync()
     {
-        if (ArticleId is null)
-        {
-            return;
-        }
-
-        var confirmed = await JS.InvokeAsync<bool>(
-            "confirm",
-            "Delete this article? This cannot be undone.");
-        if (!confirmed)
+        if (ArticleId is null
+            || !await JS.InvokeAsync<bool>("confirm", "Delete this article? This action cannot be undone."))
         {
             return;
         }
@@ -462,7 +535,7 @@
         try
         {
             await ArticlesClient.DeleteAsync(ArticleId.Value);
-            Navigation.NavigateTo("/admin/articles", replace: true);
+            Navigation.NavigateTo("/admin/articles");
         }
         catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
         {
@@ -474,29 +547,57 @@
         }
     }
 
-    private async Task PrintPreviewAsync()
+    private async Task HandleMarkdownInput(ChangeEventArgs eventArgs)
     {
-        if (!CanPrintPreview)
+        Current.Markdown = eventArgs.Value?.ToString() ?? "";
+        MarkDirty();
+        await RefreshPreview();
+    }
+
+    private async Task StartSplitterAsync(PointerEventArgs eventArgs)
+    {
+        if (_activePane != EditorPane.Split)
         {
             return;
         }
 
-        _printing = true;
+        _splitterReference ??= DotNetObjectReference.Create(this);
         try
         {
-            await JS.InvokeVoidAsync("window.print");
+            await JS.InvokeVoidAsync("gaifulinLabEditorSplitter.start", _workspaceElement, eventArgs.ClientX, _splitterReference);
         }
         catch (JSException)
         {
-            ShowMessage("The print dialog could not be opened.", true);
-        }
-        finally
-        {
-            _printing = false;
+            // Keyboard controls remain available when JavaScript is unavailable.
         }
     }
 
-    private async Task HandleMarkdownInput(ChangeEventArgs eventArgs) { Current.Markdown = eventArgs.Value?.ToString() ?? ""; await RefreshPreview(); }
+    private Task ResetSplitterAsync() => SetEditorSplitAsync(50m);
+
+    private Task HandleSplitterKeyDownAsync(KeyboardEventArgs eventArgs) => eventArgs.Key switch
+    {
+        "ArrowLeft" => SetEditorSplitAsync(_editorSplit - 5m),
+        "ArrowRight" => SetEditorSplitAsync(_editorSplit + 5m),
+        "Home" => SetEditorSplitAsync(30m),
+        "End" => SetEditorSplitAsync(70m),
+        _ => Task.CompletedTask
+    };
+
+    [JSInvokable]
+    public async Task SetEditorSplitAsync(decimal value)
+    {
+        _editorSplit = ClampEditorSplit(value);
+        try
+        {
+            _editorSplit = ClampEditorSplit(await JS.InvokeAsync<decimal>("gaifulinLabEditorSplitter.set", _editorSplit));
+        }
+        catch (JSException)
+        {
+            // Applying the current split does not depend on browser storage.
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
 
     private Task HandleLineHeightChanged(ChangeEventArgs eventArgs) =>
         UpdateTypographyAsync(eventArgs.Value?.ToString(), isLineHeight: true);
@@ -528,6 +629,8 @@
     private static string FormatTypographyValue(decimal value) =>
         value.ToString("0.##", CultureInfo.InvariantCulture);
 
+    private static decimal ClampEditorSplit(decimal value) => Math.Clamp(value, 30m, 70m);
+
     private void HandleTitleInput(ChangeEventArgs eventArgs)
     {
         Current.Title = eventArgs.Value?.ToString() ?? "";
@@ -535,12 +638,26 @@
         {
             Current.Slug = SlugSuggestion.FromTitle(Current.Title);
         }
+        MarkDirty();
     }
 
     private void HandleSlugInput(ChangeEventArgs eventArgs)
     {
         Current.Slug = eventArgs.Value?.ToString() ?? "";
         Current.SlugIsAutomatic = false;
+        MarkDirty();
+    }
+
+    private void HandleSummaryInput(ChangeEventArgs eventArgs)
+    {
+        Current.Summary = eventArgs.Value?.ToString() ?? "";
+        MarkDirty();
+    }
+
+    private void HandleTagsInput(ChangeEventArgs eventArgs)
+    {
+        _tags = eventArgs.Value?.ToString() ?? "";
+        MarkDirty();
     }
 
     private async Task HandleImageSelected(InputFileChangeEventArgs eventArgs)
@@ -555,6 +672,7 @@
             var alt = Path.GetFileNameWithoutExtension(file.Name).Replace("[", "", StringComparison.Ordinal).Replace("]", "", StringComparison.Ordinal);
             var separator = string.IsNullOrEmpty(Current.Markdown) ? "" : Current.Markdown.EndsWith('\n') ? "\n" : "\n\n";
             Current.Markdown += $"{separator}![{alt}]({uploaded.Url})";
+            MarkDirty();
             await RefreshPreview();
         }
         catch (IOException) { _imageUploadError = "The image is larger than 10 MB."; }
@@ -570,9 +688,7 @@
         {
             await ClearPreviewMathAsync();
             _previewElementReady = false;
-            _previewReady = false;
             _renderedHtml = "";
-            _previewContentHeight = 0;
             _previewError = null;
             _previewLoading = false;
             return;
@@ -581,8 +697,6 @@
         _previewCancellation = cancellation;
         await ClearPreviewMathAsync();
         _previewElementReady = false;
-        _previewReady = false;
-        _previewContentHeight = 0;
         _previewLoading = true;
         _previewError = null;
         try
@@ -616,30 +730,6 @@
         }
     }
 
-    private async Task<bool> UpdatePreviewMeasurementAsync()
-    {
-        if (!_previewElementReady)
-        {
-            return false;
-        }
-
-        try
-        {
-            var measurement = await JS.InvokeAsync<PreviewMeasurement>("articleAssets.measure", _previewElement);
-            if (Math.Abs(measurement.ContentHeight - _previewContentHeight) < 0.5)
-            {
-                return false;
-            }
-
-            _previewContentHeight = measurement.ContentHeight;
-            return true;
-        }
-        catch (JSException)
-        {
-            return false;
-        }
-    }
-
     private async Task ReloadLocalizationsAsync()
     {
         var activeLanguage = _activeLanguage;
@@ -655,9 +745,38 @@
             : _localizations.Keys.First();
     }
 
-    private void ToggleTopic(Guid id, ChangeEventArgs args) { if (args.Value is true) _topicIds.Add(id); else _topicIds.Remove(id); }
-    private void ToggleSeries(Guid id, ChangeEventArgs args) { if (args.Value is true) _series.TryAdd(id, 1); else _series.Remove(id); }
-    private void SetSeriesPosition(Guid id, ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out var value) && value > 0) _series[id] = value; }
+    private void ToggleTopic(Guid id, ChangeEventArgs args)
+    {
+        var changed = args.Value is true ? _topicIds.Add(id) : _topicIds.Remove(id);
+        if (changed) MarkDirty();
+    }
+
+    private void ToggleSeries(Guid id, ChangeEventArgs args)
+    {
+        var changed = args.Value is true ? _series.TryAdd(id, 1) : _series.Remove(id);
+        if (changed) MarkDirty();
+    }
+
+    private void SetSeriesPosition(Guid id, ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value)
+            && value > 0
+            && (!_series.TryGetValue(id, out var existing) || existing != value))
+        {
+            _series[id] = value;
+            MarkDirty();
+        }
+    }
+
+    private void RemoveTopic(Guid id) { if (_topicIds.Remove(id)) MarkDirty(); }
+    private void RemoveSeries(Guid id) { if (_series.Remove(id)) MarkDirty(); }
+    private void RemoveTag(string tag)
+    {
+        var tags = ParseTags().Where(item => !string.Equals(item, tag, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (tags.Length == ParseTags().Length) return;
+        _tags = string.Join(", ", tags);
+        MarkDirty();
+    }
     private string TaxonomyName(IEnumerable<(string LanguageCode, string Name)> names) => names.FirstOrDefault(x => x.LanguageCode == _activeLanguage).Name ?? names.FirstOrDefault().Name ?? "Untitled";
     private static string LanguageName(string languageCode) => languageCode == "ru" ? "Russian" : "English";
     private string LanguageOptionLabel(string languageCode)
@@ -671,20 +790,112 @@
         return $"{label} — add translation";
     }
     private string PublicPath => $"/{Current.LanguageCode}/articles/{(string.IsNullOrWhiteSpace(Current.Slug) ? "{slug}" : Current.Slug.Trim())}";
-    private const double PdfPageContentHeightPixels = 986.46;
-    private static string FormatPreviewHeight(double value) => Math.Ceiling(value).ToString("0", CultureInfo.InvariantCulture);
     private bool CanOpenPublicArticle => Current.Status == PublicationStatusDto.Published && !string.IsNullOrWhiteSpace(Current.Slug);
     private string[] ParseTags() => _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+    private void MarkDirty()
+    {
+        _isDirty = true;
+        _changeVersion++;
+        _saveFailed = false;
+        if (_message is not null)
+        {
+            ClearMessage();
+        }
+        _hasError = false;
+        QueueAutosave();
+    }
+
+    private void QueueAutosave()
+    {
+        if (ArticleId is null)
+        {
+            return;
+        }
+
+        _autosavePending = true;
+        if (_saving)
+        {
+            return;
+        }
+
+        CancelAutosaveDelay();
+        var cancellation = new CancellationTokenSource();
+        _autosaveCancellation = cancellation;
+        _ = AutosaveAfterDelayAsync(cancellation);
+    }
+
+    private async Task AutosaveAfterDelayAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1.2), cancellation.Token);
+            if (cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            await InvokeAsync(async () =>
+            {
+                if (cancellation.IsCancellationRequested || _saving || !_isDirty || ArticleId is null)
+                {
+                    return;
+                }
+
+                _autosavePending = false;
+                await SaveCoreAsync(navigateAfterCreate: false, isAutomaticSave: true);
+            });
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (_autosaveCancellation == cancellation)
+            {
+                _autosaveCancellation.Dispose();
+                _autosaveCancellation = null;
+            }
+        }
+    }
+
+    private void CancelAutosaveDelay()
+    {
+        _autosaveCancellation?.Cancel();
+        _autosaveCancellation?.Dispose();
+        _autosaveCancellation = null;
+    }
     private void ShowMessage(string message, bool error)
     {
         ClearMessage();
         _message = message;
         _hasError = error;
-
         if (!error)
         {
             _messageCancellation = new CancellationTokenSource();
-            _ = DismissSuccessMessageAsync(_messageCancellation.Token);
+            _ = HideMessageAsync(message, _messageCancellation.Token);
+        }
+    }
+
+    private async Task HideMessageAsync(string message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(2.5), cancellationToken);
+            await InvokeAsync(() =>
+            {
+                if (_messageCancellation?.Token == cancellationToken
+                    && string.Equals(_message, message, StringComparison.Ordinal))
+                {
+                    _message = null;
+                    _messageCancellation.Dispose();
+                    _messageCancellation = null;
+                    StateHasChanged();
+                }
+            });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
     }
 
@@ -694,23 +905,6 @@
         _messageCancellation?.Dispose();
         _messageCancellation = null;
         _message = null;
-        _hasError = false;
-    }
-
-    private async Task DismissSuccessMessageAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await Task.Delay(TimeSpan.FromSeconds(2.5), cancellationToken);
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                _message = null;
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
     }
 
     public void Dispose()
@@ -719,6 +913,8 @@
         _previewCancellation?.Dispose();
         _messageCancellation?.Cancel();
         _messageCancellation?.Dispose();
+        CancelAutosaveDelay();
+        _splitterReference?.Dispose();
     }
 
     private sealed class LocalizationModel
@@ -747,7 +943,6 @@
             Markdown = dto.Markdown;
             Slug = dto.Slug ?? "";
             Status = dto.Status;
-            PublishedAt = dto.PublishedAt;
             SlugIsAutomatic = Status == PublicationStatusDto.Draft
                 && (string.IsNullOrWhiteSpace(Slug)
                     || string.Equals(
@@ -762,10 +957,8 @@
         public string Slug { get; set; } = "";
         public bool SlugIsAutomatic { get; set; }
         public PublicationStatusDto Status { get; set; } = PublicationStatusDto.Draft;
-        public DateTimeOffset? PublishedAt { get; set; }
         public CreateArticleRequest ToCreateRequest() => new(LanguageCode, Title, Summary, Markdown, Slug);
         public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Markdown, Slug);
     }
-    private sealed record PreviewMeasurement(double ContentHeight);
-    private enum EditorPane { Edit, Preview }
+    private enum EditorPane { Edit, Split, Preview }
 }
