@@ -10,7 +10,7 @@ namespace GaifulinLab.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(IAdminAuthenticationService authenticationService) : ControllerBase
+public sealed class AuthController(IUserAuthenticationService authenticationService) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
@@ -18,7 +18,7 @@ public sealed class AuthController(IAdminAuthenticationService authenticationSer
     [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
-    public ActionResult<LoginResponse> Login(LoginRequest request)
+    public async Task<ActionResult<LoginResponse>> Login(LoginRequest request)
     {
         Response.Headers.CacheControl = "no-store";
 
@@ -27,7 +27,7 @@ public sealed class AuthController(IAdminAuthenticationService authenticationSer
             return InvalidCredentials();
         }
 
-        var token = authenticationService.Authenticate(request.Login, request.Password);
+        var token = await authenticationService.AuthenticateAsync(request.Login, request.Password);
         return token is null
             ? InvalidCredentials()
             : Ok(new LoginResponse(token.Value, token.ExpiresAt));

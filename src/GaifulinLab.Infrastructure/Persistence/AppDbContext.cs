@@ -5,13 +5,15 @@ using GaifulinLab.Domain.Pdf;
 using GaifulinLab.Domain.Series;
 using GaifulinLab.Domain.Tags;
 using GaifulinLab.Domain.Topics;
+using GaifulinLab.Infrastructure.Authentication;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SeriesAggregate = GaifulinLab.Domain.Series.Series;
 
 namespace GaifulinLab.Infrastructure.Persistence;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : DbContext(options), IAppDbContext
+    : IdentityDbContext<ApplicationUser>(options), IAppDbContext
 {
     public DbSet<Article> Articles => Set<Article>();
 
@@ -39,7 +41,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
         base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 }

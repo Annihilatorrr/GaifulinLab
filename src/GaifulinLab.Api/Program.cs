@@ -5,13 +5,15 @@ using GaifulinLab.Application;
 using GaifulinLab.Infrastructure;
 using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 
 if (args is ["--hash-admin-password"])
 {
     var password = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
     ArgumentException.ThrowIfNullOrWhiteSpace(password);
-    Console.WriteLine(new AdminPasswordHasher().Hash(password));
+    var user = new ApplicationUser { UserName = "admin" };
+    Console.WriteLine(new PasswordHasher<ApplicationUser>().HashPassword(user, password));
     return;
 }
 
@@ -21,6 +23,7 @@ builder.Services.AddControllers(options => options.Filters.Add<ApiExceptionFilte
 builder.Services.AddProblemDetails();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddIdentityAuthentication(builder.Configuration);
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (corsOrigins.Length > 0)
 {
@@ -62,6 +65,8 @@ if (app.Configuration.GetValue<bool>("APPLY_DATABASE_MIGRATIONS"))
 {
     await app.Services.ApplyDatabaseMigrationsAsync();
 }
+
+await app.Services.InitializeIdentityAsync(app.Configuration);
 
 if (!app.Environment.IsDevelopment())
 {

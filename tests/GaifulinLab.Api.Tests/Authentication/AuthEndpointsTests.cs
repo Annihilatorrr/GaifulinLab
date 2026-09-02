@@ -5,6 +5,7 @@ using GaifulinLab.Contracts.Auth;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -65,6 +66,37 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Login_WithIdentityUserWithoutAdminRole_ReturnsTokenButAdminSessionIsForbidden()
+    {
+        const string userLogin = "second-user";
+        const string userPassword = "Second-user-password-1!";
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            if (await userManager.FindByNameAsync(userLogin) is null)
+            {
+                var result = await userManager.CreateAsync(
+                    new ApplicationUser { UserName = userLogin },
+                    userPassword);
+                Assert.True(result.Succeeded, string.Join("; ", result.Errors.Select(error => error.Description)));
+            }
+        }
+
+        using var client = factory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(userLogin, userPassword));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var login = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(login);
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", login.AccessToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/auth/session")).StatusCode);
+    }
 }
 
 public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
@@ -78,7 +110,8 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        var passwordHash = new AdminPasswordHasher().Hash(AdminPassword);
+        var admin = new ApplicationUser { UserName = AdminLogin };
+        var passwordHash = new PasswordHasher<ApplicationUser>().HashPassword(admin, AdminPassword);
         var databaseName = $"gaifulinlab-api-tests-{Guid.NewGuid()}";
 
         builder.UseEnvironment("Testing");
@@ -86,8 +119,8 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting(
             "ConnectionStrings:Postgres",
             "Host=localhost;Database=gaifulinlab_tests;Username=test;Password=test");
-        builder.UseSetting("ADMIN_LOGIN", AdminLogin);
-        builder.UseSetting("ADMIN_PASSWORD_HASH", passwordHash);
+        builder.UseSetting("IDENTITY_BOOTSTRAP_ADMIN_LOGIN", AdminLogin);
+        builder.UseSetting("IDENTITY_BOOTSTRAP_ADMIN_PASSWORD_HASH", passwordHash);
         builder.UseSetting("JWT_ISSUER", "GaifulinLab.Tests");
         builder.UseSetting("JWT_AUDIENCE", "GaifulinLab.Tests.Client");
         builder.UseSetting("JWT_SIGNING_KEY", "test-signing-key-that-is-at-least-32-bytes-long");

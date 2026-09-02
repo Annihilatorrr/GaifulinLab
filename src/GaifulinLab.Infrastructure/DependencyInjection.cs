@@ -72,9 +72,13 @@ public static class DependencyInjection
             services.AddHostedService<PdfExportWorker>();
         }
 
-        services.AddAdminAuthentication(configuration);
+        services.AddIdentityAuthentication(configuration);
 
         return services;
     }
 
+    public static IServiceCollection AddIdentityAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration) =>
+        AuthenticationConfiguration.AddIdentityAuthentication(services, configuration);
 }

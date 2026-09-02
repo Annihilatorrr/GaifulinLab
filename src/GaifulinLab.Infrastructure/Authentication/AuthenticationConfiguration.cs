@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -13,48 +15,57 @@ internal static class AuthenticationConfiguration
     private const int DefaultTokenLifetimeMinutes = 30;
     private const int MinimumSigningKeyBytes = 32;
 
-    public static IServiceCollection AddAdminAuthentication(
+    public static IServiceCollection AddIdentityAuthentication(
         this IServiceCollection services,
         IConfiguration configuration)
     {
         var settings = ReadSettings(configuration);
-        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.JwtSigningKey));
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(settings.SigningKey));
 
         services.AddSingleton(settings);
-        services.AddSingleton<AdminPasswordHasher>();
-        services.AddSingleton<IAdminAuthenticationService, AdminAuthenticationService>();
+        services
+            .AddIdentityCore<ApplicationUser>(options =>
+            {
+                options.Password.RequireDigit = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireNonAlphanumeric = true;
+                options.Password.RequiredLength = 8;
+            })
+            .AddRoles<IdentityRole>()
+            .AddEntityFrameworkStores<Persistence.AppDbContext>()
+            .AddDefaultTokenProviders();
+        services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
-                options.MapInboundClaims = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
-                    ValidIssuer = settings.JwtIssuer,
+                    ValidIssuer = settings.Issuer,
                     ValidateAudience = true,
-                    ValidAudience = settings.JwtAudience,
+                    ValidAudience = settings.Audience,
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = signingKey,
                     ValidateLifetime = true,
                     RequireExpirationTime = true,
                     RequireSignedTokens = true,
                     ClockSkew = TimeSpan.FromSeconds(30),
-                    NameClaimType = JwtRegisteredClaimNames.UniqueName
+                    NameClaimType = ClaimTypes.NameIdentifier,
+                    RoleClaimType = ClaimTypes.Role
                 };
             });
 
         services.AddAuthorizationBuilder()
             .AddPolicy(AuthorizationPolicies.Admin, policy =>
-                policy.RequireAuthenticatedUser());
+                policy.RequireRole(IdentityRoles.Admin));
 
         return services;
     }
 
-    private static AdminAuthenticationSettings ReadSettings(IConfiguration configuration)
+    private static JwtAuthenticationSettings ReadSettings(IConfiguration configuration)
     {
-        var login = ReadRequired(configuration, "ADMIN_LOGIN", "Admin:Login");
-        var passwordHash = ReadRequired(configuration, "ADMIN_PASSWORD_HASH", "Admin:PasswordHash");
         var issuer = ReadRequired(configuration, "JWT_ISSUER", "Jwt:Issuer");
         var audience = ReadRequired(configuration, "JWT_AUDIENCE", "Jwt:Audience");
         var signingKey = ReadRequired(configuration, "JWT_SIGNING_KEY", "Jwt:SigningKey");
@@ -76,9 +87,7 @@ internal static class AuthenticationConfiguration
             throw new InvalidOperationException("JWT lifetime must be between 1 and 1440 minutes.");
         }
 
-        return new AdminAuthenticationSettings(
-            login,
-            passwordHash,
+        return new JwtAuthenticationSettings(
             issuer,
             audience,
             signingKey,

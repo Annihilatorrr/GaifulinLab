@@ -62,12 +62,39 @@ public sealed class TokenAuthenticationStateProvider(AccessTokenStore tokenStore
             var claims = new List<Claim>();
             AddClaim(payload.RootElement, claims, "sub", ClaimTypes.NameIdentifier);
             AddClaim(payload.RootElement, claims, "unique_name", ClaimTypes.Name);
+            AddClaims(payload.RootElement, claims, "role", ClaimTypes.Role);
 
             return new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
         }
         catch (Exception exception) when (exception is FormatException or JsonException or ArgumentOutOfRangeException)
         {
             return AnonymousUser;
+        }
+    }
+
+    private static void AddClaims(
+        JsonElement payload,
+        ICollection<Claim> claims,
+        string jsonName,
+        string claimType)
+    {
+        if (!payload.TryGetProperty(jsonName, out var value))
+        {
+            return;
+        }
+
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            claims.Add(new Claim(claimType, value.GetString()!));
+            return;
+        }
+
+        if (value.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in value.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String))
+            {
+                claims.Add(new Claim(claimType, item.GetString()!));
+            }
         }
     }
 

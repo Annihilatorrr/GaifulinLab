@@ -4,7 +4,9 @@ using GaifulinLab.Domain.Pdf;
 using GaifulinLab.Domain.Series;
 using GaifulinLab.Domain.Tags;
 using GaifulinLab.Domain.Topics;
+using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -62,6 +64,15 @@ public sealed class AppDbContextModelTests
     }
 
     [Fact]
+    public void Model_ContainsAspNetCoreIdentityUsersAndRoles()
+    {
+        using var context = CreateContext();
+
+        Assert.NotNull(context.Model.FindEntityType(typeof(ApplicationUser)));
+        Assert.NotNull(context.Model.FindEntityType(typeof(IdentityRole)));
+    }
+
+    [Fact]
     public void InitialMigration_GeneratesExpectedPostgresConstraints()
     {
         using var context = CreateContext();
@@ -76,6 +87,8 @@ public sealed class AppDbContextModelTests
         Assert.Contains("ck_article_series_position_positive", script);
         Assert.Contains("media_assets", script);
         Assert.Contains("pdf_export_jobs", script);
+        Assert.Contains("AspNetUsers", script);
+        Assert.Contains("AspNetRoles", script);
     }
 
     private static AppDbContext CreateContext()
