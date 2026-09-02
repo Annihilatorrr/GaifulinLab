@@ -37,4 +37,49 @@ public sealed class ArticleEditorPopoverTests : PageTest
             await Expect(popover).Not.ToHaveAttributeAsync("open", "");
         }
     }
+
+    [Fact]
+    public async Task Popovers_DoNotMoveTheEditorWorkspace()
+    {
+        var (login, password) = _environment.GetAdminCredentials();
+
+        await Page.GotoAsync(new Uri(_environment.BaseUri, "/admin/login").ToString());
+        await Page.Locator("#admin-login").FillAsync(login);
+        await Page.Locator("#admin-password").FillAsync(password);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
+
+        var workspace = Page.Locator(".editor-workspace");
+        var initialTop = await TopAsync(workspace);
+        var popovers = Page.Locator("details[data-dismiss-on-outside-click]");
+
+        for (var index = 0; index < await popovers.CountAsync(); index++)
+        {
+            var popover = popovers.Nth(index);
+            await popover.Locator("summary").ClickAsync();
+            await Expect(popover).ToHaveAttributeAsync("open", "");
+            await AssertWorkspaceTopAsync(workspace, initialTop);
+
+            await Page.GetByLabel("Article title").ClickAsync();
+        }
+
+        var tagsPopover = popovers.Nth(1);
+        await tagsPopover.Locator("summary").ClickAsync();
+        await Page.Locator(".metadata-popover-content input.text-field").FillAsync("layout-stability");
+        await Expect(Page.Locator(".metadata-popover-content input.text-field"))
+            .ToHaveValueAsync("layout-stability");
+        await AssertWorkspaceTopAsync(workspace, initialTop);
+    }
+
+    private static async Task<double> TopAsync(ILocator locator)
+    {
+        var box = await locator.BoundingBoxAsync();
+        return Assert.IsType<LocatorBoundingBoxResult>(box).Y;
+    }
+
+    private static async Task AssertWorkspaceTopAsync(ILocator workspace, double expectedTop)
+    {
+        var actualTop = await TopAsync(workspace);
+        Assert.InRange(Math.Abs(actualTop - expectedTop), 0, 0.5);
+    }
 }
