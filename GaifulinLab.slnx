@@ -13,5 +13,6 @@
     <Project Path="tests/GaifulinLab.Infrastructure.Tests/GaifulinLab.Infrastructure.Tests.csproj" />
     <Project Path="tests/GaifulinLab.Api.Tests/GaifulinLab.Api.Tests.csproj" />
     <Project Path="tests/GaifulinLab.Web.Tests/GaifulinLab.Web.Tests.csproj" />
+    <Project Path="tests/GaifulinLab.E2E.Tests/GaifulinLab.E2E.Tests.csproj" />
   </Folder>
 </Solution>

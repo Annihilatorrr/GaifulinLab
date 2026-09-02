@@ -4,8 +4,9 @@ This project verifies the complete article-image flow on the primary running
 site: upload in the editor, Markdown insertion and preview, save, publish,
 public rendering, and PDF download.
 
-It is intentionally excluded from `GaifulinLab.slnx`, so the normal unit and
-API test command never builds Docker images or starts a browser.
+It is included in `GaifulinLab.slnx` for discovery in Visual Studio Test
+Explorer. It still requires the local services, Chromium, and administrator
+credentials described below, and should be run explicitly.
 
 ## Prerequisites
 
