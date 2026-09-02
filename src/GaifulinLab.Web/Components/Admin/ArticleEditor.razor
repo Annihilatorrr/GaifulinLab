@@ -47,7 +47,7 @@
             {
                 <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="PublishAsync">Publish</button>
             }
-            <details class="action-menu">
+            <details class="action-menu" data-dismiss-on-outside-click>
                 <summary class="action-menu-trigger button button-secondary" aria-label="More article actions">⋯</summary>
                 <div class="action-menu-content">
                     @if (CanOpenPublicArticle)
@@ -78,7 +78,7 @@
                           value="@Current.Summary" @oninput="HandleSummaryInput"></textarea>
             </label>
             <div class="metadata-controls">
-                <details class="metadata-popover">
+                <details class="metadata-popover" data-dismiss-on-outside-click>
                     <summary>@(ParseTags().Length == 0 ? "+ Tags" : $"Tags ({ParseTags().Length})")</summary>
                     <div class="metadata-popover-content">
                         <label class="metadata-input">
@@ -89,7 +89,7 @@
                     </div>
                 </details>
 
-                <details class="metadata-popover">
+                <details class="metadata-popover" data-dismiss-on-outside-click>
                     <summary>@(_topicIds.Count == 0 ? "+ Topic" : $"Topics ({_topicIds.Count})")</summary>
                     <div class="metadata-popover-content">
                         @if (_taxonomy.Topics.Count == 0)
@@ -108,7 +108,7 @@
                     </div>
                 </details>
 
-                <details class="metadata-popover">
+                <details class="metadata-popover" data-dismiss-on-outside-click>
                     <summary>@(_series.Count == 0 ? "+ Series" : $"Series ({_series.Count})")</summary>
                     <div class="metadata-popover-content">
                         @if (_taxonomy.Series.Count == 0)
