@@ -20,6 +20,7 @@ public sealed class ArticleImageWorkflowTests : PageTest
     [Fact]
     public async Task UploadImage_SavePublishAndDownloadPdf_ContentIsAvailableOnThePrimarySite()
     {
+        await _environment.EnsurePdfWorkerAsync();
         var (login, password) = _environment.GetAdminCredentials();
         var uniqueId = Guid.NewGuid().ToString("N");
         var title = $"E2E image article {uniqueId}";
@@ -56,6 +57,7 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
         await Page.GetByRole(AriaRole.Button, new() { Name = "Publish" }).ClickAsync();
+        await Page.GetByLabel("More article actions").ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article" })).ToBeVisibleAsync();
 
         await AssertPublicImageLoadsAsync(Page, new Uri(_environment.BaseUri, publicPath));

@@ -25,18 +25,15 @@
                 <input type="text" placeholder="Untitled article" autocomplete="off"
                        value="@Current.Title" @oninput="HandleTitleInput" disabled="@_loading" />
             </label>
-            <label class="toolbar-slug">
-                <span class="visually-hidden">URL slug</span>
-                <span aria-hidden="true">/@Current.LanguageCode/articles/</span>
-                <input type="text" placeholder="article-slug" autocomplete="off" spellcheck="false"
-                       value="@Current.Slug" @oninput="HandleSlugInput" disabled="@_loading" />
-            </label>
         </div>
         <span class="publication-status @(Current.Status == PublicationStatusDto.Published ? "is-published" : "is-draft")">@Current.Status</span>
         <div class="editor-actions" aria-label="Article actions">
             <div class="save-action">
                 <button class="button button-primary" type="button" disabled="@(!CanSave)" @onclick="SaveAsync">@SaveButtonLabel</button>
-                <span class="save-status @SaveStatusClass" role="status">@SaveStatusText</span>
+                @if (_saving || _isDirty || _saveFailed)
+                {
+                    <span class="save-status @SaveStatusClass" role="status">@SaveStatusText</span>
+                }
                 @if (_message is not null)
                 {
                     <span class="toolbar-message @(_hasError ? "message-error" : null)"
@@ -72,67 +69,75 @@
     else
     {
         <section class="article-settings" aria-label="Article metadata">
-            <label class="metadata-summary">
-                <span class="visually-hidden">Summary</span>
+            <label class="metadata-field metadata-slug">
+                <span class="metadata-label">Slug</span>
+                <span class="slug-field">
+                    <span aria-hidden="true">/@Current.LanguageCode/articles/</span>
+                    <input type="text" placeholder="article-slug" autocomplete="off" spellcheck="false"
+                           value="@Current.Slug" @oninput="HandleSlugInput" disabled="@_loading" />
+                </span>
+            </label>
+            <label class="metadata-field metadata-tags">
+                <span class="metadata-label">Tags</span>
+                <input class="text-field" type="text" placeholder="Separate tags with commas" autocomplete="off"
+                       value="@_tags" @oninput="HandleTagsInput" />
+            </label>
+            <label class="metadata-field metadata-summary">
+                <span class="metadata-label">Summary</span>
                 <textarea class="summary-field" rows="1" placeholder="Add summary…"
                           value="@Current.Summary" @oninput="HandleSummaryInput"></textarea>
             </label>
             <div class="metadata-controls">
-                <details class="metadata-popover" data-dismiss-on-outside-click>
-                    <summary>@(ParseTags().Length == 0 ? "+ Tags" : $"Tags ({ParseTags().Length})")</summary>
-                    <div class="metadata-popover-content">
-                        <label class="metadata-input">
-                            <span>Tags</span>
-                            <input class="text-field" type="text" placeholder="Separate tags with commas" autocomplete="off"
-                                   value="@_tags" @oninput="HandleTagsInput" />
-                        </label>
-                    </div>
-                </details>
+                <div class="metadata-assignment">
+                    <span class="metadata-label">Topic</span>
+                    <details class="metadata-popover" data-dismiss-on-outside-click>
+                        <summary>@(_topicIds.Count == 0 ? "+ Add topic" : $"Topics ({_topicIds.Count})")</summary>
+                        <div class="metadata-popover-content">
+                            @if (_taxonomy.Topics.Count == 0)
+                            {
+                                <span class="taxonomy-empty">No topics created yet.</span>
+                            }
+                            else
+                            {
+                                <div class="choice-list">
+                                    @foreach (var topic in _taxonomy.Topics)
+                                    {
+                                        <label><input type="checkbox" checked="@_topicIds.Contains(topic.Id)" @onchange="eventArgs => ToggleTopic(topic.Id, eventArgs)" /> @TaxonomyName(topic.Localizations.Select(x => (x.LanguageCode, x.Name)))</label>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </details>
+                </div>
 
-                <details class="metadata-popover" data-dismiss-on-outside-click>
-                    <summary>@(_topicIds.Count == 0 ? "+ Topic" : $"Topics ({_topicIds.Count})")</summary>
-                    <div class="metadata-popover-content">
-                        @if (_taxonomy.Topics.Count == 0)
-                        {
-                            <span class="taxonomy-empty">No topics created yet.</span>
-                        }
-                        else
-                        {
-                            <div class="choice-list">
-                                @foreach (var topic in _taxonomy.Topics)
-                                {
-                                    <label><input type="checkbox" checked="@_topicIds.Contains(topic.Id)" @onchange="eventArgs => ToggleTopic(topic.Id, eventArgs)" /> @TaxonomyName(topic.Localizations.Select(x => (x.LanguageCode, x.Name)))</label>
-                                }
-                            </div>
-                        }
-                    </div>
-                </details>
-
-                <details class="metadata-popover" data-dismiss-on-outside-click>
-                    <summary>@(_series.Count == 0 ? "+ Series" : $"Series ({_series.Count})")</summary>
-                    <div class="metadata-popover-content">
-                        @if (_taxonomy.Series.Count == 0)
-                        {
-                            <span class="taxonomy-empty">No series created yet.</span>
-                        }
-                        else
-                        {
-                            <div class="choice-list">
-                                @foreach (var series in _taxonomy.Series)
-                                {
-                                    <label>
-                                        <input type="checkbox" checked="@_series.ContainsKey(series.Id)" @onchange="eventArgs => ToggleSeries(series.Id, eventArgs)" />
-                                        @TaxonomyName(series.Localizations.Select(x => (x.LanguageCode, x.Title)))
-                                        @if (_series.TryGetValue(series.Id, out var position))
-                                        {
-                                            <input class="position-field" type="number" min="1" value="@position" @onchange="eventArgs => SetSeriesPosition(series.Id, eventArgs)" aria-label="Position in series" />
-                                        }
-                                    </label>
-                                }
-                            </div>
-                        }
-                    </div>
-                </details>
+                <div class="metadata-assignment">
+                    <span class="metadata-label">Series</span>
+                    <details class="metadata-popover" data-dismiss-on-outside-click>
+                        <summary>@(_series.Count == 0 ? "+ Add series" : $"Series ({_series.Count})")</summary>
+                        <div class="metadata-popover-content">
+                            @if (_taxonomy.Series.Count == 0)
+                            {
+                                <span class="taxonomy-empty">No series created yet.</span>
+                            }
+                            else
+                            {
+                                <div class="choice-list">
+                                    @foreach (var series in _taxonomy.Series)
+                                    {
+                                        <label>
+                                            <input type="checkbox" checked="@_series.ContainsKey(series.Id)" @onchange="eventArgs => ToggleSeries(series.Id, eventArgs)" />
+                                            @TaxonomyName(series.Localizations.Select(x => (x.LanguageCode, x.Title)))
+                                            @if (_series.TryGetValue(series.Id, out var position))
+                                            {
+                                                <input class="position-field" type="number" min="1" value="@position" @onchange="eventArgs => SetSeriesPosition(series.Id, eventArgs)" aria-label="Position in series" />
+                                            }
+                                        </label>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </details>
+                </div>
             </div>
 
             @if (ParseTags().Length > 0 || _topicIds.Count > 0 || _series.Count > 0)
@@ -164,7 +169,7 @@
             }
             <button type="button" aria-selected="@(_activePane == EditorPane.Preview)" @onclick="() => _activePane = EditorPane.Preview">Preview</button>
         </nav>
-        <div class="editor-workspace" @ref="_workspaceElement">
+        <div class="editor-workspace" @ref="_workspaceElement" aria-busy="@(_previewLoading || _imageUploading ? "true" : "false")">
             <section id="markdown-pane" class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
                 <header class="pane-heading" id="markdown-heading">
                     <span>Markdown</span>
@@ -177,7 +182,8 @@
                 </header>
                 @if (_imageUploadError is not null) { <div class="upload-error" role="alert">@_imageUploadError</div> }
                 <label class="visually-hidden" for="article-markdown">Article Markdown</label>
-                <textarea id="article-markdown" placeholder="Start writing in Markdown…" spellcheck="true" value="@Current.Markdown" @oninput="HandleMarkdownInput"></textarea>
+                <span id="markdown-editor-help" class="visually-hidden">Use Tab to indent. Press Control or Command S to save.</span>
+                <textarea id="article-markdown" @ref="_markdownElement" aria-describedby="markdown-editor-help" placeholder="Start writing in Markdown…" spellcheck="true" value="@Current.Markdown" @oninput="HandleMarkdownInput"></textarea>
             </section>
             <div class="editor-splitter" role="separator" aria-orientation="vertical" aria-controls="markdown-pane preview-pane"
                  aria-valuemin="30" aria-valuemax="70" aria-valuenow="@FormatTypographyValue(_editorSplit)" aria-valuetext="@EditorSplitValueText"
@@ -237,12 +243,14 @@
     private decimal _editorSplit = 50m;
     private CancellationTokenSource? _previewCancellation;
     private ElementReference _workspaceElement;
+    private ElementReference _markdownElement;
     private ElementReference _previewElement;
     private bool _previewElementReady;
     private bool _mathTypesetPending;
     private bool _typographyLoaded;
     private bool _editorSplitLoaded;
     private bool _shortcutsAttached;
+    private bool _markdownEnhancementsAttached;
     private bool _responsiveLayoutAttached;
     private bool _isCompactLayout;
     private CancellationTokenSource? _messageCancellation;
@@ -351,6 +359,19 @@
             catch (JSException)
             {
                 // The CSS layout remains usable when resize notifications are unavailable.
+            }
+        }
+
+        if (!_loading && !_markdownEnhancementsAttached)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("gaifulinLabMarkdownEditor.attach", _markdownElement);
+                _markdownEnhancementsAttached = true;
+            }
+            catch (JSException)
+            {
+                // Native textarea editing remains available when JavaScript is unavailable.
             }
         }
 
@@ -670,8 +691,16 @@
             await using var content = file.OpenReadStream(MediaUploadLimits.MaximumFileSize);
             var uploaded = await MediaClient.UploadAsync(content, file.Name, file.ContentType);
             var alt = Path.GetFileNameWithoutExtension(file.Name).Replace("[", "", StringComparison.Ordinal).Replace("]", "", StringComparison.Ordinal);
-            var separator = string.IsNullOrEmpty(Current.Markdown) ? "" : Current.Markdown.EndsWith('\n') ? "\n" : "\n\n";
-            Current.Markdown += $"{separator}![{alt}]({uploaded.Url})";
+            var markdown = $"![{alt}]({uploaded.Url})";
+            try
+            {
+                Current.Markdown = await JS.InvokeAsync<string>("gaifulinLabMarkdownEditor.insertAtSelection", _markdownElement, markdown);
+            }
+            catch (JSException)
+            {
+                var separator = string.IsNullOrEmpty(Current.Markdown) ? "" : Current.Markdown.EndsWith('\n') ? "\n" : "\n\n";
+                Current.Markdown += $"{separator}{markdown}";
+            }
             MarkDirty();
             await RefreshPreview();
         }

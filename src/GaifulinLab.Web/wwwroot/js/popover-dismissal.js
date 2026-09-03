@@ -8,4 +8,19 @@
                 }
             });
     });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") {
+            return;
+        }
+
+        const popover = event.target.closest("details[data-dismiss-on-outside-click][open]");
+        if (!popover) {
+            return;
+        }
+
+        event.preventDefault();
+        popover.open = false;
+        popover.querySelector("summary")?.focus();
+    });
 })();

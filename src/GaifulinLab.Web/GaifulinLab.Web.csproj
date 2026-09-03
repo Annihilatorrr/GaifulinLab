@@ -19,8 +19,4 @@
     </AssemblyAttribute>
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="..\GaifulinLab.Contracts\Content\article-pdf.css" Link="wwwroot\css\article-pdf.css" />
-  </ItemGroup>
-
 </Project>

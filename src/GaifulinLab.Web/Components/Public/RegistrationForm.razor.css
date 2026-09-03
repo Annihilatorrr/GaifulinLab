@@ -1,0 +1,108 @@
+.registration-section {
+    display: grid;
+    min-height: calc(100vh - var(--header-height));
+    place-items: center;
+    padding: var(--space-12) var(--site-gutter);
+}
+
+.registration-card {
+    width: min(100%, 32rem);
+    padding: clamp(var(--space-6), 5vw, var(--space-10));
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+}
+
+.registration-card h1 {
+    margin: var(--space-3) 0;
+    font-size: var(--text-3xl);
+}
+
+.registration-card > p,
+.registration-success p {
+    margin-bottom: var(--space-8);
+}
+
+.registration-form,
+.registration-success {
+    display: grid;
+    gap: var(--space-5);
+}
+
+.field {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.field label {
+    font-size: var(--text-sm);
+    font-weight: 700;
+}
+
+.field input {
+    width: 100%;
+    min-height: 3rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    padding: 0.7rem 0.85rem;
+    background: var(--color-background);
+    color: var(--color-text);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.field input:hover {
+    border-color: var(--color-text-muted);
+}
+
+.field input:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 16%, transparent);
+}
+
+.field input:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.field-hint {
+    color: var(--color-text-subtle);
+    font-size: var(--text-xs);
+}
+
+.field ::deep .validation-message,
+.registration-error {
+    margin: 0;
+    color: var(--color-danger);
+    font-size: var(--text-sm);
+}
+
+.registration-submit {
+    width: 100%;
+    margin-top: var(--space-2);
+}
+
+.success-mark {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    color: var(--color-accent);
+    font-size: var(--text-xl);
+    font-weight: 800;
+    place-items: center;
+}
+
+.registration-success .button {
+    justify-self: start;
+}
+
+@media (max-width: 40rem) {
+    .registration-section {
+        align-items: start;
+        padding-block: var(--space-8);
+    }
+
+    .registration-card {
+        padding: var(--space-6);
+    }
+}

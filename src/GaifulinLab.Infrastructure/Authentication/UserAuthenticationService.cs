@@ -47,4 +47,31 @@ internal sealed class UserAuthenticationService(
 
         return new IssuedAccessToken(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
+
+    public async Task<UserRegistrationResult> RegisterAsync(string login, string password)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(login);
+        ArgumentNullException.ThrowIfNull(password);
+
+        var result = await userManager.CreateAsync(
+            new ApplicationUser
+            {
+                UserName = login,
+                SecurityStamp = Guid.NewGuid().ToString("N")
+            },
+            password);
+
+        if (result.Succeeded)
+        {
+            return UserRegistrationResult.Success;
+        }
+
+        var errors = result.Errors.ToArray();
+        var loginTaken = errors.Any(error =>
+            string.Equals(error.Code, "DuplicateUserName", StringComparison.Ordinal));
+
+        return UserRegistrationResult.Failure(
+            loginTaken,
+            errors.Select(error => error.Description).ToArray());
+    }
 }

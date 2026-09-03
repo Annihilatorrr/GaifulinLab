@@ -1,0 +1,121 @@
+@using System.ComponentModel.DataAnnotations
+@inject RegistrationClient RegistrationClient
+
+<section class="registration-section" aria-labelledby="registration-title">
+    <div class="registration-card surface">
+        @if (_registeredLogin is not null)
+        {
+            <div class="registration-success" role="status">
+                <span class="success-mark" aria-hidden="true">✓</span>
+                <span class="eyebrow">Account created</span>
+                <h1 id="registration-title">Welcome, @_registeredLogin</h1>
+                <p>Your standard account is ready. Workspace access is granted separately by an administrator.</p>
+                <a class="button button-secondary" href="/">Return to the site</a>
+            </div>
+        }
+        else
+        {
+            <span class="eyebrow">Gaifulin Lab account</span>
+            <h1 id="registration-title">Create an account</h1>
+            <p>Choose a login and a strong password. Registration does not grant access to the private workspace.</p>
+
+            <EditForm Model="_registration" OnValidSubmit="RegisterAsync" class="registration-form">
+                <DataAnnotationsValidator />
+
+                <div class="field">
+                    <label for="registration-login">Login</label>
+                    <InputText id="registration-login"
+                               autocomplete="username"
+                               aria-describedby="registration-login-hint"
+                               disabled="@_isSubmitting"
+                               @bind-Value="_registration.Login" />
+                    <span id="registration-login-hint" class="field-hint">
+                        3–64 letters, numbers, or the characters <span aria-label="hyphen, period, underscore, at sign, plus">- . _ @@ +</span>
+                    </span>
+                    <ValidationMessage For="() => _registration.Login" />
+                </div>
+
+                <div class="field">
+                    <label for="registration-password">Password</label>
+                    <InputText id="registration-password"
+                               type="password"
+                               autocomplete="new-password"
+                               aria-describedby="registration-password-hint"
+                               disabled="@_isSubmitting"
+                               @bind-Value="_registration.Password" />
+                    <span id="registration-password-hint" class="field-hint">
+                        At least 8 characters with upper- and lowercase letters, a number, and a symbol.
+                    </span>
+                    <ValidationMessage For="() => _registration.Password" />
+                </div>
+
+                <div class="field">
+                    <label for="registration-confirm-password">Confirm password</label>
+                    <InputText id="registration-confirm-password"
+                               type="password"
+                               autocomplete="new-password"
+                               disabled="@_isSubmitting"
+                               @bind-Value="_registration.ConfirmPassword" />
+                    <ValidationMessage For="() => _registration.ConfirmPassword" />
+                </div>
+
+                @if (_errorMessage is not null)
+                {
+                    <p class="registration-error" role="alert">@_errorMessage</p>
+                }
+
+                <button class="button button-primary registration-submit"
+                        type="submit"
+                        disabled="@_isSubmitting">
+                    @(_isSubmitting ? "Creating account…" : "Create account")
+                </button>
+            </EditForm>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly RegistrationModel _registration = new();
+    private string? _registeredLogin;
+    private string? _errorMessage;
+    private bool _isSubmitting;
+
+    private async Task RegisterAsync()
+    {
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        var result = await RegistrationClient.RegisterAsync(
+            _registration.Login.Trim(),
+            _registration.Password);
+
+        _isSubmitting = false;
+        if (result.Succeeded)
+        {
+            _registeredLogin = result.Login;
+            _registration.Password = string.Empty;
+            _registration.ConfirmPassword = string.Empty;
+            return;
+        }
+
+        _registration.Password = string.Empty;
+        _registration.ConfirmPassword = string.Empty;
+        _errorMessage = result.ErrorMessage;
+    }
+
+    private sealed class RegistrationModel
+    {
+        [Required]
+        [StringLength(64, MinimumLength = 3)]
+        [RegularExpression(@"^[A-Za-z0-9._@+\-]+$", ErrorMessage = "Login contains unsupported characters.")]
+        public string Login { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(128, MinimumLength = 8)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

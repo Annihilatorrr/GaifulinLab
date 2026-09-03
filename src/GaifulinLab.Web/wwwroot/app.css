@@ -1,7 +1,10 @@
 @import url("css/tokens.css");
 @import url("css/base.css");
 
-@page { size: A4; margin: 18mm 16mm; }
+@page {
+    size: A4;
+    margin: 16mm 18mm 18mm;
+}
 
 #app:has(.app-preloader) {
     min-height: 100vh;

@@ -1,5 +1,5 @@
-# The API and Web application run from Visual Studio. Docker is used locally
-# only for the Chromium-based PDF worker.
+# The API and Web application run from Visual Studio. Docker runs the separate
+# Chromium-based PDF worker executable.
 name: gaifulinlab-local
 
 services:
@@ -17,11 +17,32 @@ services:
       MEDIA_STORAGE_PATH: /app/media
       PDF_RENDERER_TIMEOUT_SECONDS: "45"
       PDF_MAX_CONCURRENT_RENDERS: "1"
-      PDF_WORKER_ENABLED: "true"
       PDF_WORKER_POLL_INTERVAL_MILLISECONDS: "1000"
       PDF_WORKER_LEASE_SECONDS: "120"
       APPLY_DATABASE_MIGRATIONS: "false"
       HTTPS_REDIRECT_ENABLED: "false"
     volumes:
       # API and worker use the same files for uploaded images and generated PDFs.
+      - ./runtime/media:/app/media
+
+  pdf-worker-e2e:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.pdf-worker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      # E2E intentionally writes inspectable data into the normal development database.
+      ConnectionStrings__Postgres: "${GAIFULINLAB_E2E_DOCKER_CONNECTION_STRING:-Host=host.docker.internal;Port=5435;Database=gaifulinlab;Username=gaifulinlab;Password=gaifulinlab}"
+      MEDIA_STORAGE_PATH: /app/media
+      PDF_RENDERER_TIMEOUT_SECONDS: "45"
+      PDF_MAX_CONCURRENT_RENDERS: "1"
+      PDF_WORKER_POLL_INTERVAL_MILLISECONDS: "1000"
+      PDF_WORKER_LEASE_SECONDS: "120"
+      APPLY_DATABASE_MIGRATIONS: "false"
+      HTTPS_REDIRECT_ENABLED: "false"
+    volumes:
+      # Kept shared with the API so E2E data can be inspected in the local application.
       - ./runtime/media:/app/media

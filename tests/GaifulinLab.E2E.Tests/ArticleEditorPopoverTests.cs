@@ -25,7 +25,7 @@ public sealed class ArticleEditorPopoverTests : PageTest
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
 
         var popovers = Page.Locator("details[data-dismiss-on-outside-click]");
-        await Expect(popovers).ToHaveCountAsync(4);
+        await Expect(popovers).ToHaveCountAsync(3);
 
         for (var index = 0; index < await popovers.CountAsync(); index++)
         {
@@ -63,12 +63,9 @@ public sealed class ArticleEditorPopoverTests : PageTest
             await Page.GetByLabel("Article title").ClickAsync();
         }
 
-        var tagsPopover = popovers.Nth(1);
-        await tagsPopover.Locator("summary").ClickAsync();
-        await Page.Locator(".metadata-popover-content input.text-field").FillAsync("layout-stability");
-        await Expect(Page.Locator(".metadata-popover-content input.text-field"))
-            .ToHaveValueAsync("layout-stability");
-        await AssertWorkspaceTopAsync(workspace, initialTop);
+        var tags = Page.GetByLabel("Tags");
+        await tags.FillAsync("layout-stability");
+        await Expect(tags).ToHaveValueAsync("layout-stability");
     }
 
     private static async Task<double> TopAsync(ILocator locator)

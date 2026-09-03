@@ -18,7 +18,7 @@ checkout по SSH, серверные Bash-скрипты настраивают
 scripts/
 └── start-local.ps1                    # единственная команда локального запуска
 
-docker-compose.local.yml               # только Chromium PDF-worker для Visual Studio
+docker-compose.local.yml               # отдельный Chromium PDF-worker для Visual Studio
 
 deployment/
 ├── client/                            # PowerShell-команды для управления production
@@ -47,7 +47,9 @@ deployment/
 ```
 
 `deployment/.env` содержит безопасные placeholders. Перед первым sync замените
-пароль БД, hash пароля администратора, JWT key и TLS email реальными значениями.
+пароль БД, bootstrap hash первого Identity-администратора, JWT key и TLS email
+реальными значениями. Bootstrap-настройки используются только для создания
+первой учётной записи; дальнейшая аутентификация читает пользователей и роли из БД.
 
 ## Локальная разработка
 
@@ -71,6 +73,25 @@ dotnet ef database update `
   --project src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj `
   --startup-project src/GaifulinLab.Api/GaifulinLab.Api.csproj
 ```
+
+Первого локального Identity-администратора задайте через User Secrets. Сначала
+получите hash командой `--hash-admin-password`, передав исходный пароль только
+через переменную процесса `ADMIN_PASSWORD`, затем сохраните login и полученный
+hash:
+
+```powershell
+$env:ADMIN_PASSWORD = '<local-admin-password>'
+dotnet run --project src/GaifulinLab.Api/GaifulinLab.Api.csproj -- --hash-admin-password
+Remove-Item Env:ADMIN_PASSWORD
+
+dotnet user-secrets set "Identity:BootstrapAdmin:Login" "admin" `
+  --project src/GaifulinLab.Api/GaifulinLab.Api.csproj
+dotnet user-secrets set "Identity:BootstrapAdmin:PasswordHash" "<generated-hash>" `
+  --project src/GaifulinLab.Api/GaifulinLab.Api.csproj
+```
+
+Bootstrap создаёт пользователя и роль `Admin`, если их ещё нет. Последующие
+входы и добавленные в будущем пользователи работают только через Identity-таблицы.
 
 ## Первый production setup
 

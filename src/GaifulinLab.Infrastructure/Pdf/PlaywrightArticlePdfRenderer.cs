@@ -5,7 +5,6 @@ using GaifulinLab.Application.Common;
 using GaifulinLab.Application.Content;
 using GaifulinLab.Application.Media;
 using GaifulinLab.Application.Pdf;
-using GaifulinLab.Contracts;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +32,6 @@ internal sealed class PlaywrightArticlePdfRenderer(
     private static readonly Regex IntegralWithoutExplicitLimits = new(
         @"\\int(?!\\(?:limits|nolimits))",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly string PdfStylesheet = LoadPdfStylesheet();
 
     private readonly SemaphoreSlim _renderSlots = new(settings.MaximumConcurrentRenders);
     private readonly SemaphoreSlim _browserLock = new(1, 1);
@@ -198,8 +196,29 @@ internal sealed class PlaywrightArticlePdfRenderer(
                     @page { size: A4; margin: 18mm 16mm; }
                     :root { color-scheme: light; }
                     * { box-sizing: border-box; }
-                    body { margin: 0; background: #fff; }
-                    __PDF_STYLESHEET__
+                    body { margin: 0; color: #071735; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: __LINE_HEIGHT__; }
+                    .article-header { margin-bottom: 1.5rem; }
+                    .article-header time { color: #5d6e92; font-size: 9pt; }
+                    h1 { margin: .4rem 0 .7rem; font-size: 26pt; line-height: 1.1; }
+                    h2 { margin-top: 1.8rem; font-size: 19pt; line-height: 1.2; break-after: avoid-page; }
+                    h3 { margin-top: 1.5rem; font-size: 15pt; line-height: 1.25; break-after: avoid-page; }
+                    h4, h5, h6 { margin-top: 1.25rem; break-after: avoid-page; }
+                    .summary { color: #40547c; font-size: 13pt; }
+                    p, ul, ol, blockquote, pre, table, .math, mjx-container[display="true"] { margin: 0 0 __BLOCK_SPACING__rem; }
+                    ul, ol { padding-left: 1.45rem; }
+                    img { display: block; max-width: 100%; max-height: 235mm; height: auto; margin-bottom: __BLOCK_SPACING__rem; border-radius: 4px; break-inside: avoid-page; }
+                    pre { overflow: visible; padding: .9rem; border: 1px solid #d6dfef; border-radius: 5px; background: #f5f7fb; white-space: pre-wrap; break-inside: avoid-page; }
+                    code { font-family: "Courier New", monospace; font-size: .9em; }
+                    .editor-colors .keyword, .editor-colors .type, .editor-colors .preprocessor { color: #6d28d9; }
+                    .editor-colors .string, .editor-colors .character, .editor-colors .regex { color: #a23a00; }
+                    .editor-colors .number { color: #08745b; }
+                    .editor-colors .comment { color: #65748b; font-style: italic; }
+                    blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid #5875ff; color: #40547c; break-inside: avoid-page; }
+                    table { width: 100%; border-collapse: collapse; font-size: .94em; break-inside: avoid-page; }
+                    th, td { padding: .45rem .55rem; border: 1px solid #d6dfef; text-align: left; vertical-align: top; }
+                    th { background: #f2f5fb; }
+                    a { color: #2647dd; text-decoration: underline; }
+                    mjx-container[display="true"] { break-inside: avoid-page; }
                 </style>
                 <script>
                     window.MathJax = {
@@ -212,7 +231,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
                 </script>
             </head>
             <body>
-                <main class="pdf-article-document" style="--article-line-height: __LINE_HEIGHT__; --article-block-spacing: __BLOCK_SPACING__rem;">
+                <main>
                     <header class="article-header">__PUBLISHED_AT__<h1>__TITLE__</h1>__SUMMARY__</header>
                     <article class="article-body">__ARTICLE_HTML__</article>
                 </main>
@@ -223,20 +242,10 @@ internal sealed class PlaywrightArticlePdfRenderer(
             .Replace("__LANGUAGE__", WebUtility.HtmlEncode(document.LanguageCode), StringComparison.Ordinal)
             .Replace("__LINE_HEIGHT__", typography.LineHeight.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
             .Replace("__BLOCK_SPACING__", typography.BlockSpacing.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
-            .Replace("__PDF_STYLESHEET__", PdfStylesheet, StringComparison.Ordinal)
             .Replace("__PUBLISHED_AT__", publishedAt, StringComparison.Ordinal)
             .Replace("__TITLE__", title, StringComparison.Ordinal)
             .Replace("__SUMMARY__", summary, StringComparison.Ordinal)
             .Replace("__ARTICLE_HTML__", articleHtml, StringComparison.Ordinal);
-    }
-
-    private static string LoadPdfStylesheet()
-    {
-        const string resourceName = "GaifulinLab.Contracts.Content.article-pdf.css";
-        using var stream = typeof(ContractsAssembly).Assembly.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException($"Embedded resource '{resourceName}' was not found.");
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
     }
 
     private async Task<string> EmbedInternalMediaAsync(string html, CancellationToken cancellationToken)

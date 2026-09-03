@@ -1,9 +1,0 @@
-.editor-page {
-    min-height: calc(100vh - 2.75rem);
-}
-
-@media (max-width: 40rem) {
-    .editor-page {
-        min-height: calc(100vh - 2.75rem);
-    }
-}

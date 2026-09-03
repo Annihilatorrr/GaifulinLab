@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <GAIFULINLAB_E2E_BASE_URL>http://localhost:5172</GAIFULINLAB_E2E_BASE_URL>
+      <GAIFULINLAB_E2E_CONNECTION_STRING>Host=localhost;Port=5435;Database=gaifulinlab;Username=gaifulinlab;Password=gaifulinlab</GAIFULINLAB_E2E_CONNECTION_STRING>
+      <GAIFULINLAB_E2E_ADMIN_LOGIN>e2e-admin</GAIFULINLAB_E2E_ADMIN_LOGIN>
+      <GAIFULINLAB_E2E_ADMIN_PASSWORD>E2E-admin-password-1!</GAIFULINLAB_E2E_ADMIN_PASSWORD>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

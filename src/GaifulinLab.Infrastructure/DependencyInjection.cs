@@ -56,23 +56,30 @@ public static class DependencyInjection
             mathJaxAssetsPath));
         services.AddSingleton<IArticlePdfRenderer, PlaywrightArticlePdfRenderer>();
 
-        if (configuration.GetValue("PDF_WORKER_ENABLED", false))
-        {
-            var pollIntervalMilliseconds = Math.Clamp(
-                configuration.GetValue("PDF_WORKER_POLL_INTERVAL_MILLISECONDS", 1_000),
-                100,
-                10_000);
-            var leaseSeconds = Math.Clamp(
-                configuration.GetValue("PDF_WORKER_LEASE_SECONDS", 120),
-                pdfTimeoutSeconds + 15,
-                600);
-            services.AddSingleton(new PdfExportWorkerSettings(
-                TimeSpan.FromMilliseconds(pollIntervalMilliseconds),
-                TimeSpan.FromSeconds(leaseSeconds)));
-            services.AddHostedService<PdfExportWorker>();
-        }
+        return services;
+    }
 
-        services.AddIdentityAuthentication(configuration);
+    public static IServiceCollection AddPdfExportWorker(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var pdfTimeoutSeconds = Math.Clamp(
+            configuration.GetValue("PDF_RENDERER_TIMEOUT_SECONDS", 45),
+            5,
+            120);
+        var pollIntervalMilliseconds = Math.Clamp(
+            configuration.GetValue("PDF_WORKER_POLL_INTERVAL_MILLISECONDS", 1_000),
+            100,
+            10_000);
+        var leaseSeconds = Math.Clamp(
+            configuration.GetValue("PDF_WORKER_LEASE_SECONDS", 120),
+            pdfTimeoutSeconds + 15,
+            600);
+
+        services.AddSingleton(new PdfExportWorkerSettings(
+            TimeSpan.FromMilliseconds(pollIntervalMilliseconds),
+            TimeSpan.FromSeconds(leaseSeconds)));
+        services.AddHostedService<PdfExportWorker>();
 
         return services;
     }

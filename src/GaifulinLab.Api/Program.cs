@@ -17,6 +17,8 @@ if (args is ["--hash-admin-password"])
     return;
 }
 
+var runMigrationAndBootstrap = args is ["--migrate-and-bootstrap"];
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers(options => options.Filters.Add<ApiExceptionFilter>());
@@ -47,6 +49,16 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+    options.AddPolicy(ApiRateLimitPolicies.Registration, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
     options.AddPolicy(ApiRateLimitPolicies.ArticlePdf, httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -61,12 +73,18 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
-if (app.Configuration.GetValue<bool>("APPLY_DATABASE_MIGRATIONS"))
+if (runMigrationAndBootstrap || app.Configuration.GetValue<bool>("APPLY_DATABASE_MIGRATIONS"))
 {
     await app.Services.ApplyDatabaseMigrationsAsync();
+    await app.Services.SeedTaxonomyAsync(app.Configuration);
 }
 
 await app.Services.InitializeIdentityAsync(app.Configuration);
+
+if (runMigrationAndBootstrap)
+{
+    return;
+}
 
 if (!app.Environment.IsDevelopment())
 {

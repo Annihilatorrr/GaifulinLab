@@ -38,6 +38,7 @@ builder.Services.AddScoped(serviceProvider =>
     };
 });
 builder.Services.AddScoped<AdminAuthClient>();
+builder.Services.AddScoped<RegistrationClient>();
 builder.Services.AddScoped<AdminArticlesClient>();
 builder.Services.AddScoped<AdminMarkdownClient>();
 builder.Services.AddScoped<AdminMediaClient>();

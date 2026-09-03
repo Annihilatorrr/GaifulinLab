@@ -74,9 +74,17 @@
     [Parameter, EditorRequired] public string Description { get; set; } = "";
     [Parameter, EditorRequired] public string EmptyTitle { get; set; } = "No content yet";
     [Parameter, EditorRequired] public string EmptyDescription { get; set; } = "Published content will appear here.";
-    [SupplyParameterFromQuery(Name = "topic")] public string? Topic { get; set; }
-    [SupplyParameterFromQuery(Name = "series")] public string? SeriesFilter { get; set; }
-    [SupplyParameterFromQuery(Name = "tag")] public string? Tag { get; set; }
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "topic")]
+    public string? Topic { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "series")]
+    public string? SeriesFilter { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "tag")]
+    public string? Tag { get; set; }
 
     private IReadOnlyList<PublicArticleListItemDto> _articles = [];
     private IReadOnlyList<PublicTopicDto> _topics = [];
