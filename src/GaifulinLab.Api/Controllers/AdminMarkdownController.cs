@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace GaifulinLab.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = AuthorizationPolicies.Admin)]
+[Authorize]
 [Route("api/admin/markdown")]
 public sealed class AdminMarkdownController(ISender sender) : ControllerBase
 {

@@ -78,7 +78,7 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
     }
 
     [HttpGet("session")]
-    [Authorize(Policy = AuthorizationPolicies.Admin)]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult GetSession() => NoContent();

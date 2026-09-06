@@ -10,9 +10,9 @@
 
 <section class="login-page" aria-labelledby="login-title">
     <div class="login-card surface">
-        <span class="eyebrow">Private workspace</span>
+        <span class="eyebrow">Your workspace</span>
         <h1 id="login-title">Sign in</h1>
-        <p>Enter the owner credentials to manage Gaifulin Lab.</p>
+        <p>Sign in to create and manage your own articles.</p>
 
         <EditForm Model="_credentials" OnValidSubmit="SignInAsync" class="login-form">
             <DataAnnotationsValidator />
@@ -51,13 +51,12 @@
         @if (ShowRegistrationLink)
         {
             <p class="login-note">
-                Need a standard account? <a href="/register">Register here</a>.
-                Workspace access is granted separately.
+                Need an account? <a href="/register">Register here</a>.
             </p>
         }
         else
         {
-            <p class="login-note">Workspace access is granted separately.</p>
+            <p class="login-note">Your articles are visible only in your workspace.</p>
         }
     </div>
 </section>

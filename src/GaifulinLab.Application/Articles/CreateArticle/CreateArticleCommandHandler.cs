@@ -16,6 +16,7 @@ internal sealed class CreateArticleCommandHandler(
         CancellationToken cancellationToken)
     {
         var article = Article.Create(
+            request.UserId,
             request.LanguageCode,
             timeProvider.GetUtcNow(),
             request.Title,

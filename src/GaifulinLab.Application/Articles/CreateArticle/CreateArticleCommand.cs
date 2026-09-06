@@ -4,6 +4,7 @@ using MediatR;
 namespace GaifulinLab.Application.Articles.CreateArticle;
 
 public sealed record CreateArticleCommand(
+    string UserId,
     string LanguageCode,
     string? Title,
     string? Summary,

@@ -14,14 +14,18 @@ public sealed class Article
     {
     }
 
-    private Article(DateTimeOffset createdAt)
+    private Article(string ownerUserId, DateTimeOffset createdAt)
     {
         Id = Guid.NewGuid();
+        OwnerUserId = NormalizeOwnerUserId(ownerUserId);
         CreatedAt = DomainRules.AsUtc(createdAt);
         UpdatedAt = CreatedAt;
     }
 
     public Guid Id { get; private set; }
+
+    // This is an internal Identity user id, not a public author profile field.
+    public string OwnerUserId { get; private set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; private set; }
 
@@ -34,6 +38,7 @@ public sealed class Article
     public IReadOnlyCollection<ArticleTag> Tags => _tags;
 
     public static Article Create(
+        string ownerUserId,
         string languageCode,
         DateTimeOffset createdAt,
         string? title = null,
@@ -41,7 +46,7 @@ public sealed class Article
         string? markdown = null,
         string? slug = null)
     {
-        var article = new Article(createdAt);
+        var article = new Article(ownerUserId, createdAt);
         article.AddLocalization(languageCode, createdAt, title, summary, markdown, slug);
         return article;
     }
@@ -160,4 +165,10 @@ public sealed class Article
         ?? throw new InvalidOperationException($"The article does not have a '{languageCode}' localization.");
 
     private void Touch(DateTimeOffset updatedAt) => UpdatedAt = DomainRules.AsUtc(updatedAt);
+
+    private static string NormalizeOwnerUserId(string ownerUserId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerUserId);
+        return ownerUserId.Trim();
+    }
 }

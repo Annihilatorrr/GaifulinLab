@@ -28,9 +28,17 @@
             <a href="/tags">Tags</a>
             <a href="/archive">Archive</a>
             <a href="/about">About</a>
-            @if (ShowRegistrationLink)
+            @if (_isLoggedIn)
             {
-                <a href="/register">Register</a>
+                <a href="/admin/articles">My articles</a>
+            }
+            else
+            {
+                <a href="/admin/login">Sign in</a>
+                @if (ShowRegistrationLink)
+                {
+                    <a href="/register">Register</a>
+                }
             }
         </nav>
 
@@ -53,9 +61,17 @@
                     <a href="/tags">Tags</a>
                     <a href="/archive">Archive</a>
                     <a href="/about">About</a>
-                    @if (ShowRegistrationLink)
+                    @if (_isLoggedIn)
                     {
-                        <a href="/register">Register</a>
+                        <a href="/admin/articles">My articles</a>
+                    }
+                    else
+                    {
+                        <a href="/admin/login">Sign in</a>
+                        @if (ShowRegistrationLink)
+                        {
+                            <a href="/register">Register</a>
+                        }
                     }
                 </nav>
             </details>

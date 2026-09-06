@@ -31,13 +31,17 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAt")
-                        .HasDatabaseName("ix_articles_created_at");
+                    b.HasIndex("OwnerUserId", "UpdatedAt")
+                        .HasDatabaseName("ix_articles_owner_user_id_updated_at");
 
                     b.ToTable("articles", (string)null);
                 });
@@ -677,6 +681,16 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("GaifulinLab.Domain.Articles.Article", b =>
+                {
+                    b.HasOne("GaifulinLab.Infrastructure.Authentication.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_articles_owner_user_id");
                 });
 
             modelBuilder.Entity("GaifulinLab.Domain.Articles.ArticleLocalization", b =>

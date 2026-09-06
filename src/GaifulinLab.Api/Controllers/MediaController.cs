@@ -15,7 +15,7 @@ public sealed class MediaController(ISender sender) : ControllerBase
     private const long MaximumRequestSize = MediaUploadLimits.MaximumFileSize + 64 * 1024;
 
     [HttpPost("/api/admin/media")]
-    [Authorize(Policy = AuthorizationPolicies.Admin)]
+    [Authorize]
     [RequestSizeLimit(MaximumRequestSize)]
     [ProducesResponseType<UploadMediaResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]

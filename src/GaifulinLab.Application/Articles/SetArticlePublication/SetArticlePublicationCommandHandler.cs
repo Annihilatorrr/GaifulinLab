@@ -13,7 +13,9 @@ internal sealed class SetArticlePublicationCommandHandler(
     {
         var article = await dbContext.Articles
             .Include(candidate => candidate.Localizations)
-            .SingleOrDefaultAsync(candidate => candidate.Id == request.ArticleId, cancellationToken)
+            .SingleOrDefaultAsync(
+                candidate => candidate.Id == request.ArticleId && candidate.OwnerUserId == request.UserId,
+                cancellationToken)
             ?? throw new ResourceNotFoundException("Article", request.ArticleId);
 
         if (article.FindLocalization(request.LanguageCode) is null)

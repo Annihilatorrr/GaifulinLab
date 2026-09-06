@@ -9,7 +9,9 @@ using GaifulinLab.Domain.Series;
 using GaifulinLab.Domain.Topics;
 using GaifulinLab.Infrastructure.Persistence;
 using GaifulinLab.Api.Tests.Authentication;
+using GaifulinLab.Infrastructure.Authentication;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Identity;
 
 namespace GaifulinLab.Api.Tests.Articles;
 
@@ -103,6 +105,54 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
     }
 
     [Fact]
+    public async Task Articles_AreVisibleAndEditableOnlyByTheirOwner()
+    {
+        var ownerLogin = $"owner-{Guid.NewGuid():N}";
+        var otherLogin = $"other-{Guid.NewGuid():N}";
+        const string password = "Strong-password-1!";
+        using var ownerClient = await CreateUserClient(factory, ownerLogin, password);
+        using var otherClient = await CreateUserClient(factory, otherLogin, password);
+
+        var createResponse = await ownerClient.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest("en", "Owner article", null, "# Owner", $"owner-{Guid.NewGuid():N}"));
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(created);
+
+        // A second account cannot discover or change a draft even when it knows its identifier.
+        var otherList = await otherClient.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>(
+            "/api/admin/articles");
+        Assert.DoesNotContain(otherList!, article => article.Id == created.ArticleId);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.GetAsync(
+            $"/api/admin/articles/{created.ArticleId}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.PutAsJsonAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest("Changed", null, "# Changed", "changed"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.PostAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en/publish",
+            null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.PostAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en/unpublish",
+            null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.PutAsJsonAsync(
+            $"/api/admin/articles/{created.ArticleId}/taxonomy",
+            new UpdateArticleTaxonomyRequest([], [], []))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.DeleteAsync(
+            $"/api/admin/articles/{created.ArticleId}")).StatusCode);
+
+        var ownerArticle = await ownerClient.GetFromJsonAsync<AdminArticleDetailsDto>(
+            $"/api/admin/articles/{created.ArticleId}");
+        Assert.Equal("Owner article", ownerArticle!.Localizations.Single().Title);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var owner = await userManager.FindByNameAsync(ownerLogin);
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(owner!.Id, (await dbContext.Articles.FindAsync(created.ArticleId))!.OwnerUserId);
+    }
+
+    [Fact]
     public async Task Taxonomy_WhenDatabaseIsEmpty_ReturnsEmptyCollections()
     {
         using var client = await CreateAuthenticatedClient();
@@ -190,6 +240,26 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         var login = await response.Content.ReadFromJsonAsync<LoginResponse>();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", login!.AccessToken);
+        return client;
+    }
+
+    private static async Task<HttpClient> CreateUserClient(
+        AuthWebApplicationFactory applicationFactory,
+        string login,
+        string password)
+    {
+        await using (var scope = applicationFactory.Services.CreateAsyncScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var result = await userManager.CreateAsync(new ApplicationUser { UserName = login }, password);
+            Assert.True(result.Succeeded, string.Join("; ", result.Errors.Select(error => error.Description)));
+        }
+
+        var client = applicationFactory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(login, password));
+        response.EnsureSuccessStatusCode();
+        var token = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token!.AccessToken);
         return client;
     }
 }

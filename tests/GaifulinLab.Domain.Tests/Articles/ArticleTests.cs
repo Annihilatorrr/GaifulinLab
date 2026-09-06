@@ -9,9 +9,10 @@ public sealed class ArticleTests
     [Fact]
     public void Create_AddsDraftLocalizationAndNormalizesLanguage()
     {
-        var article = Article.Create(" EN ", CreatedAt);
+        var article = Article.Create("test-owner", " EN ", CreatedAt);
 
         var localization = Assert.Single(article.Localizations);
+        Assert.Equal("test-owner", article.OwnerUserId);
         Assert.Equal("en", localization.LanguageCode);
         Assert.Equal(PublicationStatus.Draft, localization.Status);
         Assert.Null(localization.PublishedAt);
@@ -20,7 +21,7 @@ public sealed class ArticleTests
     [Fact]
     public void AddLocalization_RejectsDuplicateLanguage()
     {
-        var article = Article.Create("en", CreatedAt);
+        var article = Article.Create("test-owner", "en", CreatedAt);
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => article.AddLocalization("EN", CreatedAt));
@@ -32,6 +33,7 @@ public sealed class ArticleTests
     public void PublishingOneLocalization_DoesNotPublishAnother()
     {
         var article = Article.Create(
+            "test-owner",
             "en",
             CreatedAt,
             "Understanding FFT",
@@ -57,7 +59,7 @@ public sealed class ArticleTests
     [InlineData("Title", "content", null)]
     public void Publish_RejectsIncompleteDraft(string? title, string? markdown, string? slug)
     {
-        var article = Article.Create("en", CreatedAt, title, markdown: markdown, slug: slug);
+        var article = Article.Create("test-owner", "en", CreatedAt, title, markdown: markdown, slug: slug);
 
         Assert.Throws<InvalidOperationException>(
             () => article.PublishLocalization("en", CreatedAt.AddDays(1)));
@@ -67,7 +69,7 @@ public sealed class ArticleTests
     public void Unpublish_PreservesOriginalPublicationDate()
     {
         var publishedAt = CreatedAt.AddDays(1);
-        var article = Article.Create("en", CreatedAt, "Title", markdown: "Content", slug: "article");
+        var article = Article.Create("test-owner", "en", CreatedAt, "Title", markdown: "Content", slug: "article");
         article.PublishLocalization("en", publishedAt);
 
         article.UnpublishLocalization("en", CreatedAt.AddDays(2));
@@ -80,7 +82,7 @@ public sealed class ArticleTests
     [Fact]
     public void UpdatePublishedLocalization_RejectsIncompleteContentWithoutChangingIt()
     {
-        var article = Article.Create("en", CreatedAt, "Title", markdown: "Content", slug: "article");
+        var article = Article.Create("test-owner", "en", CreatedAt, "Title", markdown: "Content", slug: "article");
         article.PublishLocalization("en", CreatedAt.AddDays(1));
 
         Assert.Throws<InvalidOperationException>(() => article.UpdateLocalization(
@@ -100,7 +102,7 @@ public sealed class ArticleTests
     [Fact]
     public void FindLocalization_DoesNotFallBackToAnotherLanguage()
     {
-        var article = Article.Create("en", CreatedAt);
+        var article = Article.Create("test-owner", "en", CreatedAt);
 
         Assert.Null(article.FindLocalization("ru"));
     }

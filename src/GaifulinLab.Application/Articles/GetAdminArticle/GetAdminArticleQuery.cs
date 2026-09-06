@@ -3,4 +3,4 @@ using MediatR;
 
 namespace GaifulinLab.Application.Articles.GetAdminArticle;
 
-public sealed record GetAdminArticleQuery(Guid ArticleId) : IRequest<AdminArticleDetailsDto>;
+public sealed record GetAdminArticleQuery(Guid ArticleId, string UserId) : IRequest<AdminArticleDetailsDto>;

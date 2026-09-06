@@ -1,4 +1,5 @@
 using GaifulinLab.Domain.Articles;
+using GaifulinLab.Infrastructure.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -11,10 +12,19 @@ internal sealed class ArticleConfiguration : IEntityTypeConfiguration<Article>
         builder.ToTable("articles");
         builder.HasKey(article => article.Id);
 
+        builder.Property(article => article.OwnerUserId)
+            .IsRequired();
         builder.Property(article => article.CreatedAt).IsRequired();
         builder.Property(article => article.UpdatedAt).IsRequired();
 
-        builder.HasIndex(article => article.CreatedAt)
-            .HasDatabaseName("ix_articles_created_at");
+        // A user sees only their own workspace, so this is the main list query index.
+        builder.HasIndex(article => new { article.OwnerUserId, article.UpdatedAt })
+            .HasDatabaseName("ix_articles_owner_user_id_updated_at");
+
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(article => article.OwnerUserId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_articles_owner_user_id");
     }
 }

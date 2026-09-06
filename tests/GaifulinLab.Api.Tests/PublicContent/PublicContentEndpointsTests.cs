@@ -203,6 +203,7 @@ public sealed class PublicContentEndpointsTests
         var now = DateTimeOffset.UtcNow.AddDays(-1);
 
         var article = Article.Create(
+            "test-owner",
             "en",
             now,
             "Understanding FFT",
@@ -250,6 +251,7 @@ public sealed class PublicContentEndpointsTests
         series.AddArticle(article, 1, now);
 
         var draft = Article.Create(
+            "test-owner",
             "en",
             now,
             "Future draft",

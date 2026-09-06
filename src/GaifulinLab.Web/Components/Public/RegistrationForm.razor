@@ -9,15 +9,15 @@
                 <span class="success-mark" aria-hidden="true">✓</span>
                 <span class="eyebrow">Account created</span>
                 <h1 id="registration-title">Welcome, @_registeredLogin</h1>
-                <p>Your standard account is ready. Workspace access is granted separately by an administrator.</p>
-                <a class="button button-secondary" href="/">Return to the site</a>
+                <p>Your account is ready. Sign in to create and manage your own articles.</p>
+                <a class="button button-primary" href="/admin/login">Sign in</a>
             </div>
         }
         else
         {
             <span class="eyebrow">Gaifulin Lab account</span>
             <h1 id="registration-title">Create an account</h1>
-            <p>Enter your email address and choose a strong password. Registration does not grant access to the private workspace.</p>
+            <p>Enter your email address and choose a strong password. You can then create and manage your own articles.</p>
 
             <EditForm Model="_registration" OnValidSubmit="RegisterAsync" class="registration-form">
                 <DataAnnotationsValidator />

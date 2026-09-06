@@ -157,7 +157,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Login_WithIdentityUserWithoutAdminRole_ReturnsTokenButAdminSessionIsForbidden()
+    public async Task Login_WithIdentityUserWithoutAdminRole_ReturnsTokenAndWorkspaceSession()
     {
         const string userLogin = "second-user";
         const string userPassword = "Second-user-password-1!";
@@ -184,7 +184,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", login.AccessToken);
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/auth/session")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync("/api/auth/session")).StatusCode);
     }
 }
 

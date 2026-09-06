@@ -66,6 +66,15 @@ public sealed class AppDbContextModelTests
         AssertUniqueIndex(
             context.Model.FindEntityType(typeof(Tag))!,
             nameof(Tag.NormalizedName));
+
+        var articleType = context.Model.FindEntityType(typeof(Article))!;
+        Assert.Contains(articleType.GetIndexes(), index =>
+            index.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(Article.OwnerUserId), nameof(Article.UpdatedAt)]));
+        Assert.Contains(articleType.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(property => property.Name).SequenceEqual([nameof(Article.OwnerUserId)])
+            && foreignKey.PrincipalEntityType.ClrType == typeof(ApplicationUser)
+            && foreignKey.DeleteBehavior == DeleteBehavior.Restrict);
     }
 
     [Fact]

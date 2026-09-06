@@ -12,6 +12,12 @@ internal sealed class GetAdminTaxonomyQueryHandler(IAppDbContext dbContext)
         GetAdminTaxonomyQuery request,
         CancellationToken cancellationToken)
     {
+        var ownedArticleIds = await dbContext.Articles
+            .AsNoTracking()
+            .Where(article => article.OwnerUserId == request.UserId)
+            .Select(article => article.Id)
+            .ToArrayAsync(cancellationToken);
+
         var topics = await dbContext.Topics
             .AsNoTracking()
             .Include(topic => topic.Localizations)
@@ -57,6 +63,8 @@ internal sealed class GetAdminTaxonomyQueryHandler(IAppDbContext dbContext)
                             localization.Description))
                         .ToArray(),
                     item.Articles
+                        // Series are shared, but the workspace must not expose other authors' drafts.
+                        .Where(link => ownedArticleIds.Contains(link.ArticleId))
                         .OrderBy(link => link.Position)
                         .Select(link => new AdminSeriesArticleDto(link.ArticleId, link.Position))
                         .ToArray()))

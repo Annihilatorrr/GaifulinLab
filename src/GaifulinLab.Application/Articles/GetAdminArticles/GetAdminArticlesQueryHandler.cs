@@ -14,6 +14,8 @@ internal sealed class GetAdminArticlesQueryHandler(IAppDbContext dbContext)
     {
         var articles = await dbContext.Articles
             .AsNoTracking()
+            // Never load another author's drafts into the workspace list.
+            .Where(article => article.OwnerUserId == request.UserId)
             .Include(article => article.Localizations)
             .OrderByDescending(article => article.UpdatedAt)
             .ToListAsync(cancellationToken);

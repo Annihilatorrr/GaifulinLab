@@ -2,4 +2,4 @@ using MediatR;
 
 namespace GaifulinLab.Application.Articles.DeleteArticle;
 
-public sealed record DeleteArticleCommand(Guid ArticleId) : IRequest;
+public sealed record DeleteArticleCommand(Guid ArticleId, string UserId) : IRequest;

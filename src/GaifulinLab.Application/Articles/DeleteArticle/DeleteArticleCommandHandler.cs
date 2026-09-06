@@ -11,7 +11,7 @@ internal sealed class DeleteArticleCommandHandler(IAppDbContext dbContext)
     public async Task Handle(DeleteArticleCommand request, CancellationToken cancellationToken)
     {
         var article = await dbContext.Articles.SingleOrDefaultAsync(
-            candidate => candidate.Id == request.ArticleId,
+            candidate => candidate.Id == request.ArticleId && candidate.OwnerUserId == request.UserId,
             cancellationToken)
             ?? throw new ResourceNotFoundException("Article", request.ArticleId);
 

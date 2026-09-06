@@ -11,11 +11,12 @@ using GaifulinLab.Infrastructure.Authentication;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace GaifulinLab.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = AuthorizationPolicies.Admin)]
+[Authorize]
 [Route("api/admin/articles")]
 public sealed class AdminArticlesController(ISender sender) : ControllerBase
 {
@@ -23,7 +24,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
     [ProducesResponseType<IReadOnlyList<AdminArticleListItemDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<AdminArticleListItemDto>>> GetArticles(
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new GetAdminArticlesQuery(), cancellationToken));
+        Ok(await sender.Send(new GetAdminArticlesQuery(GetCurrentUserId()), cancellationToken));
 
     [HttpPost]
     [ProducesResponseType<CreateArticleResponse>(StatusCodes.Status201Created)]
@@ -35,6 +36,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(
             new CreateArticleCommand(
+                GetCurrentUserId(),
                 request.LanguageCode,
                 request.Title,
                 request.Summary,
@@ -51,7 +53,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
     public async Task<ActionResult<AdminArticleDetailsDto>> GetArticle(
         Guid articleId,
         CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new GetAdminArticleQuery(articleId), cancellationToken));
+        Ok(await sender.Send(new GetAdminArticleQuery(articleId, GetCurrentUserId()), cancellationToken));
 
     [HttpPut("{articleId:guid}/localizations/{languageCode}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -67,6 +69,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
         await sender.Send(
             new UpdateArticleLocalizationCommand(
                 articleId,
+                GetCurrentUserId(),
                 languageCode,
                 request.Title,
                 request.Summary,
@@ -108,6 +111,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
         await sender.Send(
             new UpdateArticleTaxonomyCommand(
                 articleId,
+                GetCurrentUserId(),
                 request.TopicIds,
                 request.Series,
                 request.Tags),
@@ -121,7 +125,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteArticle(Guid articleId, CancellationToken cancellationToken)
     {
-        await sender.Send(new DeleteArticleCommand(articleId), cancellationToken);
+        await sender.Send(new DeleteArticleCommand(articleId, GetCurrentUserId()), cancellationToken);
         return NoContent();
     }
 
@@ -132,9 +136,13 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         await sender.Send(
-            new SetArticlePublicationCommand(articleId, languageCode, publish),
+            new SetArticlePublicationCommand(articleId, GetCurrentUserId(), languageCode, publish),
             cancellationToken);
 
         return NoContent();
     }
+
+    private string GetCurrentUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? throw new InvalidOperationException("The authenticated user does not have an identifier.");
 }

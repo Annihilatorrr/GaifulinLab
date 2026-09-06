@@ -12,10 +12,10 @@ public sealed class SeriesTests
     public void AddArticle_RejectsOccupiedPosition()
     {
         var series = SeriesAggregate.Create("en", "DSP Basics", "dsp-basics", null, CreatedAt);
-        series.AddArticle(Article.Create("en", CreatedAt), 1, CreatedAt);
+        series.AddArticle(Article.Create("test-owner", "en", CreatedAt), 1, CreatedAt);
 
         Assert.Throws<InvalidOperationException>(
-            () => series.AddArticle(Article.Create("en", CreatedAt), 1, CreatedAt));
+            () => series.AddArticle(Article.Create("test-owner", "en", CreatedAt), 1, CreatedAt));
     }
 
     [Fact]
@@ -24,6 +24,6 @@ public sealed class SeriesTests
         var series = SeriesAggregate.Create("en", "DSP Basics", "dsp-basics", null, CreatedAt);
 
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => series.AddArticle(Article.Create("en", CreatedAt), 0, CreatedAt));
+            () => series.AddArticle(Article.Create("test-owner", "en", CreatedAt), 0, CreatedAt));
     }
 }
