@@ -9,12 +9,15 @@ public sealed class TokenAuthenticationStateProvider(AccessTokenStore tokenStore
 {
     private static readonly ClaimsPrincipal AnonymousUser = new(new ClaimsIdentity());
 
+    public bool IsLoggedIn { get; private set; }
+
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         var accessToken = await tokenStore.GetAsync();
         var principal = CreatePrincipal(accessToken);
+        IsLoggedIn = principal.Identity?.IsAuthenticated == true;
 
-        if (principal.Identity?.IsAuthenticated != true && accessToken is not null)
+        if (!IsLoggedIn && accessToken is not null)
         {
             await tokenStore.ClearAsync();
         }
@@ -25,13 +28,16 @@ public sealed class TokenAuthenticationStateProvider(AccessTokenStore tokenStore
     public async Task SetTokenAsync(string accessToken)
     {
         await tokenStore.SetAsync(accessToken);
+        var state = new AuthenticationState(CreatePrincipal(accessToken));
+        IsLoggedIn = state.User.Identity?.IsAuthenticated == true;
         NotifyAuthenticationStateChanged(
-            Task.FromResult(new AuthenticationState(CreatePrincipal(accessToken))));
+            Task.FromResult(state));
     }
 
     public async Task ClearTokenAsync()
     {
         await tokenStore.ClearAsync();
+        IsLoggedIn = false;
         NotifyAuthenticationStateChanged(
             Task.FromResult(new AuthenticationState(AnonymousUser)));
     }

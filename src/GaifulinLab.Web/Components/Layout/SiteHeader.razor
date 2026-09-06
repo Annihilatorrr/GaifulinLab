@@ -1,3 +1,10 @@
+@using GaifulinLab.Web.Authentication
+@using GaifulinLab.Web.Features
+@using Microsoft.AspNetCore.Components.Authorization
+@implements IDisposable
+@inject IConfiguration Configuration
+@inject TokenAuthenticationStateProvider AuthenticationStateProvider
+
 <header class="site-header">
     <div class="site-container header-content">
         <a class="brand" href="/" aria-label="Gaifulin Lab home">
@@ -21,7 +28,10 @@
             <a href="/tags">Tags</a>
             <a href="/archive">Archive</a>
             <a href="/about">About</a>
-            <a href="/register">Register</a>
+            @if (ShowRegistrationLink)
+            {
+                <a href="/register">Register</a>
+            }
         </nav>
 
         <div class="header-actions">
@@ -43,9 +53,42 @@
                     <a href="/tags">Tags</a>
                     <a href="/archive">Archive</a>
                     <a href="/about">About</a>
-                    <a href="/register">Register</a>
+                    @if (ShowRegistrationLink)
+                    {
+                        <a href="/register">Register</a>
+                    }
                 </nav>
             </details>
         </div>
     </div>
 </header>
+
+@code {
+    private bool _registrationLinkEnabled;
+    private bool _isLoggedIn;
+
+    private bool ShowRegistrationLink =>
+        RegistrationLinkVisibility.ShouldShow(_registrationLinkEnabled, _isLoggedIn);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _registrationLinkEnabled = Configuration.GetValue<bool>("Features:RegistrationLinkEnabled");
+        AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+
+        await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _isLoggedIn = AuthenticationStateProvider.IsLoggedIn;
+    }
+
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await authenticationStateTask;
+            _isLoggedIn = AuthenticationStateProvider.IsLoggedIn;
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose() =>
+        AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
+}

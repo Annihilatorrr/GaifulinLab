@@ -1,6 +1,12 @@
 @using System.ComponentModel.DataAnnotations
+@using GaifulinLab.Web.Authentication
+@using GaifulinLab.Web.Features
+@using Microsoft.AspNetCore.Components.Authorization
+@implements IDisposable
 @inject AdminAuthClient AuthClient
+@inject IConfiguration Configuration
 @inject NavigationManager Navigation
+@inject TokenAuthenticationStateProvider AuthenticationStateProvider
 
 <section class="login-page" aria-labelledby="login-title">
     <div class="login-card surface">
@@ -42,10 +48,17 @@
             </button>
         </EditForm>
 
-        <p class="login-note">
-            Need a standard account? <a href="/register">Register here</a>.
-            Workspace access is granted separately.
-        </p>
+        @if (ShowRegistrationLink)
+        {
+            <p class="login-note">
+                Need a standard account? <a href="/register">Register here</a>.
+                Workspace access is granted separately.
+            </p>
+        }
+        else
+        {
+            <p class="login-note">Workspace access is granted separately.</p>
+        }
     </div>
 </section>
 
@@ -53,6 +66,20 @@
     private readonly CredentialsModel _credentials = new();
     private string? _errorMessage;
     private bool _isSubmitting;
+    private bool _registrationLinkEnabled;
+    private bool _isLoggedIn;
+
+    private bool ShowRegistrationLink =>
+        RegistrationLinkVisibility.ShouldShow(_registrationLinkEnabled, _isLoggedIn);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _registrationLinkEnabled = Configuration.GetValue<bool>("Features:RegistrationLinkEnabled");
+        AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+
+        await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _isLoggedIn = AuthenticationStateProvider.IsLoggedIn;
+    }
 
     private async Task SignInAsync()
     {
@@ -80,4 +107,17 @@
         [Required]
         public string Password { get; set; } = string.Empty;
     }
+
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await authenticationStateTask;
+            _isLoggedIn = AuthenticationStateProvider.IsLoggedIn;
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose() =>
+        AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
 }
