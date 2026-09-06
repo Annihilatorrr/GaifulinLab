@@ -204,7 +204,8 @@ internal sealed class PlaywrightArticlePdfRenderer(
                     h3 { margin-top: 1.5rem; font-size: 15pt; line-height: 1.25; break-after: avoid-page; }
                     h4, h5, h6 { margin-top: 1.25rem; break-after: avoid-page; }
                     .summary { color: #40547c; font-size: 13pt; }
-                    p, ul, ol, blockquote, pre, table, .math, mjx-container[display="true"] { margin: 0 0 __BLOCK_SPACING__rem; }
+                    p, ul, ol, blockquote, pre, table { margin: 0 0 __BLOCK_SPACING__rem; }
+                    .math { margin: 0; break-inside: avoid-page; }
                     ul, ol { padding-left: 1.45rem; }
                     img { display: block; max-width: 100%; max-height: 235mm; height: auto; margin-bottom: __BLOCK_SPACING__rem; border-radius: 4px; break-inside: avoid-page; }
                     pre { overflow: visible; padding: .9rem; border: 1px solid #d6dfef; border-radius: 5px; background: #f5f7fb; white-space: pre-wrap; break-inside: avoid-page; }
@@ -218,7 +219,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
                     th, td { padding: .45rem .55rem; border: 1px solid #d6dfef; text-align: left; vertical-align: top; }
                     th { background: #f2f5fb; }
                     a { color: #2647dd; text-decoration: underline; }
-                    mjx-container[display="true"] { break-inside: avoid-page; }
+                    mjx-container[display="true"] { margin: 0 0 __BLOCK_SPACING__rem !important; break-inside: avoid-page; }
                 </style>
                 <script>
                     window.MathJax = {

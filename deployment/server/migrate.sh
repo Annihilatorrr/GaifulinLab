@@ -16,6 +16,7 @@ ENV_FILE="$DEPLOYMENT_DIR/.env"
 # Хранить специфичные для проекта значения вместе. Код ниже работает только с
 # этими общими настройками и поэтому может оставаться одинаковым в приложениях.
 APPLICATION_NAME="GaifulinLab"
+MIGRATION_PROJECT_PATH="src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj"
 MIGRATION_STARTUP_PROJECT_PATH="src/GaifulinLab.Api/GaifulinLab.Api.csproj"
 DOTNET_SDK_IMAGE="mcr.microsoft.com/dotnet/sdk:10.0"
 DB_HOST_ENV_KEY="GAIFULINLAB_DB_HOST"
@@ -123,6 +124,7 @@ add_license_arguments() {
 require_command docker
 require_command id
 require_file "$ENV_FILE" "Production environment file"
+require_file "$REPOSITORY_DIR/$MIGRATION_PROJECT_PATH" "Migration project"
 require_file "$REPOSITORY_DIR/$MIGRATION_STARTUP_PROJECT_PATH" "Migration startup project"
 docker info >/dev/null 2>&1 \
     || deployment_fail "Docker daemon is unavailable."
@@ -132,6 +134,7 @@ load_database_config
 # Экспортировать несекретные настройки проекта, чтобы Docker передал их по имени.
 # Версии SDK-образа и EF-инструмента зафиксированы для воспроизводимых миграций.
 MIGRATION_REQUIRES_LICENSE_KEY="$REQUIRES_LICENSE_KEY"
+export MIGRATION_PROJECT_PATH
 export MIGRATION_STARTUP_PROJECT_PATH
 export MIGRATION_REQUIRES_LICENSE_KEY
 
@@ -149,6 +152,7 @@ DOCKER_ARGUMENTS=(
     --user "$(id -u):$(id -g)"
     --env DOTNET_CLI_HOME=/tmp/dotnet-home
     --env NUGET_PACKAGES=/tmp/nuget
+    --env MIGRATION_PROJECT_PATH
     --env MIGRATION_STARTUP_PROJECT_PATH
     --env MIGRATION_REQUIRES_LICENSE_KEY
     --env MIGRATION_DB_HOST
@@ -175,38 +179,13 @@ docker run "${DOCKER_ARGUMENTS[@]}" "$DOTNET_SDK_IMAGE" sh -c '
     : "${MIGRATION_DB_NAME:?required}"
     : "${MIGRATION_DB_USER:?required}"
     : "${MIGRATION_DB_PASSWORD:?required}"
+    : "${MIGRATION_PROJECT_PATH:?required}"
     : "${MIGRATION_STARTUP_PROJECT_PATH:?required}"
 
     # ASP.NET заменяет двойное подчёркивание двоеточием конфигурации, поэтому эта
     # переменная становится `ConnectionStrings:Postgres` для startup-проекта EF Core.
     export ConnectionStrings__Postgres="Host=${MIGRATION_DB_HOST};Port=${MIGRATION_DB_PORT};Database=${MIGRATION_DB_NAME};Username=${MIGRATION_DB_USER};Password=${MIGRATION_DB_PASSWORD}"
-    export IDENTITY_BOOTSTRAP_ADMIN_LOGIN="${GAIFULINLAB_IDENTITY_BOOTSTRAP_ADMIN_LOGIN:-}"
-    export IDENTITY_BOOTSTRAP_ADMIN_PASSWORD_HASH="${GAIFULINLAB_IDENTITY_BOOTSTRAP_ADMIN_PASSWORD_HASH:-}"
-    TAXONOMY_BOOTSTRAP_TOPICS_JSON="${GAIFULINLAB_TAXONOMY_BOOTSTRAP_TOPICS_JSON:-}"
-
-    if [ -n "${GAIFULINLAB_TAXONOMY_BOOTSTRAP_TOPICS_FILE:-}" ]; then
-        case "$GAIFULINLAB_TAXONOMY_BOOTSTRAP_TOPICS_FILE" in
-            /*|*..*)
-                echo "GAIFULINLAB_TAXONOMY_BOOTSTRAP_TOPICS_FILE must be a relative path inside the repository." >&2
-                exit 1
-                ;;
-        esac
-
-        if [ -n "$TAXONOMY_BOOTSTRAP_TOPICS_JSON" ]; then
-            echo "Configure either GAIFULINLAB_TAXONOMY_BOOTSTRAP_TOPICS_JSON or GAIFULINLAB_TAXONOMY_BOOTSTRAP_TOPICS_FILE, not both." >&2
-            exit 1
-        fi
-
-        if [ ! -f "$GAIFULINLAB_TAXONOMY_BOOTSTRAP_TOPICS_FILE" ]; then
-            echo "Taxonomy bootstrap file was not found: $GAIFULINLAB_TAXONOMY_BOOTSTRAP_TOPICS_FILE" >&2
-            exit 1
-        fi
-
-        export TAXONOMY_BOOTSTRAP_TOPICS_JSON="$(cat "$GAIFULINLAB_TAXONOMY_BOOTSTRAP_TOPICS_FILE")"
-    else
-        export TAXONOMY_BOOTSTRAP_TOPICS_JSON
-    fi
-
+    export ASPNETCORE_ENVIRONMENT=Production
     if [ "${MIGRATION_REQUIRES_LICENSE_KEY:-0}" = 1 ]; then
         : "${MIGRATION_LICENSE_PRIVATE_KEY_PATH:?required}"
         : "${MIGRATION_LICENSE_ACTIVE_KEY_ID:?required}"
@@ -216,15 +195,10 @@ docker run "${DOCKER_ARGUMENTS[@]}" "$DOTNET_SDK_IMAGE" sh -c '
         export Licensing__CertificateValidityDays="$MIGRATION_LICENSE_VALIDITY_DAYS"
     fi
 
-    # Установить зафиксированную версию инструмента во временную файловую систему.
-    # Restore и build выполняются явно один раз; затем `--no-build` заставляет EF
-    # использовать именно полученный результат сборки.
-    dotnet restore "$MIGRATION_STARTUP_PROJECT_PATH"
-    dotnet build "$MIGRATION_STARTUP_PROJECT_PATH" --no-restore
-    dotnet run \
-        --no-build \
-        --project "$MIGRATION_STARTUP_PROJECT_PATH" \
-        -- --migrate-and-bootstrap
+    dotnet tool restore
+    dotnet tool run dotnet-ef database update \
+        --project "$MIGRATION_PROJECT_PATH" \
+        --startup-project "$MIGRATION_STARTUP_PROJECT_PATH"
 '
 
 echo "$APPLICATION_NAME production migrations completed."

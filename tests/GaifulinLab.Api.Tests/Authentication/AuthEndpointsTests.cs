@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace GaifulinLab.Api.Tests.Authentication;
@@ -173,7 +174,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
 public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
 {
     public const string AdminLogin = "admin";
-    public const string AdminPassword = "correct-horse-battery-staple";
+    public const string AdminPassword = "Correct-horse-battery-staple-1!";
 
     private readonly string _mediaStoragePath = Path.Combine(
         Path.GetTempPath(),
@@ -181,8 +182,6 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        var admin = new ApplicationUser { UserName = AdminLogin };
-        var passwordHash = new PasswordHasher<ApplicationUser>().HashPassword(admin, AdminPassword);
         var databaseName = $"gaifulinlab-api-tests-{Guid.NewGuid()}";
 
         builder.UseEnvironment("Testing");
@@ -190,8 +189,6 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting(
             "ConnectionStrings:Postgres",
             "Host=localhost;Database=gaifulinlab_tests;Username=test;Password=test");
-        builder.UseSetting("IDENTITY_BOOTSTRAP_ADMIN_LOGIN", AdminLogin);
-        builder.UseSetting("IDENTITY_BOOTSTRAP_ADMIN_PASSWORD_HASH", passwordHash);
         builder.UseSetting("JWT_ISSUER", "GaifulinLab.Tests");
         builder.UseSetting("JWT_AUDIENCE", "GaifulinLab.Tests.Client");
         builder.UseSetting("JWT_SIGNING_KEY", "test-signing-key-that-is-at-least-32-bytes-long");
@@ -205,6 +202,36 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
             services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase(databaseName));
         });
+    }
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+        using var scope = host.Services.CreateScope();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+        if (!roleManager.RoleExistsAsync(IdentityRoles.Admin).GetAwaiter().GetResult())
+        {
+            var roleResult = roleManager.CreateAsync(new IdentityRole(IdentityRoles.Admin)).GetAwaiter().GetResult();
+            Assert.True(roleResult.Succeeded, string.Join("; ", roleResult.Errors.Select(error => error.Description)));
+        }
+
+        var user = userManager.FindByNameAsync(AdminLogin).GetAwaiter().GetResult();
+        if (user is null)
+        {
+            user = new ApplicationUser { UserName = AdminLogin };
+            var userResult = userManager.CreateAsync(user, AdminPassword).GetAwaiter().GetResult();
+            Assert.True(userResult.Succeeded, string.Join("; ", userResult.Errors.Select(error => error.Description)));
+        }
+
+        if (!userManager.IsInRoleAsync(user, IdentityRoles.Admin).GetAwaiter().GetResult())
+        {
+            var roleResult = userManager.AddToRoleAsync(user, IdentityRoles.Admin).GetAwaiter().GetResult();
+            Assert.True(roleResult.Succeeded, string.Join("; ", roleResult.Errors.Select(error => error.Description)));
+        }
+
+        return host;
     }
 
     protected override void Dispose(bool disposing)

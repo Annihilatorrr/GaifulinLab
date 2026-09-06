@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Sockets;
+using Microsoft.AspNetCore.Identity;
 using Npgsql;
 
 namespace GaifulinLab.E2E.Tests;
@@ -51,6 +52,8 @@ public sealed class E2EEnvironment : IAsyncLifetime
         {
             ConfigureDevelopmentDatabase();
             await EnsureDevelopmentDatabaseExistsAsync();
+            await ApplyMigrationsAsync();
+            await SeedAdminAsync();
         }
 
         try
@@ -220,16 +223,92 @@ public sealed class E2EEnvironment : IAsyncLifetime
         };
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
         startInfo.Environment["ASPNETCORE_URLS"] = "http://localhost:5180";
-        startInfo.Environment["APPLY_DATABASE_MIGRATIONS"] = "true";
         startInfo.Environment["ConnectionStrings__Postgres"] = _connectionString;
-        startInfo.Environment["IDENTITY_BOOTSTRAP_ADMIN_LOGIN"] = AdminLogin;
-        startInfo.Environment["IDENTITY_BOOTSTRAP_ADMIN_PASSWORD"] = AdminPassword;
         startInfo.Environment["Logging__LogLevel__Microsoft.AspNetCore.DataProtection"] = "None";
         startInfo.Environment["Logging__EventLog__LogLevel__Default"] = "None";
         startInfo.ArgumentList.Add(apiAssembly);
 
         return Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start the API.");
+    }
+
+    private async Task ApplyMigrationsAsync()
+    {
+        await RunCommandAsync("dotnet", _repositoryRoot, ["tool", "restore"]);
+        await RunCommandAsync(
+            "dotnet",
+            _repositoryRoot,
+            [
+                "tool", "run", "dotnet-ef", "database", "update", "--no-build",
+                "--project", "src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj",
+                "--startup-project", "src/GaifulinLab.Api/GaifulinLab.Api.csproj"
+            ],
+            environment: new Dictionary<string, string>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Development",
+                ["ConnectionStrings__Postgres"] = _connectionString
+            });
+    }
+
+    private async Task SeedAdminAsync()
+    {
+        const string roleId = "e2e-admin-role";
+        var passwordHash = new PasswordHasher<object>().HashPassword(new object(), AdminPassword);
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+
+        await using (var roleCommand = new NpgsqlCommand(
+            """
+            INSERT INTO "AspNetRoles" ("Id", "Name", "NormalizedName", "ConcurrencyStamp")
+            VALUES (@roleId, 'Admin', 'ADMIN', @concurrencyStamp)
+            ON CONFLICT ("NormalizedName") DO NOTHING
+            """,
+            connection,
+            transaction))
+        {
+            roleCommand.Parameters.AddWithValue("roleId", roleId);
+            roleCommand.Parameters.AddWithValue("concurrencyStamp", Guid.NewGuid().ToString("N"));
+            await roleCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var userCommand = new NpgsqlCommand(
+            """
+            INSERT INTO "AspNetUsers" ("Id", "UserName", "NormalizedUserName", "Email", "NormalizedEmail", "EmailConfirmed", "PasswordHash", "SecurityStamp", "ConcurrencyStamp", "PhoneNumber", "PhoneNumberConfirmed", "TwoFactorEnabled", "LockoutEnd", "LockoutEnabled", "AccessFailedCount")
+            VALUES (@userId, @login, @normalizedLogin, NULL, NULL, false, @passwordHash, @securityStamp, @concurrencyStamp, NULL, false, false, NULL, true, 0)
+            ON CONFLICT ("NormalizedUserName") DO UPDATE
+            SET "PasswordHash" = EXCLUDED."PasswordHash", "SecurityStamp" = EXCLUDED."SecurityStamp"
+            """,
+            connection,
+            transaction))
+        {
+            userCommand.Parameters.AddWithValue("userId", Guid.NewGuid().ToString("N"));
+            userCommand.Parameters.AddWithValue("login", AdminLogin);
+            userCommand.Parameters.AddWithValue("normalizedLogin", AdminLogin.ToUpperInvariant());
+            userCommand.Parameters.AddWithValue("passwordHash", passwordHash);
+            userCommand.Parameters.AddWithValue("securityStamp", Guid.NewGuid().ToString("N"));
+            userCommand.Parameters.AddWithValue("concurrencyStamp", Guid.NewGuid().ToString("N"));
+            await userCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var assignmentCommand = new NpgsqlCommand(
+            """
+            INSERT INTO "AspNetUserRoles" ("UserId", "RoleId")
+            SELECT user_account."Id", role."Id"
+            FROM "AspNetUsers" AS user_account
+            JOIN "AspNetRoles" AS role ON role."NormalizedName" = 'ADMIN'
+            WHERE user_account."NormalizedUserName" = @normalizedLogin
+            ON CONFLICT ("UserId", "RoleId") DO NOTHING
+            """,
+            connection,
+            transaction))
+        {
+            assignmentCommand.Parameters.AddWithValue("normalizedLogin", AdminLogin.ToUpperInvariant());
+            await assignmentCommand.ExecuteNonQueryAsync();
+        }
+
+        await transaction.CommitAsync();
     }
 
     private Process StartWeb()

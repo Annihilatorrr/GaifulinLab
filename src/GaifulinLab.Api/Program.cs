@@ -4,20 +4,7 @@ using GaifulinLab.Api.Filters;
 using GaifulinLab.Application;
 using GaifulinLab.Infrastructure;
 using GaifulinLab.Infrastructure.Authentication;
-using GaifulinLab.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
-
-if (args is ["--hash-admin-password"])
-{
-    var password = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
-    ArgumentException.ThrowIfNullOrWhiteSpace(password);
-    var user = new ApplicationUser { UserName = "admin" };
-    Console.WriteLine(new PasswordHasher<ApplicationUser>().HashPassword(user, password));
-    return;
-}
-
-var runMigrationAndBootstrap = args is ["--migrate-and-bootstrap"];
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,19 +59,6 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
-
-if (runMigrationAndBootstrap || app.Configuration.GetValue<bool>("APPLY_DATABASE_MIGRATIONS"))
-{
-    await app.Services.ApplyDatabaseMigrationsAsync();
-    await app.Services.SeedTaxonomyAsync(app.Configuration);
-}
-
-await app.Services.InitializeIdentityAsync(app.Configuration);
-
-if (runMigrationAndBootstrap)
-{
-    return;
-}
 
 if (!app.Environment.IsDevelopment())
 {

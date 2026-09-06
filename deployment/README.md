@@ -47,9 +47,8 @@ deployment/
 ```
 
 `deployment/.env` содержит безопасные placeholders. Перед первым sync замените
-пароль БД, bootstrap hash первого Identity-администратора, JWT key и TLS email
-реальными значениями. Bootstrap-настройки используются только для создания
-первой учётной записи; дальнейшая аутентификация читает пользователей и роли из БД.
+пароль БД, JWT key и TLS email реальными значениями. Пользователей и их роли
+приложение всегда читает только из Identity-таблиц БД.
 
 ## Локальная разработка
 
@@ -69,29 +68,31 @@ worker.
 Миграции локальной БД применяются отдельно, когда это требуется:
 
 ```powershell
-dotnet ef database update `
+dotnet tool run dotnet-ef database update `
   --project src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj `
   --startup-project src/GaifulinLab.Api/GaifulinLab.Api.csproj
 ```
 
-Первого локального Identity-администратора задайте через User Secrets. Сначала
-получите hash командой `--hash-admin-password`, передав исходный пароль только
-через переменную процесса `ADMIN_PASSWORD`, затем сохраните login и полученный
-hash:
+Чтобы назначить зарегистрированному пользователю роль `Admin`, выполните
+идемпотентный SQL ниже и замените `YOUR-EMAIL@EXAMPLE.COM` на его логин.
 
-```powershell
-$env:ADMIN_PASSWORD = '<local-admin-password>'
-dotnet run --project src/GaifulinLab.Api/GaifulinLab.Api.csproj -- --hash-admin-password
-Remove-Item Env:ADMIN_PASSWORD
+```sql
+-- Run this once in PostgreSQL after registering the account that should be an administrator.
+INSERT INTO "AspNetRoles" ("Id", "Name", "NormalizedName", "ConcurrencyStamp")
+SELECT 'admin-role', 'Admin', 'ADMIN', 'admin-role'
+WHERE NOT EXISTS (SELECT 1 FROM "AspNetRoles" WHERE "NormalizedName" = 'ADMIN');
 
-dotnet user-secrets set "Identity:BootstrapAdmin:Login" "admin" `
-  --project src/GaifulinLab.Api/GaifulinLab.Api.csproj
-dotnet user-secrets set "Identity:BootstrapAdmin:PasswordHash" "<generated-hash>" `
-  --project src/GaifulinLab.Api/GaifulinLab.Api.csproj
+INSERT INTO "AspNetUserRoles" ("UserId", "RoleId")
+SELECT u."Id", r."Id"
+FROM "AspNetUsers" u
+JOIN "AspNetRoles" r ON r."NormalizedName" = 'ADMIN'
+WHERE u."NormalizedUserName" = UPPER('YOUR-EMAIL@EXAMPLE.COM')
+  AND NOT EXISTS (
+      SELECT 1 FROM "AspNetUserRoles" ur
+      WHERE ur."UserId" = u."Id" AND ur."RoleId" = r."Id");
 ```
 
-Bootstrap создаёт пользователя и роль `Admin`, если их ещё нет. Последующие
-входы и добавленные в будущем пользователи работают только через Identity-таблицы.
+Обычный запуск API не выполняет миграции, сидирование или изменение ролей.
 
 ## Первый production setup
 
