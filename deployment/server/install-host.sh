@@ -33,6 +33,7 @@ DB_PORT_ENV_KEY="GAIFULINLAB_DB_PORT"
 BASE_PACKAGES=(git openssl curl nginx postgresql postgresql-client)
 DOCKER_PACKAGES=(docker.io docker-compose-v2)
 POSTGRES_HBA_RANGE="172.16.0.0/12"
+POSTGRES_RESTART_REQUIRED=false
 
 # Потребовать серверный dotenv-файл до изменения установленных пакетов.
 # Проект с файлом-примером может создать первоначальную копию. Пустое значение
@@ -145,9 +146,24 @@ SELECT format('CREATE DATABASE %I OWNER %I', :'db_name', :'db_user')
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db_name') \gexec
 SELECT format('ALTER DATABASE %I OWNER TO %I', :'db_name', :'db_user') \gexec
 
--- Контейнеры обращаются к PostgreSQL через адрес хоста, поэтому localhost недостаточно.
-ALTER SYSTEM SET listen_addresses = '*';
 SQL
+}
+
+# Контейнеры обращаются к PostgreSQL через адрес хоста, поэтому localhost
+# недостаточно. Изменение listen_addresses применяется только после restart;
+# на shared-host не выполняем его, если PostgreSQL уже принимает подключения
+# со всех адресов.
+ensure_postgres_listen_addresses() {
+    local current_listen_addresses
+
+    current_listen_addresses="$(sudo -u postgres psql --tuples-only --no-align --command='show listen_addresses;')"
+    if [[ "$current_listen_addresses" = '*' ]]; then
+        return 0
+    fi
+
+    sudo -u postgres psql --set=ON_ERROR_STOP=1 \
+        --command="ALTER SYSTEM SET listen_addresses = '*';"
+    POSTGRES_RESTART_REQUIRED=true
 }
 
 # Разрешить доступ из стандартного приватного диапазона Docker только этой роли
@@ -192,13 +208,21 @@ ensure_docker_runtime
 docker compose version >/dev/null 2>&1 \
     || deployment_fail "Docker Compose plugin is unavailable."
 
-# Идемпотентно подготовить PostgreSQL и один раз перезапустить его, чтобы изменения
-# `ALTER SYSTEM` и pg_hba.conf вступили в силу до проверки TCP-аутентификации.
+# Идемпотентно подготовить PostgreSQL. Изменение pg_hba.conf применяется через
+# reload и не разрывает подключения соседних проектов. Restart нужен только
+# новому host, на котором listen_addresses ещё не равен '*'.
 echo "Creating or updating the $APPLICATION_NAME PostgreSQL role and database..."
 ensure_postgres_objects
+ensure_postgres_listen_addresses
 ensure_hba_bridge_access
-sudo systemctl enable postgresql
-sudo systemctl restart postgresql
+sudo systemctl enable --now postgresql
+
+if [[ "$POSTGRES_RESTART_REQUIRED" = true ]]; then
+    sudo systemctl restart postgresql
+else
+    sudo systemctl reload postgresql
+fi
+
 verify_database_connection
 
 echo "$APPLICATION_NAME host dependencies and database are ready."
