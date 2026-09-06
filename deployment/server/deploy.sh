@@ -66,7 +66,10 @@ SQL
 
 # Проверить тот же путь подключения к БД, который использует контейнер приложения.
 # `docker run --rm` запускает одноразовый клиент PostgreSQL и затем удаляет его.
-# Псевдоним host-gateway даёт Linux-контейнеру доступ к PostgreSQL на хосте.
+# В `--add-host name:value` левая часть — имя внутри контейнера, а `host-gateway`
+# справа — специальная инструкция Docker подставить gateway IP Linux-хоста.
+# Поэтому `$DB_HOST=host.docker.internal` ведёт не в одноразовый контейнер, а к
+# PostgreSQL на сервере; localhost здесь означал бы сам контейнер psql.
 check_database() {
     docker run --rm \
         --add-host host.docker.internal:host-gateway \

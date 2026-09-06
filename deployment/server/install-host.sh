@@ -33,6 +33,8 @@ DB_PORT_ENV_KEY="GAIFULINLAB_DB_PORT"
 BASE_PACKAGES=(git openssl curl nginx postgresql postgresql-client)
 DOCKER_PACKAGES=(docker.io docker-compose-v2)
 POSTGRES_HBA_RANGE="172.16.0.0/12"
+# Этот флаг означает не "кому разрешён доступ", а "изменилась ли startup-настройка
+# listen_addresses". В начале ничего не менялось, поэтому restart пока не нужен.
 POSTGRES_RESTART_REQUIRED=false
 
 # Потребовать серверный dotenv-файл до изменения установленных пакетов.
@@ -149,25 +151,36 @@ SELECT format('ALTER DATABASE %I OWNER TO %I', :'db_name', :'db_user') \gexec
 SQL
 }
 
-# Контейнеры обращаются к PostgreSQL через адрес хоста, поэтому localhost
-# недостаточно. Изменение listen_addresses применяется только после restart;
-# на shared-host не выполняем его, если PostgreSQL уже принимает подключения
-# со всех адресов.
+# Для PostgreSQL контейнер является отдельной машиной: его localhost указывает на
+# сам контейнер, а не на Linux-хост. Контейнер приходит к PostgreSQL через адрес
+# Docker gateway, поэтому PostgreSQL должен слушать не только 127.0.0.1.
+# listen_addresses='*' открывает TCP-сокет на всех интерфейсах хоста, включая
+# loopback, Docker bridge и LAN. Это ещё не разрешение на вход: конкретные БД,
+# роли и диапазоны источников отдельно ограничивает pg_hba.conf.
 ensure_postgres_listen_addresses() {
     local current_listen_addresses
 
+    # psql запускается от системного администратора PostgreSQL. Параметры
+    # --tuples-only и --no-align оставляют в выводе только значение настройки;
+    # конструкция $(...) записывает его в Bash-переменную.
     current_listen_addresses="$(sudo -u postgres psql --tuples-only --no-align --command='show listen_addresses;')"
+
+    # Если '*' уже активен, функция успешно завершается. return 0 выходит только
+    # из этой функции: остальные шаги install-host.sh продолжат выполняться.
     if [[ "$current_listen_addresses" = '*' ]]; then
         return 0
     fi
 
+    # ALTER SYSTEM записывает новое значение в конфигурацию, но работающий процесс
+    # не сможет открыть дополнительные listen-сокеты до полноценного restart.
     sudo -u postgres psql --set=ON_ERROR_STOP=1 \
         --command="ALTER SYSTEM SET listen_addresses = '*';"
     POSTGRES_RESTART_REQUIRED=true
 }
 
 # Разрешить доступ из стандартного приватного диапазона Docker только этой роли
-# и к этой базе. PostgreSQL сам сообщает путь активного pg_hba.conf, поэтому в
+# и к этой базе. Поэтому listen_addresses='*' сам по себе не делает БД доступной
+# любому клиенту. PostgreSQL сам сообщает путь активного pg_hba.conf, поэтому в
 # файловом пути не нужно жёстко фиксировать версию, например 15 или 17.
 ensure_hba_bridge_access() {
     local pg_hba_file
@@ -183,7 +196,7 @@ ensure_hba_bridge_access() {
     fi
 }
 
-# После перезапуска PostgreSQL проверить новые реквизиты через TCP.
+# После reload или restart PostgreSQL проверить новые реквизиты через TCP.
 # Запись `PGPASSWORD=...` непосредственно перед psql передаёт пароль только этому
 # процессу и не экспортирует его для всех последующих команд текущего shell.
 verify_database_connection() {
@@ -217,6 +230,9 @@ ensure_postgres_listen_addresses
 ensure_hba_bridge_access
 sudo systemctl enable --now postgresql
 
+# listen_addresses применяется только при restart. Если эта настройка уже была
+# равна '*', изменился лишь pg_hba.conf: его PostgreSQL перечитывает через reload,
+# сохраняя существующие подключения соседних проектов.
 if [[ "$POSTGRES_RESTART_REQUIRED" = true ]]; then
     sudo systemctl restart postgresql
 else

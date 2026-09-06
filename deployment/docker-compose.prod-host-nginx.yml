@@ -8,7 +8,10 @@ services:
     container_name: gaifulinlab-prod-api-host-nginx
     restart: unless-stopped
     extra_hosts:
-      # Linux containers use this alias to reach PostgreSQL installed on the Docker host.
+      # Add a manual /etc/hosts entry inside this Linux container. The left side is
+      # the hostname used by the connection string; host-gateway is a special Docker
+      # value replaced with the gateway IP of the server running Docker. localhost
+      # would point back to this API container, not to PostgreSQL on the server.
       - "host.docker.internal:host-gateway"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -36,6 +39,7 @@ services:
       dockerfile: deployment/Dockerfile.pdf-worker
     restart: unless-stopped
     extra_hosts:
+      # The worker uses the same container-local alias to reach host PostgreSQL.
       - "host.docker.internal:host-gateway"
     environment:
       ASPNETCORE_ENVIRONMENT: Production

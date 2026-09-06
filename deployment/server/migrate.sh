@@ -141,7 +141,9 @@ export MIGRATION_REQUIRES_LICENSE_KEY
 # Массив Bash хранит каждый параметр Docker и его значение отдельным аргументом.
 # Основные параметры:
 # --rm — удалить одноразовый контейнер после завершения;
-# --add-host — дать контейнеру доступ к PostgreSQL на Docker-хосте;
+# --add-host — создать внутри migration-контейнера имя host.docker.internal,
+# а специальным значением host-gateway сопоставить его с IP Docker-хоста. Так
+# migrations используют тот же адрес host PostgreSQL, что API и PDF-worker;
 # --env-file — передать полную серверную конфигурацию приложения;
 # --user — создавать bin/obj с числовым владельцем текущего пользователя сервера;
 # --volume/--workdir — подключить checkout как `/workspace` контейнера.
