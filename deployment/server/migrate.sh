@@ -141,13 +141,11 @@ export MIGRATION_REQUIRES_LICENSE_KEY
 # Массив Bash хранит каждый параметр Docker и его значение отдельным аргументом.
 # Основные параметры:
 # --rm — удалить одноразовый контейнер после завершения;
-# --add-host — дать контейнеру доступ к PostgreSQL на Docker-хосте;
 # --env-file — передать полную серверную конфигурацию приложения;
 # --user — создавать bin/obj с числовым владельцем текущего пользователя сервера;
 # --volume/--workdir — подключить checkout как `/workspace` контейнера.
 DOCKER_ARGUMENTS=(
     --rm
-    --add-host host.docker.internal:host-gateway
     --env-file "$ENV_FILE"
     --user "$(id -u):$(id -g)"
     --env DOTNET_CLI_HOME=/tmp/dotnet-home
