@@ -197,6 +197,9 @@ docker run "${DOCKER_ARGUMENTS[@]}" "$DOTNET_SDK_IMAGE" sh -c '
         export Licensing__CertificateValidityDays="$MIGRATION_LICENSE_VALIDITY_DAYS"
     fi
 
+    # dotnet-ef reads project metadata from obj/project.assets.json.
+    # Restore the startup project first; it also restores the referenced Infrastructure project.
+    dotnet restore "$MIGRATION_STARTUP_PROJECT_PATH"
     dotnet tool restore
     dotnet tool run dotnet-ef database update \
         --project "$MIGRATION_PROJECT_PATH" \
