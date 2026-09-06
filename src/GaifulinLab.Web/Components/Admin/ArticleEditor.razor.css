@@ -537,9 +537,10 @@
 }
 
 .editor-workspace {
-    min-height: clamp(34rem, calc(100dvh - 10.75rem), 54rem);
+    height: clamp(34rem, calc(100dvh - 10.75rem), 54rem);
+    min-height: 0;
     display: grid;
-    flex: 1;
+    flex: 1 1 auto;
     grid-template-columns: minmax(0, calc(var(--editor-split) - 0.5rem)) 1rem minmax(0, calc(var(--editor-preview-split) - 0.5rem));
     border: 1px solid var(--color-border);
     background: var(--color-surface);
@@ -979,7 +980,7 @@
     }
 
     .editor-workspace {
-        min-height: calc(100dvh - 15.5rem);
+        height: calc(100dvh - 15.5rem);
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -1100,7 +1101,7 @@
     }
 
     .editor-workspace {
-        min-height: calc(100dvh - 16rem);
+        height: calc(100dvh - 16rem);
     }
 
     .pane-heading {
