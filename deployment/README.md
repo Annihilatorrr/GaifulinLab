@@ -6,10 +6,10 @@ checkout по SSH, серверные Bash-скрипты настраивают
 
 ## Target
 
-- user: `v3rt3x`;
-- host: `192.168.50.11`;
-- checkout: `/home/v3rt3x/deployments/gaifulinlab`;
-- SSH key: `C:\Users\pwrfl\.ssh\rbpi0807`;
+- user: `ruslan`;
+- host: `192.168.50.142`;
+- checkout: `/home/ruslan/deployments/gaifulinlab`;
+- SSH key: `C:\Users\pwrfl\.ssh\id_ed25519_192_168_50_142`;
 - production URL: `https://gaifulinlab.com`.
 
 ## Структура
@@ -116,7 +116,7 @@ TCP 80/443 должны быть доступны из интернета.
 2. Один раз подготовьте host:
 
    ```bash
-   cd /home/v3rt3x/deployments/gaifulinlab
+   cd /home/ruslan/deployments/gaifulinlab
    ./deployment/server/install-host.sh
    ```
 

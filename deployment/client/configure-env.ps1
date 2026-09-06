@@ -6,7 +6,7 @@ param(
     [string]$RemoteUser,
     [string]$RemoteHost,
     [string]$RemoteDir,
-    [string]$IdentityFile = 'C:\Users\pwrfl\.ssh\rbpi0807'
+    [string]$IdentityFile = 'C:\Users\pwrfl\.ssh\id_ed25519_192_168_50_142'
 )
 
 # Dot-sourcing loads the shared connection and environment-file helpers into
