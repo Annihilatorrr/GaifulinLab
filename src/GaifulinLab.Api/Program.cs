@@ -3,6 +3,7 @@ using GaifulinLab.Api.Configuration;
 using GaifulinLab.Api.Filters;
 using GaifulinLab.Application;
 using GaifulinLab.Infrastructure;
+using GaifulinLab.Infrastructure.Analytics;
 using GaifulinLab.Infrastructure.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -12,6 +13,7 @@ builder.Services.AddControllers(options => options.Filters.Add<ApiExceptionFilte
 builder.Services.AddProblemDetails();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton(new ArticleViewVisitorHasher(builder.Configuration));
 builder.Services.AddIdentityAuthentication(builder.Configuration);
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (corsOrigins.Length > 0)
@@ -65,6 +67,8 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler();
     app.UseHsts();
 }
+
+app.UseForwardedHeaders(ApiForwardedHeadersConfiguration.Create(app.Configuration));
 
 if (app.Configuration.GetValue("HTTPS_REDIRECT_ENABLED", true))
 {

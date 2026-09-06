@@ -11,4 +11,5 @@ public sealed record PublicArticleDetailsDto(
     IReadOnlyList<AvailableLocalizationDto> AvailableLocalizations,
     IReadOnlyList<PublicArticleTaxonomyLinkDto> Topics,
     IReadOnlyList<PublicArticleTaxonomyLinkDto> Series,
-    IReadOnlyList<string> Tags);
+    IReadOnlyList<string> Tags,
+    long ViewCount);

@@ -52,6 +52,7 @@ public sealed class PublicContentEndpointsTests
         Assert.Equal("Understanding FFT", article.Title);
         Assert.Contains("<strong>safe</strong>", article.Html);
         Assert.DoesNotContain("<script", article.Html, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, article.ViewCount);
         Assert.Equal(
             [
                 new AvailableLocalizationDto("en", "/en/articles/understanding-fft"),
@@ -66,6 +67,48 @@ public sealed class PublicContentEndpointsTests
         Assert.Equal(HttpStatusCode.NotFound, noFallback.StatusCode);
         Assert.Equal(HttpStatusCode.OK, russian.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, draft.StatusCode);
+    }
+
+    [Fact]
+    public async Task ArticleView_RecordsOnlyOneViewPerArticleAndVisitor()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        await SeedContent(factory.Services);
+        using var client = factory.CreateClient();
+
+        var first = await PostArticleViewAsync(client, "en", "understanding-fft", "198.51.100.10");
+        var firstCount = await first.Content.ReadFromJsonAsync<ArticleViewCountDto>();
+        var repeated = await PostArticleViewAsync(client, "en", "understanding-fft", "198.51.100.10");
+        var repeatedCount = await repeated.Content.ReadFromJsonAsync<ArticleViewCountDto>();
+        var localized = await PostArticleViewAsync(client, "ru", "kak-rabotaet-fft", "198.51.100.10");
+        var localizedCount = await localized.Content.ReadFromJsonAsync<ArticleViewCountDto>();
+        var differentVisitor = await PostArticleViewAsync(client, "en", "understanding-fft", "198.51.100.11");
+        var differentVisitorCount = await differentVisitor.Content.ReadFromJsonAsync<ArticleViewCountDto>();
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, repeated.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, localized.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, differentVisitor.StatusCode);
+        Assert.Equal(1, firstCount?.ViewCount);
+        Assert.Equal(1, repeatedCount?.ViewCount);
+        Assert.Equal(1, localizedCount?.ViewCount);
+        Assert.Equal(2, differentVisitorCount?.ViewCount);
+
+        var details = await client.GetFromJsonAsync<PublicArticleDetailsDto>(
+            "/api/public/articles/en/understanding-fft");
+        Assert.Equal(2, details?.ViewCount);
+    }
+
+    [Fact]
+    public async Task ArticleView_ForDraftLocalization_ReturnsNotFound()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        await SeedContent(factory.Services);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsync("/api/public/articles/en/future-draft/views", content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -219,6 +262,19 @@ public sealed class PublicContentEndpointsTests
 
         dbContext.AddRange(article, draft, topic, series, tag);
         await dbContext.SaveChangesAsync();
+    }
+
+    private static Task<HttpResponseMessage> PostArticleViewAsync(
+        HttpClient client,
+        string languageCode,
+        string slug,
+        string forwardedFor)
+    {
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/public/articles/{languageCode}/{slug}/views");
+        request.Headers.Add("X-Forwarded-For", forwardedFor);
+        return client.SendAsync(request);
     }
 
 }

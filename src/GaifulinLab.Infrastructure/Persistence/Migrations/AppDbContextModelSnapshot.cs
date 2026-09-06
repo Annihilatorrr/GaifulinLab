@@ -142,6 +142,23 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                     b.ToTable("article_topics", (string)null);
                 });
 
+            modelBuilder.Entity("GaifulinLab.Domain.Articles.ArticleView", b =>
+                {
+                    b.Property<Guid>("ArticleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VisitorHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("FirstViewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ArticleId", "VisitorHash");
+
+                    b.ToTable("article_views", (string)null);
+                });
+
             modelBuilder.Entity("GaifulinLab.Domain.Media.MediaAsset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -697,6 +714,15 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                     b.HasOne("GaifulinLab.Domain.Topics.Topic", null)
                         .WithMany()
                         .HasForeignKey("TopicId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GaifulinLab.Domain.Articles.ArticleView", b =>
+                {
+                    b.HasOne("GaifulinLab.Domain.Articles.Article", null)
+                        .WithMany()
+                        .HasForeignKey("ArticleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

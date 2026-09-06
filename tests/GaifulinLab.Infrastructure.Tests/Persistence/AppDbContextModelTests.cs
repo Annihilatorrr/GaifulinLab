@@ -27,6 +27,7 @@ public sealed class AppDbContextModelTests
             typeof(ArticleLocalization),
             typeof(ArticleTopic),
             typeof(ArticleTag),
+            typeof(ArticleView),
             typeof(Topic),
             typeof(TopicLocalization),
             typeof(SeriesAggregate),
@@ -54,6 +55,10 @@ public sealed class AppDbContextModelTests
             context.Model.FindEntityType(typeof(ArticleLocalization))!,
             nameof(ArticleLocalization.LanguageCode),
             nameof(ArticleLocalization.Slug));
+        AssertPrimaryKey(
+            context.Model.FindEntityType(typeof(ArticleView))!,
+            nameof(ArticleView.ArticleId),
+            nameof(ArticleView.VisitorHash));
         AssertUniqueIndex(
             context.Model.FindEntityType(typeof(ArticleSeries))!,
             nameof(ArticleSeries.SeriesId),
@@ -87,6 +92,7 @@ public sealed class AppDbContextModelTests
         Assert.Contains("ck_article_series_position_positive", script);
         Assert.Contains("media_assets", script);
         Assert.Contains("pdf_export_jobs", script);
+        Assert.Contains("article_views", script);
         Assert.Contains("AspNetUsers", script);
         Assert.Contains("AspNetRoles", script);
     }
@@ -107,4 +113,9 @@ public sealed class AppDbContextModelTests
 
         Assert.True(index.IsUnique);
     }
+
+    private static void AssertPrimaryKey(IReadOnlyEntityType entityType, params string[] propertyNames) =>
+        Assert.Equal(
+            propertyNames,
+            entityType.FindPrimaryKey()!.Properties.Select(property => property.Name));
 }

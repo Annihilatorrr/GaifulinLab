@@ -13,6 +13,7 @@ using GaifulinLab.Contracts.Taxonomy;
 using GaifulinLab.Domain.Articles;
 using GaifulinLab.Domain.Common;
 using GaifulinLab.Domain.Pdf;
+using GaifulinLab.Infrastructure.Analytics;
 using GaifulinLab.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +29,8 @@ namespace GaifulinLab.Api.Controllers;
 public sealed class PublicContentController(
     ISender sender,
     AppDbContext dbContext,
-    IMediaStorage mediaStorage) : ControllerBase
+    IMediaStorage mediaStorage,
+    ArticleViewVisitorHasher articleViewVisitorHasher) : ControllerBase
 {
     [HttpGet("articles")]
     [ProducesResponseType<IReadOnlyList<PublicArticleListItemDto>>(StatusCodes.Status200OK)]
@@ -52,6 +54,62 @@ public sealed class PublicContentController(
         string slug,
         CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetPublicArticleQuery(languageCode, slug), cancellationToken));
+
+    [HttpPost("articles/{languageCode}/{slug}/views")]
+    [ProducesResponseType<ArticleViewCountDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ArticleViewCountDto>> RecordArticleView(
+        string languageCode,
+        string slug,
+        CancellationToken cancellationToken)
+    {
+        var normalizedLanguageCode = DomainRules.NormalizeLanguageCode(languageCode);
+        var normalizedSlug = DomainRules.NormalizeSlug(slug);
+        // Resolve the requested translation, but record the view against the shared article.
+        // Switching language must not turn one reader into two unique visitors.
+        var articleId = await dbContext.ArticleLocalizations
+            .AsNoTracking()
+            .Where(localization =>
+                localization.LanguageCode == normalizedLanguageCode
+                && localization.Slug == normalizedSlug
+                && localization.Status == PublicationStatus.Published)
+            .Select(localization => (Guid?)localization.ArticleId)
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new ResourceNotFoundException(
+                "Published article",
+                $"{normalizedLanguageCode}/{normalizedSlug}");
+
+        var address = HttpContext.Connection.RemoteIpAddress;
+        if (address is not null)
+        {
+            var visitorHash = articleViewVisitorHasher.Hash(address);
+            var firstViewedAt = DateTimeOffset.UtcNow;
+            if (dbContext.Database.IsRelational())
+            {
+                // Checking first would race when a page is opened in several tabs. PostgreSQL
+                // decides which request wins, while every other request remains harmless.
+                await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO article_views ("ArticleId", "VisitorHash", "FirstViewedAt")
+                    VALUES ({articleId}, {visitorHash}, {firstViewedAt})
+                    ON CONFLICT ("ArticleId", "VisitorHash") DO NOTHING;
+                    """, cancellationToken);
+            }
+            else if (!await dbContext.ArticleViews.AnyAsync(
+                view => view.ArticleId == articleId && view.VisitorHash == visitorHash,
+                cancellationToken))
+            {
+                // EF's in-memory provider has no ON CONFLICT support; this keeps API tests
+                // behaviorally equivalent without changing the production path above.
+                dbContext.ArticleViews.Add(ArticleView.Create(articleId, visitorHash, firstViewedAt));
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        var viewCount = await dbContext.ArticleViews
+            .LongCountAsync(view => view.ArticleId == articleId, cancellationToken);
+        return Ok(new ArticleViewCountDto(viewCount));
+    }
 
     [HttpPost("articles/{languageCode}/{slug}/pdf-exports")]
     [EnableRateLimiting(ApiRateLimitPolicies.ArticlePdf)]

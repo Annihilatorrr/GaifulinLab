@@ -65,6 +65,20 @@ public sealed class PublicContentClient(HttpClient httpClient)
             $"/api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}",
             cancellationToken);
 
+    public async Task<ArticleViewCountDto> RecordArticleViewAsync(
+        string languageCode,
+        string slug,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsync(
+            $"/api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}/views",
+            content: null,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ArticleViewCountDto>(cancellationToken)
+            ?? throw new HttpRequestException("The server returned an empty article view response.");
+    }
+
     public Task<IReadOnlyList<PublicTopicDto>> GetTopicsAsync(
         string languageCode,
         CancellationToken cancellationToken = default) =>

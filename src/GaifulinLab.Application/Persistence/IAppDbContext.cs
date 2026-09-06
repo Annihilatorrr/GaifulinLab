@@ -19,6 +19,8 @@ public interface IAppDbContext
 
     DbSet<ArticleTag> ArticleTags { get; }
 
+    DbSet<ArticleView> ArticleViews { get; }
+
     DbSet<Topic> Topics { get; }
 
     DbSet<TopicLocalization> TopicLocalizations { get; }

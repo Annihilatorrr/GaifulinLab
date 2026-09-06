@@ -36,6 +36,8 @@ internal sealed class GetPublicArticleQueryHandler(
             [article.Id],
             languageCode,
             cancellationToken);
+        var viewCount = await dbContext.ArticleViews
+            .LongCountAsync(view => view.ArticleId == article.Id, cancellationToken);
 
         return new PublicArticleDetailsDto(
             languageCode,
@@ -54,6 +56,7 @@ internal sealed class GetPublicArticleQueryHandler(
                 .ToArray(),
             taxonomy.TopicsFor(article.Id),
             taxonomy.SeriesFor(article.Id),
-            taxonomy.TagsFor(article.Id));
+            taxonomy.TagsFor(article.Id),
+            viewCount);
     }
 }

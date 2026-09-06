@@ -19,6 +19,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
     private bool _startedPdfWorker;
 
     public Uri BaseUri { get; private set; } = null!;
+    public Uri ApiBaseUri => new(new Uri(DefaultApiHealthUrl).GetLeftPart(UriPartial.Authority));
     private string AdminLogin { get; set; } = null!;
     private string AdminPassword { get; set; } = null!;
 
@@ -121,6 +122,67 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
         await transaction.CommitAsync(cancellationToken);
         return topic;
+    }
+
+    public async Task<SeededArticle> SeedPublishedArticleAsync(
+        string title,
+        string slug,
+        string markdown,
+        CancellationToken cancellationToken = default)
+    {
+        var article = new SeededArticle(Guid.NewGuid(), title, slug);
+        var now = DateTimeOffset.UtcNow;
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (var articleCommand = new NpgsqlCommand(
+            """
+            INSERT INTO articles ("Id", "CreatedAt", "UpdatedAt")
+            VALUES (@articleId, @createdAt, @updatedAt)
+            """,
+            connection,
+            transaction))
+        {
+            articleCommand.Parameters.AddWithValue("articleId", article.Id);
+            articleCommand.Parameters.AddWithValue("createdAt", now);
+            articleCommand.Parameters.AddWithValue("updatedAt", now);
+            await articleCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var localizationCommand = new NpgsqlCommand(
+            """
+            INSERT INTO article_localizations ("Id", "ArticleId", "LanguageCode", "Slug", "Title", "Summary", "Markdown", "Status", "PublishedAt", "UpdatedAt")
+            VALUES (@localizationId, @articleId, 'en', @slug, @title, NULL, @markdown, 'Published', @publishedAt, @updatedAt)
+            """,
+            connection,
+            transaction))
+        {
+            localizationCommand.Parameters.AddWithValue("localizationId", Guid.NewGuid());
+            localizationCommand.Parameters.AddWithValue("articleId", article.Id);
+            localizationCommand.Parameters.AddWithValue("slug", article.Slug);
+            localizationCommand.Parameters.AddWithValue("title", article.Title);
+            localizationCommand.Parameters.AddWithValue("markdown", markdown);
+            localizationCommand.Parameters.AddWithValue("publishedAt", now);
+            localizationCommand.Parameters.AddWithValue("updatedAt", now);
+            await localizationCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return article;
+    }
+
+    public async Task<long> CountArticleViewsAsync(Guid articleId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT COUNT(*) FROM article_views WHERE \"ArticleId\" = @articleId",
+            connection);
+        command.Parameters.AddWithValue("articleId", articleId);
+        return (long)(await command.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException("Article view count query returned no value."));
     }
 
     public async Task EnsurePdfWorkerAsync()
@@ -591,3 +653,5 @@ public sealed class E2EEnvironment : IAsyncLifetime
 }
 
 public sealed record SeededTopic(Guid Id, string Name, string Slug, string? Description);
+
+public sealed record SeededArticle(Guid Id, string Title, string Slug);

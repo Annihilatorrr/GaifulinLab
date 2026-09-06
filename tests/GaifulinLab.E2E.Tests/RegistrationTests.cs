@@ -62,6 +62,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = title })).ToBeVisibleAsync();
         await Expect(Page.GetByText(summary, new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.Locator("article.article-body")).ToContainTextAsync(body);
+        await Expect(Page.Locator(".article-views")).ToContainTextAsync("1 views");
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/topics").ToString());
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = topic.Name })).ToBeVisibleAsync();

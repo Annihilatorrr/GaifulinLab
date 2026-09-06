@@ -23,6 +23,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<ArticleTag> ArticleTags => Set<ArticleTag>();
 
+    public DbSet<ArticleView> ArticleViews => Set<ArticleView>();
+
     public DbSet<Topic> Topics => Set<Topic>();
 
     public DbSet<TopicLocalization> TopicLocalizations => Set<TopicLocalization>();

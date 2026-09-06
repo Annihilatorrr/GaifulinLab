@@ -5,6 +5,7 @@ using GaifulinLab.Contracts.Auth;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -209,10 +210,13 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("JWT_AUDIENCE", "GaifulinLab.Tests.Client");
         builder.UseSetting("JWT_SIGNING_KEY", "test-signing-key-that-is-at-least-32-bytes-long");
         builder.UseSetting("JWT_LIFETIME_MINUTES", "5");
+        builder.UseSetting("Analytics:ViewHashKey", "test-view-hash-key-that-is-at-least-32-bytes-long");
+        builder.UseSetting("ForwardedHeaders:TrustedNetworks:0", "127.0.0.1/32");
         builder.UseSetting("MEDIA_STORAGE_PATH", _mediaStoragePath);
         builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5172");
         builder.ConfigureServices(services =>
         {
+            services.AddSingleton<IStartupFilter, TestRemoteIpStartupFilter>();
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
             services.AddDbContext<AppDbContext>(options =>
@@ -258,5 +262,18 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         {
             Directory.Delete(_mediaStoragePath, recursive: true);
         }
+    }
+
+    private sealed class TestRemoteIpStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (context, nextRequest) =>
+            {
+                context.Connection.RemoteIpAddress = IPAddress.Loopback;
+                await nextRequest();
+            });
+            next(app);
+        };
     }
 }

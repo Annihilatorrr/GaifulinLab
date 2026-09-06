@@ -12,7 +12,13 @@
         {
             <header class="article-header">
                 <div class="article-meta">
-                    <time datetime="@_article.PublishedAt.ToString("O")">@_article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                    <div class="article-meta-info">
+                        <time datetime="@_article.PublishedAt.ToString("O")">@_article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                        <span class="article-views">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Zm9.5 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /></svg>
+                            <span>@_article.ViewCount @ViewCountLabel</span>
+                        </span>
+                    </div>
                     @if (_typographyReady)
                     {
                         <button class="article-download" @onclick="DownloadPdfAsync" disabled="@_pdfExportInProgress">
@@ -66,6 +72,11 @@
             ? "Скачать PDF"
             : "Download PDF";
 
+    private string ViewCountLabel =>
+        string.Equals(_article?.LanguageCode, "ru", StringComparison.OrdinalIgnoreCase)
+            ? "просмотров"
+            : "views";
+
     protected override async Task OnParametersSetAsync()
     {
         await ClearArticleMathAsync();
@@ -79,6 +90,18 @@
             _article = await ContentClient.GetArticleAsync(
                 LanguageCode,
                 Slug);
+            if (_article is not null)
+            {
+                try
+                {
+                    var view = await ContentClient.RecordArticleViewAsync(LanguageCode, Slug);
+                    _article = _article with { ViewCount = view.ViewCount };
+                }
+                catch (HttpRequestException)
+                {
+                    // Reading matters more than telemetry: leave the initially loaded count visible.
+                }
+            }
             _mathTypesetPending = _article is not null;
         }
         catch (HttpRequestException) { _article = null; }

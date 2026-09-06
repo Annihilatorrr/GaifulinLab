@@ -63,6 +63,29 @@ public sealed class PublicContentClientTests
     }
 
     [Fact]
+    public async Task RecordArticleViewAsync_PostsAndReturnsTheUpdatedCount()
+    {
+        HttpRequestMessage? request = null;
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(message =>
+        {
+            request = message;
+            return JsonResponse(new ArticleViewCountDto(7), HttpStatusCode.OK);
+        }))
+        {
+            BaseAddress = new Uri("http://localhost:5180/")
+        };
+        var client = new PublicContentClient(httpClient);
+
+        var view = await client.RecordArticleViewAsync("en", "article with spaces");
+
+        Assert.Equal(7, view.ViewCount);
+        Assert.Equal(HttpMethod.Post, request?.Method);
+        Assert.Equal(
+            "/api/public/articles/en/article%20with%20spaces/views",
+            request?.RequestUri?.PathAndQuery);
+    }
+
+    [Fact]
     public void ResolveApiUrl_UsesTheApiOriginForRelativeUrls()
     {
         using var httpClient = new HttpClient
