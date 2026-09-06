@@ -23,7 +23,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     [Fact]
     public async Task Register_WithValidCredentials_CreatesStandardUser()
     {
-        var login = $"new-user-{Guid.NewGuid():N}";
+        var login = $"new-user-{Guid.NewGuid():N}@example.com";
         using var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
@@ -39,13 +39,14 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await userManager.FindByNameAsync(login);
         Assert.NotNull(user);
+        Assert.Equal(login, user.Email);
         Assert.False(await userManager.IsInRoleAsync(user, IdentityRoles.Admin));
     }
 
     [Fact]
     public async Task Register_WithDuplicateLogin_ReturnsConflict()
     {
-        var login = $"duplicate-{Guid.NewGuid():N}";
+        var login = $"duplicate-{Guid.NewGuid():N}@example.com";
         using var client = factory.CreateClient();
         var request = new RegisterRequest(login, "Strong-password-1!");
 
@@ -58,13 +59,28 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task Register_WithNonEmailLogin_ReturnsEmailValidationError()
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new RegisterRequest("not-an-email", "Strong-password-1!"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+        Assert.Equal("invalid_registration", error?.Code);
+        Assert.Equal("Enter a valid email address.", error?.Errors?["Login"].Single());
+    }
+
+    [Fact]
     public async Task Register_WithWeakPassword_ReturnsPasswordValidationErrors()
     {
         using var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/register",
-            new RegisterRequest($"weak-{Guid.NewGuid():N}", "password"));
+            new RegisterRequest($"weak-{Guid.NewGuid():N}@example.com", "password"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();

@@ -17,20 +17,22 @@
         {
             <span class="eyebrow">Gaifulin Lab account</span>
             <h1 id="registration-title">Create an account</h1>
-            <p>Choose a login and a strong password. Registration does not grant access to the private workspace.</p>
+            <p>Enter your email address and choose a strong password. Registration does not grant access to the private workspace.</p>
 
             <EditForm Model="_registration" OnValidSubmit="RegisterAsync" class="registration-form">
                 <DataAnnotationsValidator />
 
                 <div class="field">
-                    <label for="registration-login">Login</label>
-                    <InputText id="registration-login"
-                               autocomplete="username"
-                               aria-describedby="registration-login-hint"
+                    <label for="registration-email">Email</label>
+                    <InputText id="registration-email"
+                               type="email"
+                               autocomplete="email"
+                               inputmode="email"
+                               aria-describedby="registration-email-hint"
                                disabled="@_isSubmitting"
                                @bind-Value="_registration.Login" />
-                    <span id="registration-login-hint" class="field-hint">
-                        3–64 letters, numbers, or the characters <span aria-label="hyphen, period, underscore, at sign, plus">- . _ @@ +</span>
+                    <span id="registration-email-hint" class="field-hint">
+                        Enter the email address you want to use for your account.
                     </span>
                     <ValidationMessage For="() => _registration.Login" />
                 </div>
@@ -105,9 +107,9 @@
 
     private sealed class RegistrationModel
     {
-        [Required]
-        [StringLength(64, MinimumLength = 3)]
-        [RegularExpression(@"^[A-Za-z0-9._@+\-]+$", ErrorMessage = "Login contains unsupported characters.")]
+        [Required(ErrorMessage = "Email is required.")]
+        [StringLength(254, ErrorMessage = "Email must not exceed 254 characters.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
         public string Login { get; set; } = string.Empty;
 
         [Required]

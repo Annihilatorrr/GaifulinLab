@@ -11,7 +11,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
     public async Task VisitorRegisters_AndAdministratorPublishesArticle_ThatIsPubliclyAvailable()
     {
         const string password = "Strong-password-1!";
-        var login = $"e2e-user-{Guid.NewGuid():N}";
+        var login = $"e2e-user-{Guid.NewGuid():N}@example.com";
         var uniqueId = Guid.NewGuid().ToString("N");
         var title = $"E2E registration article {uniqueId}";
         var slug = $"e2e-registration-article-{uniqueId}";
@@ -25,7 +25,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/register").ToString());
 
-        await Page.GetByLabel("Login").FillAsync(login);
+        await Page.GetByLabel("Email").FillAsync(login);
         await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password);
         await Page.GetByLabel("Confirm password").FillAsync(password);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();

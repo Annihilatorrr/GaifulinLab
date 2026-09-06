@@ -57,6 +57,7 @@ internal sealed class UserAuthenticationService(
             new ApplicationUser
             {
                 UserName = login,
+                Email = login,
                 SecurityStamp = Guid.NewGuid().ToString("N")
             },
             password);

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using GaifulinLab.Api.Configuration;
 using GaifulinLab.Contracts.Auth;
 using GaifulinLab.Contracts.Common;
@@ -12,8 +13,7 @@ namespace GaifulinLab.Api.Controllers;
 [Route("api/auth")]
 public sealed class AuthController(IUserAuthenticationService authenticationService) : ControllerBase
 {
-    private const int MinimumLoginLength = 3;
-    private const int MaximumLoginLength = 64;
+    private const int MaximumEmailLength = 254;
     private const int MaximumPasswordLength = 128;
 
     [HttpPost("login")]
@@ -48,8 +48,8 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
     {
         Response.Headers.CacheControl = "no-store";
 
-        var login = request.Login?.Trim() ?? string.Empty;
-        var validationErrors = ValidateRegistration(login, request.Password);
+        var email = request.Login?.Trim() ?? string.Empty;
+        var validationErrors = ValidateRegistration(email, request.Password);
         if (validationErrors.Count > 0)
         {
             return BadRequest(new ApiErrorResponse(
@@ -58,17 +58,17 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
                 validationErrors));
         }
 
-        var result = await authenticationService.RegisterAsync(login, request.Password);
+        var result = await authenticationService.RegisterAsync(email, request.Password);
         if (result.Succeeded)
         {
-            return StatusCode(StatusCodes.Status201Created, new RegisterResponse(login));
+            return StatusCode(StatusCodes.Status201Created, new RegisterResponse(email));
         }
 
         if (result.LoginTaken)
         {
             return Conflict(new ApiErrorResponse(
                 "login_taken",
-                "This login is already in use."));
+                "This email address is already in use."));
         }
 
         return BadRequest(new ApiErrorResponse(
@@ -86,21 +86,17 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
     private UnauthorizedObjectResult InvalidCredentials() =>
         Unauthorized(new ApiErrorResponse("invalid_credentials", "Invalid login or password."));
 
-    private static Dictionary<string, string[]> ValidateRegistration(string login, string? password)
+    private static Dictionary<string, string[]> ValidateRegistration(string email, string? password)
     {
         var errors = new Dictionary<string, string[]>();
-        if (login.Length is < MinimumLoginLength or > MaximumLoginLength)
+        if (string.IsNullOrWhiteSpace(email))
         {
-            errors["Login"] =
-            [
-                $"Login must be between {MinimumLoginLength} and {MaximumLoginLength} characters."
-            ];
+            errors["Login"] = ["Email is required."];
         }
-        else if (login.Any(character =>
-                     !char.IsAsciiLetterOrDigit(character)
-                     && character is not '-' and not '.' and not '_' and not '@' and not '+'))
+        else if (email.Length > MaximumEmailLength
+                 || !new EmailAddressAttribute().IsValid(email))
         {
-            errors["Login"] = ["Login contains unsupported characters."];
+            errors["Login"] = ["Enter a valid email address."];
         }
 
         if (string.IsNullOrEmpty(password) || password.Length > MaximumPasswordLength)
