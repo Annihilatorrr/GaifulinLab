@@ -18,7 +18,47 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                 name: "OwnerUserId",
                 table: "articles",
                 type: "text",
-                nullable: false);
+                nullable: true);
+
+            // Legacy articles predate user ownership. They belong to the single existing administrator.
+            migrationBuilder.Sql(
+                """
+                DO $$
+                DECLARE
+                    owner_id text;
+                    owner_count integer;
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM articles) THEN
+                        RETURN;
+                    END IF;
+
+                    SELECT COUNT(*), MIN(u."Id")
+                    INTO owner_count, owner_id
+                    FROM "AspNetUsers" AS u
+                    INNER JOIN "AspNetUserRoles" AS ur ON ur."UserId" = u."Id"
+                    INNER JOIN "AspNetRoles" AS r ON r."Id" = ur."RoleId"
+                    WHERE r."NormalizedName" = 'ADMIN';
+
+                    IF owner_count <> 1 THEN
+                        RAISE EXCEPTION
+                            'Cannot assign existing articles: exactly one Admin user is required, found %.',
+                            owner_count;
+                    END IF;
+
+                    UPDATE articles
+                    SET "OwnerUserId" = owner_id
+                    WHERE "OwnerUserId" IS NULL;
+                END $$;
+                """);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "OwnerUserId",
+                table: "articles",
+                type: "text",
+                nullable: false,
+                oldClrType: typeof(string),
+                oldType: "text",
+                oldNullable: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_articles_owner_user_id_updated_at",
