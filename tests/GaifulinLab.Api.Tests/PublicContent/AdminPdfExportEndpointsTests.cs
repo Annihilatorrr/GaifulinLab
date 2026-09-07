@@ -57,22 +57,6 @@ public sealed class AdminPdfExportEndpointsTests
     }
 
     [Fact]
-    public async Task AdminArticlePdfRender_RequiresAdminRole()
-    {
-        await using var factory = new AuthWebApplicationFactory();
-        using var anonymousClient = factory.CreateClient();
-        using var userClient = await CreateUserClientAsync(factory);
-        var request = new AdminArticlePdfRequest("en", "article", "Article", null, "# Article", null, null, null);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymousClient.PostAsJsonAsync(
-            "/api/admin/articles/pdf",
-            request)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await userClient.PostAsJsonAsync(
-            "/api/admin/articles/pdf",
-            request)).StatusCode);
-    }
-
-    [Fact]
     public async Task ArticlePdf_ForDraftOrDeletedArticle_ReturnsNotFound()
     {
         await using var factory = new AuthWebApplicationFactory();

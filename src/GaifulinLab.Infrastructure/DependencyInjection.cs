@@ -37,25 +37,6 @@ public static class DependencyInjection
             ?? configuration["MediaStorage:RootPath"]
             ?? Path.Combine(AppContext.BaseDirectory, "media")));
 
-        var pdfTimeoutSeconds = Math.Clamp(
-            configuration.GetValue("PDF_RENDERER_TIMEOUT_SECONDS", 45),
-            5,
-            120);
-        var maximumConcurrentPdfRenders = Math.Clamp(
-            configuration.GetValue("PDF_MAX_CONCURRENT_RENDERS", 2),
-            1,
-            8);
-
-        var mathJaxAssetsPath = configuration["PDF_MATHJAX_ASSETS_PATH"]
-            ?? Path.Combine(AppContext.BaseDirectory, "pdf-assets");
-        services.AddSingleton(new ArticlePdfRendererSettings(
-            TimeSpan.FromSeconds(pdfTimeoutSeconds),
-            maximumConcurrentPdfRenders,
-            configuration["PDF_MATHJAX_PATH"]
-            ?? Path.Combine(mathJaxAssetsPath, "mathjax", "tex-chtml.js"),
-            mathJaxAssetsPath));
-        services.AddSingleton<IArticlePdfRenderer, PlaywrightArticlePdfRenderer>();
-
         return services;
     }
 
@@ -67,6 +48,10 @@ public static class DependencyInjection
             configuration.GetValue("PDF_RENDERER_TIMEOUT_SECONDS", 45),
             5,
             120);
+        var maximumConcurrentPdfRenders = Math.Clamp(
+            configuration.GetValue("PDF_MAX_CONCURRENT_RENDERS", 2),
+            1,
+            8);
         var pollIntervalMilliseconds = Math.Clamp(
             configuration.GetValue("PDF_WORKER_POLL_INTERVAL_MILLISECONDS", 1_000),
             100,
@@ -76,6 +61,15 @@ public static class DependencyInjection
             pdfTimeoutSeconds + 15,
             600);
 
+        var mathJaxAssetsPath = configuration["PDF_MATHJAX_ASSETS_PATH"]
+            ?? Path.Combine(AppContext.BaseDirectory, "pdf-assets");
+        services.AddSingleton(new ArticlePdfRendererSettings(
+            TimeSpan.FromSeconds(pdfTimeoutSeconds),
+            maximumConcurrentPdfRenders,
+            configuration["PDF_MATHJAX_PATH"]
+            ?? Path.Combine(mathJaxAssetsPath, "mathjax", "tex-chtml.js"),
+            mathJaxAssetsPath));
+        services.AddSingleton<IArticlePdfRenderer, PlaywrightArticlePdfRenderer>();
         services.AddSingleton(new PdfExportWorkerSettings(
             TimeSpan.FromMilliseconds(pollIntervalMilliseconds),
             TimeSpan.FromSeconds(leaseSeconds)));
