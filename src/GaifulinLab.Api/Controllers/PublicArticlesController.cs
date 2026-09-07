@@ -79,8 +79,9 @@ public sealed class PublicArticlesController(
             var firstViewedAt = DateTimeOffset.UtcNow;
             if (dbContext.Database.IsRelational())
             {
-                // Checking first would race when a page is opened in several tabs. PostgreSQL
-                // decides which request wins, while every other request remains harmless.
+                // EF Core has no provider-agnostic, atomic "insert if absent" operation. Checking
+                // first would race when a page is opened in several tabs; PostgreSQL's ON CONFLICT
+                // lets the unique constraint decide which request wins and keeps the others harmless.
                 await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
                     INSERT INTO article_views ("ArticleId", "VisitorHash", "FirstViewedAt")
                     VALUES ({articleId}, {visitorHash}, {firstViewedAt})
