@@ -34,7 +34,7 @@
         }
         catch (HttpRequestException) { }
     }
-    private async Task LoadArticles() => _articles = await ContentClient.GetArticlesAsync(LanguageCode);
+    private async Task LoadArticles() => _articles = await ContentClient.GetArticlesAsync(LanguageCode, pageSize: 3);
     private async Task LoadTopics() => _topics = await ContentClient.GetTopicsAsync(LanguageCode);
     private async Task LoadSeries() => _series = await ContentClient.GetSeriesAsync(LanguageCode);
 }

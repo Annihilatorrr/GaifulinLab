@@ -49,6 +49,8 @@ public sealed class PublicContentClient(HttpClient httpClient)
         string? topic = null,
         string? series = null,
         string? tag = null,
+        int page = 1,
+        int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
         var parameters = new List<string>
@@ -58,6 +60,8 @@ public sealed class PublicContentClient(HttpClient httpClient)
         Add(parameters, "topic", topic);
         Add(parameters, "series", series);
         Add(parameters, "tag", tag);
+        parameters.Add($"page={page}");
+        parameters.Add($"pageSize={pageSize}");
         return GetAsync<IReadOnlyList<PublicArticleListItemDto>>(
             $"/api/public/articles?{string.Join('&', parameters)}",
             cancellationToken);

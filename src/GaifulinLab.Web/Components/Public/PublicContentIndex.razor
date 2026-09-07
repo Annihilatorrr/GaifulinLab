@@ -34,6 +34,12 @@
                     </article>
                 }
             </div>
+            @if (_hasMoreArticles)
+            {
+                <button class="button button-secondary" type="button" disabled="@_loadingMoreArticles" @onclick="LoadMoreArticlesAsync">
+                    @(_loadingMoreArticles ? "Loading…" : "Load more")
+                </button>
+            }
         }
         else if (Kind == "topics")
         {
@@ -94,13 +100,19 @@
     private IReadOnlyList<PublicSeriesListItemDto> _series = [];
     private IReadOnlyList<PublicTagDto> _tags = [];
     private bool _loading = true;
+    private bool _loadingMoreArticles;
     private bool _error;
+    private bool _hasMoreArticles;
+    private int _articlePage = 1;
+    private const int ArticlePageSize = 20;
     private bool HasItems => Kind switch { "articles" or "archive" => _articles.Count > 0, "topics" => _topics.Count > 0, "series" => _series.Count > 0, _ => _tags.Count > 0 };
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
         _error = false;
+        _hasMoreArticles = false;
+        _articlePage = 1;
         try
         {
             switch (Kind)
@@ -108,10 +120,45 @@
                 case "topics": _topics = await ContentClient.GetTopicsAsync(LanguageCode); break;
                 case "series": _series = await ContentClient.GetSeriesAsync(LanguageCode); break;
                 case "tags": _tags = await ContentClient.GetTagsAsync(LanguageCode); break;
-                default: _articles = await ContentClient.GetArticlesAsync(LanguageCode, Topic, SeriesFilter, Tag); break;
+                default:
+                    _articles = await ContentClient.GetArticlesAsync(
+                        LanguageCode,
+                        Topic,
+                        SeriesFilter,
+                        Tag,
+                        _articlePage,
+                        ArticlePageSize);
+                    _hasMoreArticles = _articles.Count == ArticlePageSize;
+                    break;
             }
         }
         catch (HttpRequestException) { _error = true; }
         finally { _loading = false; }
+    }
+
+    private async Task LoadMoreArticlesAsync()
+    {
+        _loadingMoreArticles = true;
+        try
+        {
+            var nextPage = await ContentClient.GetArticlesAsync(
+                LanguageCode,
+                Topic,
+                SeriesFilter,
+                Tag,
+                _articlePage + 1,
+                ArticlePageSize);
+            _articles = _articles.Concat(nextPage).ToArray();
+            _articlePage++;
+            _hasMoreArticles = nextPage.Count == ArticlePageSize;
+        }
+        catch (HttpRequestException)
+        {
+            _error = true;
+        }
+        finally
+        {
+            _loadingMoreArticles = false;
+        }
     }
 }

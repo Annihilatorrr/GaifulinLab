@@ -109,7 +109,7 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_article_localizations_language_slug")
                         .HasFilter("\"Slug\" IS NOT NULL");
 
-                    b.HasIndex("LanguageCode", "Status", "PublishedAt")
+                    b.HasIndex("LanguageCode", "Status", "PublishedAt", "Id")
                         .HasDatabaseName("ix_article_localizations_public_listing");
 
                     b.ToTable("article_localizations", null, t =>

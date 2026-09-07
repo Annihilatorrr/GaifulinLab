@@ -7,4 +7,6 @@ public sealed record GetPublicArticlesQuery(
     string LanguageCode,
     string? TopicSlug,
     string? SeriesSlug,
-    string? Tag) : IRequest<IReadOnlyList<PublicArticleListItemDto>>;
+    string? Tag,
+    int Page,
+    int PageSize) : IRequest<IReadOnlyList<PublicArticleListItemDto>>;

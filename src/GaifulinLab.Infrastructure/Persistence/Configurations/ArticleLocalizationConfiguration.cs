@@ -62,7 +62,8 @@ internal sealed class ArticleLocalizationConfiguration : IEntityTypeConfiguratio
             .IsUnique()
             .HasFilter("\"Slug\" IS NOT NULL")
             .HasDatabaseName("ux_article_localizations_language_slug");
-        builder.HasIndex(localization => new { localization.LanguageCode, localization.Status, localization.PublishedAt })
+        builder.HasIndex(localization => new
+            { localization.LanguageCode, localization.Status, localization.PublishedAt, localization.Id })
             .HasDatabaseName("ix_article_localizations_public_listing");
     }
 }

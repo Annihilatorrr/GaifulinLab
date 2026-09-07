@@ -134,4 +134,33 @@ public sealed class PublicArticleEndpointsTests
             "/api/public/articles?languageCode=en");
         Assert.Single(allEnglish!);
     }
+
+    [Fact]
+    public async Task ArticleList_PaginatesInPublishedOrderWithoutDuplicatingArticles()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        await PublicContentTestData.SeedAsync(factory.Services);
+        await PublicContentTestData.SeedPublishedEnglishArticlesAsync(factory.Services, 22);
+        using var client = factory.CreateClient();
+
+        var firstPage = await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en&page=1&pageSize=10");
+        var secondPage = await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en&page=2&pageSize=10");
+        var thirdPage = await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en&page=3&pageSize=10");
+
+        Assert.NotNull(firstPage);
+        Assert.NotNull(secondPage);
+        Assert.NotNull(thirdPage);
+        Assert.Equal(10, firstPage.Count);
+        Assert.Equal(10, secondPage.Count);
+        Assert.Equal(3, thirdPage.Count);
+
+        var articles = firstPage.Concat(secondPage).Concat(thirdPage).ToArray();
+        Assert.Equal(23, articles.Select(article => article.Slug).Distinct().Count());
+        Assert.Equal(
+            articles.OrderByDescending(article => article.PublishedAt).Select(article => article.Slug),
+            articles.Select(article => article.Slug));
+    }
 }

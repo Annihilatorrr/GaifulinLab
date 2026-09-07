@@ -93,4 +93,27 @@ internal static class PublicContentTestData
         request.Headers.Add("X-Forwarded-For", forwardedFor);
         return client.SendAsync(request);
     }
+
+    public static async Task SeedPublishedEnglishArticlesAsync(IServiceProvider services, int count)
+    {
+        using var scope = services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var publishedAt = DateTimeOffset.UtcNow;
+
+        for (var index = 1; index <= count; index++)
+        {
+            var article = Article.Create(
+                "test-owner",
+                "en",
+                publishedAt.AddMinutes(index),
+                $"Paged article {index}",
+                null,
+                "This body must never be part of the list projection.",
+                $"paged-article-{index}");
+            article.PublishLocalization("en", publishedAt.AddMinutes(index));
+            dbContext.Articles.Add(article);
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
 }

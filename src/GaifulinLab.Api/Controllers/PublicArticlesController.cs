@@ -30,9 +30,11 @@ public sealed class PublicArticlesController(
         [FromQuery] string? topic,
         [FromQuery] string? series,
         [FromQuery] string? tag,
-        CancellationToken cancellationToken) =>
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default) =>
         Ok(await sender.Send(
-            new GetPublicArticlesQuery(languageCode, topic, series, tag),
+            new GetPublicArticlesQuery(languageCode, topic, series, tag, page, pageSize),
             cancellationToken));
 
     [HttpGet("articles/{languageCode}/{slug}")]

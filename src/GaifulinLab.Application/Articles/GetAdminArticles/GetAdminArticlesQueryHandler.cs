@@ -16,18 +16,25 @@ internal sealed class GetAdminArticlesQueryHandler(IAppDbContext dbContext)
             .AsNoTracking()
             // Never load another author's drafts into the workspace list.
             .Where(article => article.OwnerUserId == request.UserId && article.DeletedAt == null)
-            .Include(article => article.Localizations)
             .OrderByDescending(article => article.UpdatedAt)
-            .ToListAsync(cancellationToken);
-
-        return articles.Select(article => new AdminArticleListItemDto(
+            .Select(article => new AdminArticleListItemDto(
                 article.Id,
                 article.CreatedAt,
                 article.UpdatedAt,
                 article.Localizations
                     .OrderBy(localization => localization.LanguageCode)
-                    .Select(localization => localization.ToSummary())
+                    .Select(localization => new AdminArticleLocalizationSummaryDto(
+                        localization.Id,
+                        localization.LanguageCode,
+                        localization.Slug,
+                        localization.Title,
+                        (PublicationStatusDto)localization.Status,
+                        localization.PublishedAt,
+                        localization.UpdatedAt,
+                        localization.LastEditedAt))
                     .ToArray()))
-            .ToArray();
+            .ToListAsync(cancellationToken);
+
+        return articles;
     }
 }
