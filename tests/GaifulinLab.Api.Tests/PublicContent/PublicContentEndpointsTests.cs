@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Contracts.Articles;
@@ -10,6 +11,7 @@ using GaifulinLab.Infrastructure.Persistence;
 using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Api.Tests.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using SeriesAggregate = GaifulinLab.Domain.Series.Series;
 
@@ -174,10 +176,21 @@ public sealed class PublicContentEndpointsTests
     {
         await using var factory = new AuthWebApplicationFactory();
         await SeedContent(factory.Services);
-        using var client = factory.CreateClient();
+        using var anonymousClient = factory.CreateClient();
+        using var userClient = await CreateUserClientAsync(factory);
+        using var adminClient = await CreateAdminClientAsync(factory);
 
-        var response = await client.PostAsync(
-            "/api/public/articles/en/understanding-fft/pdf-exports?lineHeight=1.5&blockSpacing=0.4",
+        var unauthorized = await anonymousClient.PostAsync(
+            "/api/admin/articles/en/understanding-fft/pdf-exports?lineHeight=1.5&blockSpacing=0.4",
+            content: null);
+        var forbidden = await userClient.PostAsync(
+            "/api/admin/articles/en/understanding-fft/pdf-exports?lineHeight=1.5&blockSpacing=0.4",
+            content: null);
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        var response = await adminClient.PostAsync(
+            "/api/admin/articles/en/understanding-fft/pdf-exports?lineHeight=1.5&blockSpacing=0.4",
             content: null);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
@@ -185,9 +198,44 @@ public sealed class PublicContentEndpointsTests
         Assert.NotNull(export);
         Assert.Equal("queued", export.Status);
 
-        var status = await client.GetFromJsonAsync<PdfExportStatusDto>(
-            $"/api/public/pdf-exports/{export.Id}");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymousClient.GetAsync(
+            $"/api/admin/pdf-exports/{export.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await userClient.GetAsync(
+            $"/api/admin/pdf-exports/{export.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymousClient.GetAsync(
+            $"/api/admin/pdf-exports/{export.Id}/download")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await userClient.GetAsync(
+            $"/api/admin/pdf-exports/{export.Id}/download")).StatusCode);
+
+        var status = await adminClient.GetFromJsonAsync<PdfExportStatusDto>(
+            $"/api/admin/pdf-exports/{export.Id}");
         Assert.Equal("queued", status?.Status);
+        Assert.Equal(HttpStatusCode.Conflict, (await adminClient.GetAsync(
+            $"/api/admin/pdf-exports/{export.Id}/download")).StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminArticlePdfRender_RequiresAdminRole()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        using var anonymousClient = factory.CreateClient();
+        using var userClient = await CreateUserClientAsync(factory);
+        var request = new AdminArticlePdfRequest(
+            "en",
+            "article",
+            "Article",
+            null,
+            "# Article",
+            null,
+            null,
+            null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymousClient.PostAsJsonAsync(
+            "/api/admin/articles/pdf",
+            request)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await userClient.PostAsJsonAsync(
+            "/api/admin/articles/pdf",
+            request)).StatusCode);
     }
 
     [Fact]
@@ -195,13 +243,13 @@ public sealed class PublicContentEndpointsTests
     {
         await using var factory = new AuthWebApplicationFactory();
         await SeedContent(factory.Services);
-        using var client = factory.CreateClient();
+        using var client = await CreateAdminClientAsync(factory);
 
-        var response = await client.PostAsync("/api/public/articles/en/future-draft/pdf-exports", content: null);
+        var response = await client.PostAsync("/api/admin/articles/en/future-draft/pdf-exports", content: null);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
-        var deletedResponse = await client.PostAsync("/api/public/articles/en/deleted-published/pdf-exports", content: null);
+        var deletedResponse = await client.PostAsync("/api/admin/articles/en/deleted-published/pdf-exports", content: null);
         Assert.Equal(HttpStatusCode.NotFound, deletedResponse.StatusCode);
     }
 
@@ -210,13 +258,13 @@ public sealed class PublicContentEndpointsTests
     {
         await using var factory = new AuthWebApplicationFactory();
         await SeedContent(factory.Services);
-        using var client = factory.CreateClient();
+        using var client = await CreateAdminClientAsync(factory);
 
         var created = await client.PostAsync(
-            "/api/public/articles/en/understanding-fft/pdf-exports",
+            "/api/admin/articles/en/understanding-fft/pdf-exports",
             content: null);
         var export = await created.Content.ReadFromJsonAsync<PdfExportStatusDto>();
-        var response = await client.GetAsync($"/api/public/pdf-exports/{export!.Id}/download");
+        var response = await client.GetAsync($"/api/admin/pdf-exports/{export!.Id}/download");
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
@@ -228,10 +276,10 @@ public sealed class PublicContentEndpointsTests
     {
         await using var factory = new AuthWebApplicationFactory();
         await SeedContent(factory.Services);
-        using var client = factory.CreateClient();
+        using var client = await CreateAdminClientAsync(factory);
 
         var created = await client.PostAsync(
-            "/api/public/articles/en/understanding-fft/pdf-exports",
+            "/api/admin/articles/en/understanding-fft/pdf-exports",
             content: null);
         var export = await created.Content.ReadFromJsonAsync<PdfExportStatusDto>();
         Assert.NotNull(export);
@@ -247,9 +295,48 @@ public sealed class PublicContentEndpointsTests
         }
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(
-            $"/api/public/pdf-exports/{export!.Id}")).StatusCode);
+            $"/api/admin/pdf-exports/{export!.Id}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(
-            $"/api/public/pdf-exports/{export.Id}/download")).StatusCode);
+            $"/api/admin/pdf-exports/{export.Id}/download")).StatusCode);
+    }
+
+    private static async Task<HttpClient> CreateAdminClientAsync(AuthWebApplicationFactory factory)
+    {
+        return await CreateAuthenticatedClientAsync(
+            factory,
+            AuthWebApplicationFactory.AdminLogin,
+            AuthWebApplicationFactory.AdminPassword);
+    }
+
+    private static async Task<HttpClient> CreateUserClientAsync(AuthWebApplicationFactory factory)
+    {
+        var login = $"pdf-user-{Guid.NewGuid():N}@example.com";
+        const string password = "Strong-password-1!";
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var result = await userManager.CreateAsync(
+                new ApplicationUser { UserName = login, DisplayName = "PDF User" },
+                password);
+            Assert.True(result.Succeeded, string.Join("; ", result.Errors.Select(error => error.Description)));
+        }
+
+        return await CreateAuthenticatedClientAsync(factory, login, password);
+    }
+
+    private static async Task<HttpClient> CreateAuthenticatedClientAsync(
+        AuthWebApplicationFactory factory,
+        string login,
+        string password)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var authenticationService = scope.ServiceProvider.GetRequiredService<IUserAuthenticationService>();
+        var token = await authenticationService.AuthenticateAsync(login, password);
+        Assert.NotNull(token);
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
+        return client;
     }
 
     private static async Task SeedContent(IServiceProvider services)

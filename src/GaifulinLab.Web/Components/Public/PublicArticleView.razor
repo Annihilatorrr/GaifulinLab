@@ -21,17 +21,25 @@
                         </span>
                         <time datetime="@_article.LastEditedAt.ToString("O")">Last edited @_article.LastEditedAt.ToLocalTime().ToString("d MMM yyyy")</time>
                     </div>
-                    @if (_typographyReady)
-                    {
-                        <button class="article-download" @onclick="DownloadPdfAsync" disabled="@_pdfExportInProgress">
-                            @PdfDownloadLabel
-                        </button>
-                    }
+                    <AuthorizeView Roles="Admin">
+                        <Authorized>
+                            @if (_typographyReady)
+                            {
+                                <button class="article-download" @onclick="DownloadPdfAsync" disabled="@_pdfExportInProgress">
+                                    @PdfDownloadLabel
+                                </button>
+                            }
+                        </Authorized>
+                    </AuthorizeView>
                 </div>
-                @if (_pdfExportError is not null)
-                {
-                    <p class="article-download-error" role="alert">@_pdfExportError</p>
-                }
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        @if (_pdfExportError is not null)
+                        {
+                            <p class="article-download-error" role="alert">@_pdfExportError</p>
+                        }
+                    </Authorized>
+                </AuthorizeView>
                 <h1>@_article.Title</h1>
                 @if (!string.IsNullOrWhiteSpace(_article.Summary)) { <p>@_article.Summary</p> }
                 @if (_article.AvailableLocalizations.Count > 1)
@@ -188,9 +196,8 @@
                 if (string.Equals(export.Status, "completed", StringComparison.OrdinalIgnoreCase)
                     && !string.IsNullOrWhiteSpace(export.DownloadUrl))
                 {
-                    await JS.InvokeVoidAsync(
-                        "articleAssets.download",
-                        ContentClient.ResolveApiUrl(export.DownloadUrl));
+                    var pdf = await ContentClient.DownloadPdfExportAsync(export.Id);
+                    await JS.InvokeVoidAsync("articleAssets.download", pdf, $"{Slug}.pdf");
                     return;
                 }
 

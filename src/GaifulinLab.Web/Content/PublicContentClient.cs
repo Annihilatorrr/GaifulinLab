@@ -9,9 +9,6 @@ public sealed class PublicContentClient(HttpClient httpClient)
 {
     public string AssetBaseUrl => httpClient.BaseAddress!.AbsoluteUri;
 
-    public string ResolveApiUrl(string relativeOrAbsoluteUrl) =>
-        new Uri(httpClient.BaseAddress!, relativeOrAbsoluteUrl).AbsoluteUri;
-
     public async Task<PdfExportStatusDto> CreateArticlePdfExportAsync(
         string languageCode,
         string slug,
@@ -19,7 +16,7 @@ public sealed class PublicContentClient(HttpClient httpClient)
         CancellationToken cancellationToken = default)
     {
         var uri =
-            $"/api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}/pdf-exports" +
+            $"/api/admin/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}/pdf-exports" +
             $"?lineHeight={typography.LineHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
             $"&blockSpacing={typography.BlockSpacing.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
         using var response = await httpClient.PostAsync(uri, content: null, cancellationToken);
@@ -32,10 +29,19 @@ public sealed class PublicContentClient(HttpClient httpClient)
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.GetAsync($"/api/public/pdf-exports/{id}", cancellationToken);
+        using var response = await httpClient.GetAsync($"/api/admin/pdf-exports/{id}", cancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<PdfExportStatusDto>(cancellationToken)
             ?? throw new HttpRequestException("The server returned an empty PDF export response.");
+    }
+
+    public async Task<byte[]> DownloadPdfExportAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync($"/api/admin/pdf-exports/{id}/download", cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
     public Task<IReadOnlyList<PublicArticleListItemDto>> GetArticlesAsync(

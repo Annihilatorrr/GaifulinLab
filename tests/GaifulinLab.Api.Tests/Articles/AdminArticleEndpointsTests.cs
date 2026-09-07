@@ -107,7 +107,7 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync(
             $"/api/public/articles/en/{slug}/views", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync(
-            $"/api/public/articles/en/{slug}/pdf-exports", null)).StatusCode);
+            $"/api/admin/articles/en/{slug}/pdf-exports", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync(
             $"/api/admin/articles/{created.ArticleId}/localizations/en",
             new UpdateArticleLocalizationRequest("Changed", null, "# Changed", "changed"))).StatusCode);

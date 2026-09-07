@@ -30,7 +30,7 @@ public sealed class PublicContentClientTests
         Assert.Equal(exportId, export.Id);
         Assert.Equal(HttpMethod.Post, request?.Method);
         Assert.Equal(
-            "/api/public/articles/en/article%20with%20spaces/pdf-exports?lineHeight=1.5&blockSpacing=0.4",
+            "/api/admin/articles/en/article%20with%20spaces/pdf-exports?lineHeight=1.5&blockSpacing=0.4",
             request?.RequestUri?.PathAndQuery);
     }
 
@@ -46,7 +46,7 @@ public sealed class PublicContentClientTests
                 exportId,
                 "completed",
                 null,
-                $"/api/public/pdf-exports/{exportId}/download"),
+                $"/api/admin/pdf-exports/{exportId}/download"),
                 HttpStatusCode.OK);
         }))
         {
@@ -58,8 +58,36 @@ public sealed class PublicContentClientTests
 
         Assert.Equal("completed", export.Status);
         Assert.Equal(
-            $"/api/public/pdf-exports/{exportId}",
+            $"/api/admin/pdf-exports/{exportId}",
             requestUri?.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task DownloadPdfExportAsync_GetsPdfBytes()
+    {
+        HttpRequestMessage? request = null;
+        var exportId = Guid.NewGuid();
+        var content = "%PDF-test"u8.ToArray();
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(message =>
+        {
+            request = message;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(content)
+            };
+        }))
+        {
+            BaseAddress = new Uri("http://localhost:5180/")
+        };
+        var client = new PublicContentClient(httpClient);
+
+        var pdf = await client.DownloadPdfExportAsync(exportId);
+
+        Assert.Equal(content, pdf);
+        Assert.Equal(HttpMethod.Get, request?.Method);
+        Assert.Equal(
+            $"/api/admin/pdf-exports/{exportId}/download",
+            request?.RequestUri?.PathAndQuery);
     }
 
     [Fact]
@@ -83,20 +111,6 @@ public sealed class PublicContentClientTests
         Assert.Equal(
             "/api/public/articles/en/article%20with%20spaces/views",
             request?.RequestUri?.PathAndQuery);
-    }
-
-    [Fact]
-    public void ResolveApiUrl_UsesTheApiOriginForRelativeUrls()
-    {
-        using var httpClient = new HttpClient
-        {
-            BaseAddress = new Uri("http://localhost:5180/")
-        };
-        var client = new PublicContentClient(httpClient);
-
-        var url = client.ResolveApiUrl("/api/public/pdf-exports/123/download");
-
-        Assert.Equal("http://localhost:5180/api/public/pdf-exports/123/download", url);
     }
 
     private static HttpResponseMessage JsonResponse<T>(T value, HttpStatusCode statusCode) =>

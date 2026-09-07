@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace GaifulinLab.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = AuthorizationPolicies.Admin)]
 [Route("api/admin/articles/pdf")]
 public sealed class AdminArticlePdfController(IArticlePdfRenderer renderer) : ControllerBase
 {

@@ -62,6 +62,7 @@ public sealed class ArticleImageWorkflowTests : PageTest
 
         await AssertPublicImageLoadsAsync(Page, new Uri(_environment.BaseUri, publicPath));
         await AssertPdfDownloadsAsync(Page, slug);
+        await AssertPdfButtonIsHiddenForAnonymousAndRegularUserAsync(publicPath);
     }
 
     private static async Task AssertPublicImageLoadsAsync(IPage page, Uri publicArticleUri)
@@ -80,11 +81,11 @@ public sealed class ArticleImageWorkflowTests : PageTest
     {
         var queuedResponseTask = page.WaitForResponseAsync(response =>
             response.Request.Method == "POST"
-            && response.Url.Contains("/api/public/articles/", StringComparison.Ordinal)
+            && response.Url.Contains("/api/admin/articles/", StringComparison.Ordinal)
             && response.Url.Contains("/pdf-exports", StringComparison.Ordinal));
         var responseTask = page.WaitForResponseAsync(response =>
             response.Request.Method == "GET"
-            && response.Url.Contains("/api/public/pdf-exports/", StringComparison.Ordinal)
+            && response.Url.Contains("/api/admin/pdf-exports/", StringComparison.Ordinal)
             && response.Url.Contains("/download", StringComparison.Ordinal));
         var download = await page.RunAndWaitForDownloadAsync(
             () => page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" }).ClickAsync(),
@@ -105,5 +106,29 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await using var stream = File.OpenRead(path);
         Assert.Equal(header.Length, await stream.ReadAsync(header));
         Assert.Equal("%PDF-"u8.ToArray(), header);
+    }
+
+    private async Task AssertPdfButtonIsHiddenForAnonymousAndRegularUserAsync(string publicPath)
+    {
+        await Page.EvaluateAsync("sessionStorage.clear()");
+        await Page.ReloadAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" })).ToHaveCountAsync(0);
+
+        var login = $"pdf-reader-{Guid.NewGuid():N}@example.com";
+        const string password = "Strong-password-1!";
+        await Page.GotoAsync(new Uri(_environment.BaseUri, "/register").ToString());
+        await Page.GetByLabel("Display name").FillAsync("PDF Reader");
+        await Page.GetByLabel("Email").FillAsync(login);
+        await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password);
+        await Page.GetByLabel("Confirm password").FillAsync(password);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+
+        await Page.GotoAsync(new Uri(_environment.BaseUri, "/admin/login").ToString());
+        await Page.Locator("#admin-login").FillAsync(login);
+        await Page.Locator("#admin-password").FillAsync(password);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
+
+        await Page.GotoAsync(new Uri(_environment.BaseUri, publicPath).ToString());
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" })).ToHaveCountAsync(0);
     }
 }
