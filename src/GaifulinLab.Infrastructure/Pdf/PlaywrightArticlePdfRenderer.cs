@@ -43,105 +43,23 @@ internal sealed class PlaywrightArticlePdfRenderer(
         ArticleTypography typography,
         CancellationToken cancellationToken)
     {
-        await _renderSlots.WaitAsync(cancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(settings.Timeout);
+
+        var renderSlotAcquired = false;
         try
         {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(settings.Timeout);
-            var token = timeout.Token;
-            var html = await BuildHtmlAsync(document, typography, token);
-            var browser = await GetBrowserAsync(token);
+            await _renderSlots.WaitAsync(timeout.Token);
+            renderSlotAcquired = true;
 
-            await using var context = await browser.NewContextAsync();
-            var mathJaxAssetsPath = Path.GetFullPath(settings.MathJaxAssetsPath);
-            if (!Directory.Exists(mathJaxAssetsPath))
-            {
-                throw new PdfRenderingException(
-                    $"The local MathJax assets were not found at '{settings.MathJaxAssetsPath}'.");
-            }
+            var html = await BuildHtmlAsync(document, typography, timeout.Token);
+            var browser = await GetBrowserAsync(timeout.Token);
 
-            var mathJaxAssetsRoot = mathJaxAssetsPath.EndsWith(Path.DirectorySeparatorChar)
-                ? mathJaxAssetsPath
-                : $"{mathJaxAssetsPath}{Path.DirectorySeparatorChar}";
-            var mathJaxPath = Path.GetFullPath(settings.MathJaxPath);
-            if (!File.Exists(mathJaxPath))
-            {
-                throw new PdfRenderingException(
-                    $"The local MathJax asset was not found at '{settings.MathJaxPath}'.");
-            }
-
-            if (!mathJaxPath.StartsWith(mathJaxAssetsRoot, StringComparison.Ordinal))
-            {
-                throw new PdfRenderingException(
-                    $"The local MathJax asset must be located under '{settings.MathJaxAssetsPath}'.");
-            }
-
-            var mathJaxScriptUrl = $"https://mathjax.local/{Path.GetRelativePath(mathJaxAssetsPath, mathJaxPath).Replace(Path.DirectorySeparatorChar, '/')}";
-            await context.RouteAsync("**/*", async route =>
-            {
-                var uri = new Uri(route.Request.Url);
-                if (string.Equals(uri.Host, "mathjax.local", StringComparison.OrdinalIgnoreCase))
-                {
-                    var relativePath = uri.AbsolutePath.TrimStart('/');
-                    var assetPath = Path.GetFullPath(Path.Combine(
-                        mathJaxAssetsPath,
-                        relativePath.Replace('/', Path.DirectorySeparatorChar)));
-
-                    if (!assetPath.StartsWith(mathJaxAssetsRoot, StringComparison.Ordinal)
-                        || !File.Exists(assetPath))
-                    {
-                        await route.AbortAsync();
-                        return;
-                    }
-
-                    await route.FulfillAsync(new RouteFulfillOptions { Path = assetPath });
-                    return;
-                }
-
-                if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
-                {
-                    await route.AbortAsync();
-                    return;
-                }
-
-                await route.ContinueAsync();
-            });
-            var page = await context.NewPageAsync();
-            await page.EmulateMediaAsync(new PageEmulateMediaOptions { Media = Microsoft.Playwright.Media.Print });
-            await page.SetContentAsync(html, new PageSetContentOptions { WaitUntil = WaitUntilState.Load });
-
-            await page.AddScriptTagAsync(new PageAddScriptTagOptions
-            {
-                Url = mathJaxScriptUrl
-            });
-            await page.EvaluateAsync("""
-                async () => {
-                    await document.fonts.ready;
-                    if (!window.MathJax?.startup?.promise) {
-                        throw new Error('MathJax did not initialize.');
-                    }
-
-                    if (typeof window.MathJax.typesetPromise !== 'function') {
-                        window.MathJax.startup.defaultReady();
-                    }
-
-                    await window.MathJax.startup.promise;
-                    if (typeof window.MathJax.typesetPromise !== 'function') {
-                        throw new Error('MathJax typesetting API did not initialize.');
-                    }
-
-                    await window.MathJax.typesetPromise();
-                    await document.fonts.ready;
-                    document.documentElement.dataset.pdfReady = 'true';
-                }
-                """);
-
-            var pdf = await page.PdfAsync(new PagePdfOptions
-            {
-                Format = "A4",
-                PrintBackground = true,
-                PreferCSSPageSize = true
-            });
+            await using var context = await browser.NewContextAsync().WaitAsync(timeout.Token);
+            var pdf = await AwaitWithContextCancellationAsync(
+                RenderInContextAsync(context, html),
+                () => context.CloseAsync(),
+                timeout.Token);
 
             if (pdf.Length < 5 || !pdf.AsSpan(0, 5).SequenceEqual("%PDF-"u8))
             {
@@ -157,6 +75,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            await ResetBrowserAsync();
             throw new PdfRenderingException("The article PDF renderer timed out.");
         }
         catch (PlaywrightException exception)
@@ -167,7 +86,129 @@ internal sealed class PlaywrightArticlePdfRenderer(
         }
         finally
         {
-            _renderSlots.Release();
+            if (renderSlotAcquired)
+            {
+                _renderSlots.Release();
+            }
+        }
+    }
+
+    private async Task<byte[]> RenderInContextAsync(IBrowserContext context, string html)
+    {
+        context.SetDefaultTimeout((float)settings.Timeout.TotalMilliseconds);
+
+        var mathJaxAssetsPath = Path.GetFullPath(settings.MathJaxAssetsPath);
+        if (!Directory.Exists(mathJaxAssetsPath))
+        {
+            throw new PdfRenderingException(
+                $"The local MathJax assets were not found at '{settings.MathJaxAssetsPath}'.");
+        }
+
+        var mathJaxAssetsRoot = mathJaxAssetsPath.EndsWith(Path.DirectorySeparatorChar)
+            ? mathJaxAssetsPath
+            : $"{mathJaxAssetsPath}{Path.DirectorySeparatorChar}";
+        var mathJaxPath = Path.GetFullPath(settings.MathJaxPath);
+        if (!File.Exists(mathJaxPath))
+        {
+            throw new PdfRenderingException(
+                $"The local MathJax asset was not found at '{settings.MathJaxPath}'.");
+        }
+
+        if (!mathJaxPath.StartsWith(mathJaxAssetsRoot, StringComparison.Ordinal))
+        {
+            throw new PdfRenderingException(
+                $"The local MathJax asset must be located under '{settings.MathJaxAssetsPath}'.");
+        }
+
+        var mathJaxScriptUrl = $"https://mathjax.local/{Path.GetRelativePath(mathJaxAssetsPath, mathJaxPath).Replace(Path.DirectorySeparatorChar, '/')}";
+        await context.RouteAsync("**/*", async route =>
+        {
+            var uri = new Uri(route.Request.Url);
+            if (string.Equals(uri.Host, "mathjax.local", StringComparison.OrdinalIgnoreCase))
+            {
+                var relativePath = uri.AbsolutePath.TrimStart('/');
+                var assetPath = Path.GetFullPath(Path.Combine(
+                    mathJaxAssetsPath,
+                    relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+                if (!assetPath.StartsWith(mathJaxAssetsRoot, StringComparison.Ordinal)
+                    || !File.Exists(assetPath))
+                {
+                    await route.AbortAsync();
+                    return;
+                }
+
+                await route.FulfillAsync(new RouteFulfillOptions { Path = assetPath });
+                return;
+            }
+
+            if (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+            {
+                await route.AbortAsync();
+                return;
+            }
+
+            await route.ContinueAsync();
+        });
+        var page = await context.NewPageAsync();
+        await page.EmulateMediaAsync(new PageEmulateMediaOptions { Media = Microsoft.Playwright.Media.Print });
+        await page.SetContentAsync(html, new PageSetContentOptions { WaitUntil = WaitUntilState.Load });
+
+        await page.AddScriptTagAsync(new PageAddScriptTagOptions
+        {
+            Url = mathJaxScriptUrl
+        });
+        await page.EvaluateAsync("""
+            async () => {
+                await document.fonts.ready;
+                if (!window.MathJax?.startup?.promise) {
+                    throw new Error('MathJax did not initialize.');
+                }
+
+                if (typeof window.MathJax.typesetPromise !== 'function') {
+                    window.MathJax.startup.defaultReady();
+                }
+
+                await window.MathJax.startup.promise;
+                if (typeof window.MathJax.typesetPromise !== 'function') {
+                    throw new Error('MathJax typesetting API did not initialize.');
+                }
+
+                await window.MathJax.typesetPromise();
+                await document.fonts.ready;
+                document.documentElement.dataset.pdfReady = 'true';
+            }
+            """);
+
+        return await page.PdfAsync(new PagePdfOptions
+        {
+            Format = "A4",
+            PrintBackground = true,
+            PreferCSSPageSize = true
+        });
+    }
+
+    internal static async Task<T> AwaitWithContextCancellationAsync<T>(
+        Task<T> renderTask,
+        Func<Task> closeContext,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await renderTask.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await closeContext();
+            }
+            catch (PlaywrightException)
+            {
+                // A disconnected Chromium cannot acknowledge context closure.
+            }
+
+            throw;
         }
     }
 

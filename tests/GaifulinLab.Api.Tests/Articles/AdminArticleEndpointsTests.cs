@@ -18,6 +18,8 @@ namespace GaifulinLab.Api.Tests.Articles;
 public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory)
     : IClassFixture<AuthWebApplicationFactory>
 {
+    private static int _nextTestClientIp;
+
     [Fact]
     public async Task Articles_WithoutBearerToken_ReturnsUnauthorized()
     {
@@ -294,6 +296,7 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         AuthWebApplicationFactory applicationFactory)
     {
         var client = applicationFactory.CreateClient();
+        AssignUniqueClientIp(client);
         var response = await client.PostAsJsonAsync(
             "/api/auth/login",
             new LoginRequest(AuthWebApplicationFactory.AdminLogin, AuthWebApplicationFactory.AdminPassword));
@@ -320,10 +323,19 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         }
 
         var client = applicationFactory.CreateClient();
+        AssignUniqueClientIp(client);
         var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(login, password));
         response.EnsureSuccessStatusCode();
         var token = await response.Content.ReadFromJsonAsync<LoginResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token!.AccessToken);
         return client;
+    }
+
+    private static void AssignUniqueClientIp(HttpClient client)
+    {
+        var address = (uint)Interlocked.Increment(ref _nextTestClientIp);
+        client.DefaultRequestHeaders.Add(
+            "X-Forwarded-For",
+            $"10.{address >> 16 & 255}.{address >> 8 & 255}.{address & 255}");
     }
 }

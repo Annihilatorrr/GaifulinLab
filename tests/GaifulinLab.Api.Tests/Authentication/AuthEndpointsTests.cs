@@ -26,7 +26,8 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     {
         var login = $"new-user-{Guid.NewGuid():N}@example.com";
         const string displayName = "Ada Lovelace";
-        using var client = factory.CreateClient();
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = isolatedFactory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/register",
@@ -37,7 +38,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
         var registration = await response.Content.ReadFromJsonAsync<RegisterResponse>();
         Assert.Equal(login, registration?.Login);
 
-        await using var scope = factory.Services.CreateAsyncScope();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await userManager.FindByNameAsync(login);
         Assert.NotNull(user);
@@ -50,7 +51,8 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     public async Task Register_WithDuplicateLogin_ReturnsConflict()
     {
         var login = $"duplicate-{Guid.NewGuid():N}@example.com";
-        using var client = factory.CreateClient();
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = isolatedFactory.CreateClient();
         var request = new RegisterRequest(login, "Ada Lovelace", "Strong-password-1!");
 
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/auth/register", request)).StatusCode);
@@ -64,7 +66,8 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     [Fact]
     public async Task Register_WithNonEmailLogin_ReturnsEmailValidationError()
     {
-        using var client = factory.CreateClient();
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = isolatedFactory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/register",
@@ -79,7 +82,8 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     [Fact]
     public async Task Register_WithWeakPassword_ReturnsPasswordValidationErrors()
     {
-        using var client = factory.CreateClient();
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = isolatedFactory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/register",
@@ -149,6 +153,73 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task Login_WhenUserIsLockedOut_ReturnsGenericUnauthorizedError()
+    {
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await userManager.FindByNameAsync(AuthWebApplicationFactory.AdminLogin);
+            Assert.NotNull(user);
+            Assert.True((await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddMinutes(1))).Succeeded);
+            Assert.True(await userManager.IsLockedOutAsync(user));
+        }
+
+        using var client = isolatedFactory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(AuthWebApplicationFactory.AdminLogin, AuthWebApplicationFactory.AdminPassword));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+        Assert.Equal("invalid_credentials", error?.Code);
+    }
+
+    [Fact]
+    public async Task Login_WithInvalidPassword_RecordsFailuresAndLocksAccount()
+    {
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = isolatedFactory.CreateClient();
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var response = await client.PostAsJsonAsync(
+                "/api/auth/login",
+                new LoginRequest(AuthWebApplicationFactory.AdminLogin, "wrong-password"));
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await userManager.FindByNameAsync(AuthWebApplicationFactory.AdminLogin);
+        Assert.NotNull(user);
+        Assert.True(await userManager.IsLockedOutAsync(user));
+    }
+
+    [Fact]
+    public async Task Login_WithValidPassword_ResetsFailedAccessCount()
+    {
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = isolatedFactory.CreateClient();
+
+        var failedLogin = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(AuthWebApplicationFactory.AdminLogin, "wrong-password"));
+        Assert.Equal(HttpStatusCode.Unauthorized, failedLogin.StatusCode);
+
+        var successfulLogin = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(AuthWebApplicationFactory.AdminLogin, AuthWebApplicationFactory.AdminPassword));
+        Assert.Equal(HttpStatusCode.OK, successfulLogin.StatusCode);
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await userManager.FindByNameAsync(AuthWebApplicationFactory.AdminLogin);
+        Assert.NotNull(user);
+        Assert.Equal(0, await userManager.GetAccessFailedCountAsync(user));
+    }
+
+    [Fact]
     public async Task Session_WithoutBearerToken_ReturnsUnauthorized()
     {
         using var client = factory.CreateClient();
@@ -183,7 +254,8 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     [Fact]
     public async Task Register_WithInvalidDisplayName_ReturnsValidationError()
     {
-        using var client = factory.CreateClient();
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = isolatedFactory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/register",

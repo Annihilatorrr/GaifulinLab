@@ -16,10 +16,18 @@ internal sealed class UserAuthenticationService(
         ArgumentNullException.ThrowIfNull(password);
 
         var user = await userManager.FindByNameAsync(login);
-        if (user is null || !await userManager.CheckPasswordAsync(user, password))
+        if (user is null || await userManager.IsLockedOutAsync(user))
         {
             return null;
         }
+
+        if (!await userManager.CheckPasswordAsync(user, password))
+        {
+            await userManager.AccessFailedAsync(user);
+            return null;
+        }
+
+        await userManager.ResetAccessFailedCountAsync(user);
 
         var issuedAt = DateTimeOffset.UtcNow;
         var expiresAt = issuedAt.Add(settings.TokenLifetime);
