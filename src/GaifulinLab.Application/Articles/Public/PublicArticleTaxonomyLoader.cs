@@ -17,13 +17,16 @@ internal static class PublicArticleTaxonomyLoader
             return PublicArticleTaxonomy.Empty;
         }
 
-        var topics = await (
-                from link in dbContext.ArticleTopics.AsNoTracking()
-                join localization in dbContext.TopicLocalizations.AsNoTracking()
-                    on link.TopicId equals localization.TopicId
-                where articleIds.Contains(link.ArticleId)
-                    && localization.LanguageCode == languageCode
-                select new
+        var topics = await dbContext.ArticleTopics
+            .AsNoTracking()
+            .Where(link => articleIds.Contains(link.ArticleId))
+            .Join(
+                dbContext.TopicLocalizations
+                    .AsNoTracking()
+                    .Where(localization => localization.LanguageCode == languageCode),
+                link => link.TopicId,
+                localization => localization.TopicId,
+                (link, localization) => new
                 {
                     link.ArticleId,
                     localization.Slug,
@@ -31,13 +34,16 @@ internal static class PublicArticleTaxonomyLoader
                 })
             .ToListAsync(cancellationToken);
 
-        var series = await (
-                from link in dbContext.ArticleSeries.AsNoTracking()
-                join localization in dbContext.SeriesLocalizations.AsNoTracking()
-                    on link.SeriesId equals localization.SeriesId
-                where articleIds.Contains(link.ArticleId)
-                    && localization.LanguageCode == languageCode
-                select new
+        var series = await dbContext.ArticleSeries
+            .AsNoTracking()
+            .Where(link => articleIds.Contains(link.ArticleId))
+            .Join(
+                dbContext.SeriesLocalizations
+                    .AsNoTracking()
+                    .Where(localization => localization.LanguageCode == languageCode),
+                link => link.SeriesId,
+                localization => localization.SeriesId,
+                (link, localization) => new
                 {
                     link.ArticleId,
                     localization.Slug,
@@ -45,11 +51,14 @@ internal static class PublicArticleTaxonomyLoader
                 })
             .ToListAsync(cancellationToken);
 
-        var tags = await (
-                from link in dbContext.ArticleTags.AsNoTracking()
-                join tag in dbContext.Tags.AsNoTracking() on link.TagId equals tag.Id
-                where articleIds.Contains(link.ArticleId)
-                select new { link.ArticleId, tag.Name })
+        var tags = await dbContext.ArticleTags
+            .AsNoTracking()
+            .Where(link => articleIds.Contains(link.ArticleId))
+            .Join(
+                dbContext.Tags.AsNoTracking(),
+                link => link.TagId,
+                tag => tag.Id,
+                (link, tag) => new { link.ArticleId, tag.Name })
             .ToListAsync(cancellationToken);
 
         return new PublicArticleTaxonomy(

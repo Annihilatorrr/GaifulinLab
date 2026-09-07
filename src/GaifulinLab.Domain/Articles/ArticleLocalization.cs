@@ -28,6 +28,8 @@ public sealed class ArticleLocalization
 
     public Guid ArticleId { get; private set; }
 
+    public Article Article { get; private set; } = null!;
+
     public string LanguageCode { get; private set; } = string.Empty;
 
     public string? Slug { get; private set; }

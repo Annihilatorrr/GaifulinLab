@@ -233,15 +233,12 @@ public sealed class PublicContentController(
                 : null);
 
     private Task<PdfExportJob?> GetPublishedPdfExport(Guid id, CancellationToken cancellationToken) =>
-        (
-            from job in dbContext.PdfExportJobs.AsNoTracking()
-            join localization in dbContext.ArticleLocalizations.AsNoTracking()
-                on job.ArticleLocalizationId equals localization.Id
-            join article in dbContext.Articles.AsNoTracking()
-                on localization.ArticleId equals article.Id
-            where job.Id == id
-                && article.DeletedAt == null
-                && localization.Status == PublicationStatus.Published
-            select job)
-        .SingleOrDefaultAsync(cancellationToken);
+        dbContext.PdfExportJobs
+            .AsNoTracking()
+            .Where(job => job.Id == id
+                && dbContext.ArticleLocalizations.Any(localization =>
+                    localization.Id == job.ArticleLocalizationId
+                    && localization.Article.DeletedAt == null
+                    && localization.Status == PublicationStatus.Published))
+            .SingleOrDefaultAsync(cancellationToken);
 }

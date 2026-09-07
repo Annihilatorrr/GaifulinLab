@@ -705,11 +705,12 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("GaifulinLab.Domain.Articles.ArticleLocalization", b =>
                 {
-                    b.HasOne("GaifulinLab.Domain.Articles.Article", null)
+                    b.HasOne("GaifulinLab.Domain.Articles.Article", "Article")
                         .WithMany("Localizations")
                         .HasForeignKey("ArticleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                    b.Navigation("Article");
                 });
 
             modelBuilder.Entity("GaifulinLab.Domain.Articles.ArticleTag", b =>

@@ -25,26 +25,27 @@ internal sealed class GetPublicSeriesDetailsQueryHandler(
             .SingleOrDefaultAsync(candidate => candidate.LanguageCode == languageCode
                 && candidate.Slug == slug, cancellationToken)
             ?? throw new ResourceNotFoundException("Series", $"{languageCode}/{slug}");
-        var rows = await (
-                from link in dbContext.ArticleSeries.AsNoTracking()
-                join articleLocalization in dbContext.ArticleLocalizations.AsNoTracking()
-                    on link.ArticleId equals articleLocalization.ArticleId
-                join article in dbContext.Articles.AsNoTracking()
-                    on link.ArticleId equals article.Id
-                where link.SeriesId == localization.SeriesId
-                    && article.DeletedAt == null
-                    && articleLocalization.LanguageCode == languageCode
-                    && articleLocalization.Status == PublicationStatus.Published
-                orderby link.Position
-                select new
+        var rows = await dbContext.ArticleSeries
+            .AsNoTracking()
+            .Where(link => link.SeriesId == localization.SeriesId)
+            .Join(
+                dbContext.ArticleLocalizations
+                    .AsNoTracking()
+                    .Where(articleLocalization => articleLocalization.Article.DeletedAt == null
+                        && articleLocalization.LanguageCode == languageCode
+                        && articleLocalization.Status == PublicationStatus.Published),
+                link => link.ArticleId,
+                articleLocalization => articleLocalization.ArticleId,
+                (link, articleLocalization) => new
                 {
                     link.Position,
                     articleLocalization.Slug,
                     articleLocalization.Title,
                     articleLocalization.Summary,
                     articleLocalization.PublishedAt,
-                    article.OwnerUserId
+                    articleLocalization.Article.OwnerUserId
                 })
+            .OrderBy(row => row.Position)
             .ToListAsync(cancellationToken);
         var authorDisplayNames = await authorDisplayNameLookup.GetDisplayNamesAsync(
             rows.Select(row => row.OwnerUserId).ToArray(),

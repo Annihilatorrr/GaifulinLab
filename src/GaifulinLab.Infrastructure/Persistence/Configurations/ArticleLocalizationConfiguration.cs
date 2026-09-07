@@ -46,7 +46,7 @@ internal sealed class ArticleLocalizationConfiguration : IEntityTypeConfiguratio
         builder.Property(localization => localization.UpdatedAt).IsRequired();
         builder.Property(localization => localization.LastEditedAt).IsRequired();
 
-        builder.HasOne<Article>()
+        builder.HasOne(localization => localization.Article)
             .WithMany(article => article.Localizations)
             .HasForeignKey(localization => localization.ArticleId)
             .OnDelete(DeleteBehavior.Cascade);

@@ -15,14 +15,12 @@ internal sealed class GetPublicTopicsQueryHandler(IAppDbContext dbContext)
         CancellationToken cancellationToken)
     {
         var languageCode = DomainRules.NormalizeLanguageCode(request.LanguageCode);
-        var publishedArticleIds = await (
-                from localization in dbContext.ArticleLocalizations.AsNoTracking()
-                join article in dbContext.Articles.AsNoTracking()
-                    on localization.ArticleId equals article.Id
-                where article.DeletedAt == null
-                    && localization.LanguageCode == languageCode
-                    && localization.Status == PublicationStatus.Published
-                select localization.ArticleId)
+        var publishedArticleIds = await dbContext.ArticleLocalizations
+            .AsNoTracking()
+            .Where(localization => localization.Article.DeletedAt == null
+                && localization.LanguageCode == languageCode
+                && localization.Status == PublicationStatus.Published)
+            .Select(localization => localization.ArticleId)
             .ToListAsync(cancellationToken);
         var links = await dbContext.ArticleTopics
             .AsNoTracking()
