@@ -70,7 +70,10 @@ public sealed class AppDbContextModelTests
         var articleType = context.Model.FindEntityType(typeof(Article))!;
         Assert.Contains(articleType.GetIndexes(), index =>
             index.Properties.Select(property => property.Name).SequenceEqual(
-                [nameof(Article.OwnerUserId), nameof(Article.UpdatedAt)]));
+                [nameof(Article.OwnerUserId), nameof(Article.DeletedAt), nameof(Article.UpdatedAt)]));
+        Assert.NotNull(articleType.FindProperty(nameof(Article.DeletedAt)));
+        Assert.NotNull(context.Model.FindEntityType(typeof(ArticleLocalization))!
+            .FindProperty(nameof(ArticleLocalization.LastEditedAt)));
         Assert.Contains(articleType.GetForeignKeys(), foreignKey =>
             foreignKey.Properties.Select(property => property.Name).SequenceEqual([nameof(Article.OwnerUserId)])
             && foreignKey.PrincipalEntityType.ClrType == typeof(ApplicationUser)
@@ -98,6 +101,9 @@ public sealed class AppDbContextModelTests
         Assert.Contains("ux_article_localizations_language_slug", script);
         Assert.Contains("ux_article_series_series_position", script);
         Assert.Contains("ck_article_localizations_status", script);
+        Assert.Contains("Unpublished", script);
+        Assert.Contains("DeletedAt", script);
+        Assert.Contains("LastEditedAt", script);
         Assert.Contains("ck_article_series_position_positive", script);
         Assert.Contains("media_assets", script);
         Assert.Contains("pdf_export_jobs", script);

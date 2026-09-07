@@ -1,5 +1,6 @@
 using GaifulinLab.Application.Common;
 using GaifulinLab.Application.Persistence;
+using GaifulinLab.Domain.Articles;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +15,9 @@ internal sealed class SetArticlePublicationCommandHandler(
         var article = await dbContext.Articles
             .Include(candidate => candidate.Localizations)
             .SingleOrDefaultAsync(
-                candidate => candidate.Id == request.ArticleId && candidate.OwnerUserId == request.UserId,
+                candidate => candidate.Id == request.ArticleId
+                    && candidate.OwnerUserId == request.UserId
+                    && candidate.DeletedAt == null,
                 cancellationToken)
             ?? throw new ResourceNotFoundException("Article", request.ArticleId);
 
@@ -24,13 +27,17 @@ internal sealed class SetArticlePublicationCommandHandler(
         }
 
         var now = timeProvider.GetUtcNow();
-        if (request.Publish)
+        if (request.TargetStatus == PublicationStatus.Published)
         {
             article.PublishLocalization(request.LanguageCode, now);
         }
-        else
+        else if (request.TargetStatus == PublicationStatus.Unpublished)
         {
             article.UnpublishLocalization(request.LanguageCode, now);
+        }
+        else
+        {
+            throw new ArgumentException("The target status must be Published or Unpublished.", nameof(request));
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

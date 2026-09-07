@@ -18,6 +18,7 @@
                             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Zm9.5 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /></svg>
                             <span>@_article.ViewCount @ViewCountLabel</span>
                         </span>
+                        <time datetime="@_article.LastEditedAt.ToString("O")">Last edited @_article.LastEditedAt.ToLocalTime().ToString("d MMM yyyy")</time>
                     </div>
                     @if (_typographyReady)
                     {

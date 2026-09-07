@@ -61,6 +61,22 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
             null);
         Assert.Equal(HttpStatusCode.NoContent, publishResponse.StatusCode);
 
+        var unpublishResponse = await client.PostAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en/unpublish",
+            null);
+        Assert.Equal(HttpStatusCode.NoContent, unpublishResponse.StatusCode);
+
+        var unpublishedArticle = await client.GetFromJsonAsync<AdminArticleDetailsDto>(
+            $"/api/admin/articles/{created.ArticleId}");
+        Assert.Equal(
+            PublicationStatusDto.Unpublished,
+            unpublishedArticle!.Localizations.Single(localization => localization.LanguageCode == "en").Status);
+
+        var republishResponse = await client.PostAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en/publish",
+            null);
+        Assert.Equal(HttpStatusCode.NoContent, republishResponse.StatusCode);
+
         var article = await client.GetFromJsonAsync<AdminArticleDetailsDto>(
             $"/api/admin/articles/{created.ArticleId}");
         Assert.NotNull(article);
@@ -86,6 +102,52 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
 
         var missingResponse = await client.GetAsync($"/api/admin/articles/{created.ArticleId}");
         Assert.Equal(HttpStatusCode.NotFound, missingResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(
+            $"/api/public/articles/en/{slug}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync(
+            $"/api/public/articles/en/{slug}/views", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync(
+            $"/api/public/articles/en/{slug}/pdf-exports", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest("Changed", null, "# Changed", "changed"))).StatusCode);
+
+        var listAfterDelete = await client.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>(
+            "/api/admin/articles");
+        Assert.DoesNotContain(listAfterDelete!, item => item.Id == created.ArticleId);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var deleted = await dbContext.Articles.FindAsync(created.ArticleId);
+        Assert.NotNull(deleted);
+        Assert.NotNull(deleted!.DeletedAt);
+        Assert.True(dbContext.ArticleLocalizations.Any(
+            localization => localization.ArticleId == created.ArticleId));
+    }
+
+    [Fact]
+    public async Task Unpublish_RejectsDraftAndMakesTheLocalizationPrivateUntilRepublished()
+    {
+        using var client = await CreateAuthenticatedClient();
+        var slug = $"lifecycle-{Guid.NewGuid():N}";
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest("en", "Title", null, "# Content", slug));
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(created);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync(
+            $"/api/admin/articles/{created!.ArticleId}/localizations/en/unpublish", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en/publish", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(
+            $"/api/public/articles/en/{slug}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en/unpublish", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(
+            $"/api/public/articles/en/{slug}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en/publish", null)).StatusCode);
     }
 
     [Fact]

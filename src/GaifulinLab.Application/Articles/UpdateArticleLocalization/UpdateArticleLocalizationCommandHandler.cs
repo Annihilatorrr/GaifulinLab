@@ -14,7 +14,9 @@ internal sealed class UpdateArticleLocalizationCommandHandler(
         var article = await dbContext.Articles
             .Include(candidate => candidate.Localizations)
             .SingleOrDefaultAsync(
-                candidate => candidate.Id == request.ArticleId && candidate.OwnerUserId == request.UserId,
+                candidate => candidate.Id == request.ArticleId
+                    && candidate.OwnerUserId == request.UserId
+                    && candidate.DeletedAt == null,
                 cancellationToken)
             ?? throw new ResourceNotFoundException("Article", request.ArticleId);
 

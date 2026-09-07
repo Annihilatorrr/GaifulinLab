@@ -20,7 +20,9 @@ internal sealed class GetAdminArticleQueryHandler(IAppDbContext dbContext)
             .Include(candidate => candidate.Tags)
             // Returning not found also avoids exposing another author's draft by id.
             .SingleOrDefaultAsync(
-                candidate => candidate.Id == request.ArticleId && candidate.OwnerUserId == request.UserId,
+                candidate => candidate.Id == request.ArticleId
+                    && candidate.OwnerUserId == request.UserId
+                    && candidate.DeletedAt == null,
                 cancellationToken)
             ?? throw new ResourceNotFoundException("Article", request.ArticleId);
 

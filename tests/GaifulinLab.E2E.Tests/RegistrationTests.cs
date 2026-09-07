@@ -32,11 +32,11 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = $"Welcome, {login}" }))
             .ToBeVisibleAsync();
-        await Expect(Page.GetByText("Workspace access is granted separately"))
+        await Expect(Page.GetByText("Your account is ready. Sign in to create and manage your own articles."))
             .ToBeVisibleAsync();
 
         await SignInAsync(login, password);
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Articles could not be loaded" }))
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "My articles" }))
             .ToBeVisibleAsync();
 
         await Page.EvaluateAsync("sessionStorage.clear()");
@@ -55,6 +55,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
+        var articleId = ExtractArticleId();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Publish" }).ClickAsync();
         await Expect(Page.Locator(".publication-status")).ToHaveTextAsync("Published");
 
@@ -63,6 +64,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Expect(Page.GetByText(summary, new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.Locator("article.article-body")).ToContainTextAsync(body);
         await Expect(Page.Locator(".article-views")).ToContainTextAsync("1 views");
+        await Expect(Page.GetByText(new Regex("^Last edited "))).ToBeVisibleAsync();
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/topics").ToString());
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = topic.Name })).ToBeVisibleAsync();
@@ -84,7 +86,29 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/tags").ToString());
         await Expect(Page.GetByText($"#{tag}")).ToBeVisibleAsync();
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{articleId}").ToString());
+        await Page.GetByLabel("More article actions").ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Unpublish", Exact = true }).ClickAsync();
+        await Expect(Page.Locator(".publication-status")).ToHaveTextAsync("Unpublished");
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/articles/{slug}").ToString());
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Article not found" })).ToBeVisibleAsync();
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{articleId}").ToString());
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Publish", Exact = true }).ClickAsync();
+        await Expect(Page.Locator(".publication-status")).ToHaveTextAsync("Published");
+
+        Page.Dialog += async (_, dialog) => await dialog.AcceptAsync();
+        await Page.GetByLabel("More article actions").ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Delete article", Exact = true }).ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles$"));
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/articles/{slug}").ToString());
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Article not found" })).ToBeVisibleAsync();
     }
+
+    private string ExtractArticleId() => new Uri(Page.Url).Segments[^1].Trim('/');
 
     private async Task SignInAsync(string login, string password)
     {

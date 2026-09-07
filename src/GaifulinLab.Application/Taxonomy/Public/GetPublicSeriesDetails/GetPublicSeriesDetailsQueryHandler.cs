@@ -26,7 +26,10 @@ internal sealed class GetPublicSeriesDetailsQueryHandler(IAppDbContext dbContext
                 from link in dbContext.ArticleSeries.AsNoTracking()
                 join articleLocalization in dbContext.ArticleLocalizations.AsNoTracking()
                     on link.ArticleId equals articleLocalization.ArticleId
+                join article in dbContext.Articles.AsNoTracking()
+                    on link.ArticleId equals article.Id
                 where link.SeriesId == localization.SeriesId
+                    && article.DeletedAt == null
                     && articleLocalization.LanguageCode == languageCode
                     && articleLocalization.Status == PublicationStatus.Published
                 orderby link.Position

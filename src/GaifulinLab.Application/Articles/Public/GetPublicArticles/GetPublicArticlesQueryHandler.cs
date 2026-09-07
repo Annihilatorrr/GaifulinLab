@@ -23,7 +23,7 @@ internal sealed class GetPublicArticlesQueryHandler(IAppDbContext dbContext)
 
         var query = dbContext.Articles
             .AsNoTracking()
-            .Where(article => article.Localizations.Any(localization =>
+            .Where(article => article.DeletedAt == null && article.Localizations.Any(localization =>
                 localization.LanguageCode == languageCode
                 && localization.Status == PublicationStatus.Published));
 

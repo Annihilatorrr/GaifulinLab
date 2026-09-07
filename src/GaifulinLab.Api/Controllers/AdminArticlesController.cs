@@ -7,6 +7,7 @@ using GaifulinLab.Application.Articles.UpdateArticleLocalization;
 using GaifulinLab.Application.Articles.UpdateArticleTaxonomy;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Contracts.Common;
+using GaifulinLab.Domain.Articles;
 using GaifulinLab.Infrastructure.Authentication;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -88,7 +89,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
         Guid articleId,
         string languageCode,
         CancellationToken cancellationToken) =>
-        SetPublication(articleId, languageCode, true, cancellationToken);
+        SetPublication(articleId, languageCode, PublicationStatus.Published, cancellationToken);
 
     [HttpPost("{articleId:guid}/localizations/{languageCode}/unpublish")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -97,7 +98,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
         Guid articleId,
         string languageCode,
         CancellationToken cancellationToken) =>
-        SetPublication(articleId, languageCode, false, cancellationToken);
+        SetPublication(articleId, languageCode, PublicationStatus.Unpublished, cancellationToken);
 
     [HttpPut("{articleId:guid}/taxonomy")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -132,11 +133,11 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
     private async Task<IActionResult> SetPublication(
         Guid articleId,
         string languageCode,
-        bool publish,
+        PublicationStatus targetStatus,
         CancellationToken cancellationToken)
     {
         await sender.Send(
-            new SetArticlePublicationCommand(articleId, GetCurrentUserId(), languageCode, publish),
+            new SetArticlePublicationCommand(articleId, GetCurrentUserId(), languageCode, targetStatus),
             cancellationToken);
 
         return NoContent();

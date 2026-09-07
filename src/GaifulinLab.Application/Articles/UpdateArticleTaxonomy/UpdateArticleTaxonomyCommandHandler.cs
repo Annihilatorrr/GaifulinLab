@@ -18,7 +18,9 @@ internal sealed class UpdateArticleTaxonomyCommandHandler(
             .Include(candidate => candidate.Topics)
             .Include(candidate => candidate.Tags)
             .SingleOrDefaultAsync(
-                candidate => candidate.Id == request.ArticleId && candidate.OwnerUserId == request.UserId,
+                candidate => candidate.Id == request.ArticleId
+                    && candidate.OwnerUserId == request.UserId
+                    && candidate.DeletedAt == null,
                 cancellationToken)
             ?? throw new ResourceNotFoundException("Article", request.ArticleId);
 

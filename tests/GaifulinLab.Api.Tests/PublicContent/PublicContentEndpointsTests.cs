@@ -53,6 +53,7 @@ public sealed class PublicContentEndpointsTests
         Assert.Contains("<strong>safe</strong>", article.Html);
         Assert.DoesNotContain("<script", article.Html, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, article.ViewCount);
+        Assert.Equal(article.PublishedAt, article.LastEditedAt);
         Assert.Equal(
             [
                 new AvailableLocalizationDto("en", "/en/articles/understanding-fft"),
@@ -63,10 +64,12 @@ public sealed class PublicContentEndpointsTests
         var noFallback = await client.GetAsync("/api/public/articles/ru/understanding-fft");
         var russian = await client.GetAsync("/api/public/articles/ru/kak-rabotaet-fft");
         var draft = await client.GetAsync("/api/public/articles/en/future-draft");
+        var deleted = await client.GetAsync("/api/public/articles/en/deleted-published");
 
         Assert.Equal(HttpStatusCode.NotFound, noFallback.StatusCode);
         Assert.Equal(HttpStatusCode.OK, russian.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, draft.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deleted.StatusCode);
     }
 
     [Fact]
@@ -109,6 +112,9 @@ public sealed class PublicContentEndpointsTests
         var response = await client.PostAsync("/api/public/articles/en/future-draft/views", content: null);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var deletedResponse = await client.PostAsync("/api/public/articles/en/deleted-published/views", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, deletedResponse.StatusCode);
     }
 
     [Fact]
@@ -176,6 +182,9 @@ public sealed class PublicContentEndpointsTests
         var response = await client.PostAsync("/api/public/articles/en/future-draft/pdf-exports", content: null);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var deletedResponse = await client.PostAsync("/api/public/articles/en/deleted-published/pdf-exports", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, deletedResponse.StatusCode);
     }
 
     [Fact]
@@ -194,6 +203,35 @@ public sealed class PublicContentEndpointsTests
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
         Assert.Equal("pdf_export_not_ready", error?.Code);
+    }
+
+    [Fact]
+    public async Task ExistingPdfExport_BecomesUnavailableWhenItsArticleIsDeleted()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        await SeedContent(factory.Services);
+        using var client = factory.CreateClient();
+
+        var created = await client.PostAsync(
+            "/api/public/articles/en/understanding-fft/pdf-exports",
+            content: null);
+        var export = await created.Content.ReadFromJsonAsync<PdfExportStatusDto>();
+        Assert.NotNull(export);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var articleId = dbContext.ArticleLocalizations.Single(
+                localization => localization.Slug == "understanding-fft").ArticleId;
+            var article = dbContext.Articles.Single(item => item.Id == articleId);
+            article.Delete(DateTimeOffset.UtcNow);
+            await dbContext.SaveChangesAsync();
+        }
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(
+            $"/api/public/pdf-exports/{export!.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(
+            $"/api/public/pdf-exports/{export.Id}/download")).StatusCode);
     }
 
     private static async Task SeedContent(IServiceProvider services)
@@ -262,7 +300,21 @@ public sealed class PublicContentEndpointsTests
         draft.AssignTag(tag, now);
         series.AddArticle(draft, 2, now);
 
-        dbContext.AddRange(article, draft, topic, series, tag);
+        var deleted = Article.Create(
+            "test-owner",
+            "en",
+            now,
+            "Deleted published article",
+            null,
+            "This article must remain private.",
+            "deleted-published");
+        deleted.PublishLocalization("en", now);
+        deleted.AssignTopic(topic, now);
+        deleted.AssignTag(tag, now);
+        series.AddArticle(deleted, 3, now);
+        deleted.Delete(now.AddHours(1));
+
+        dbContext.AddRange(article, draft, deleted, topic, series, tag);
         await dbContext.SaveChangesAsync();
     }
 

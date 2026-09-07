@@ -9,4 +9,5 @@ public sealed record AdminArticleLocalizationDto(
     string Markdown,
     PublicationStatusDto Status,
     DateTimeOffset? PublishedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset LastEditedAt);

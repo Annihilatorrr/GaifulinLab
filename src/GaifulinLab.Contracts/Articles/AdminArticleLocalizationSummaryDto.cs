@@ -7,4 +7,5 @@ public sealed record AdminArticleLocalizationSummaryDto(
     string Title,
     PublicationStatusDto Status,
     DateTimeOffset? PublishedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset LastEditedAt);

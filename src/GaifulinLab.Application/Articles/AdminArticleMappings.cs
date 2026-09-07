@@ -14,7 +14,8 @@ internal static class AdminArticleMappings
         localization.Markdown,
         (PublicationStatusDto)localization.Status,
         localization.PublishedAt,
-        localization.UpdatedAt);
+        localization.UpdatedAt,
+        localization.LastEditedAt);
 
     public static AdminArticleLocalizationSummaryDto ToSummary(this ArticleLocalization localization) => new(
         localization.Id,
@@ -23,5 +24,6 @@ internal static class AdminArticleMappings
         localization.Title,
         (PublicationStatusDto)localization.Status,
         localization.PublishedAt,
-        localization.UpdatedAt);
+        localization.UpdatedAt,
+        localization.LastEditedAt);
 }

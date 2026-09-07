@@ -28,7 +28,7 @@
                        value="@Current.Title" @oninput="HandleTitleInput" disabled="@_loading" />
             </label>
         </div>
-        <span class="publication-status @(Current.Status == PublicationStatusDto.Published ? "is-published" : "is-draft")">@Current.Status</span>
+        <span class="publication-status @StatusClass">@Current.Status</span>
         <div class="editor-actions" aria-label="Article actions">
             <div class="save-action">
                 <button class="button button-primary" type="button" disabled="@(!CanSave)" @onclick="SaveAsync">@SaveButtonLabel</button>
@@ -42,7 +42,7 @@
                           role="@(_hasError ? "alert" : "status")">@_message</span>
                 }
             </div>
-            @if (Current.Status != PublicationStatusDto.Published)
+            @if (CanPublishCurrent)
             {
                 <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="PublishAsync">Publish</button>
             }
@@ -263,6 +263,13 @@
     private LocalizationModel Current => _localizations[_activeLanguage];
     private bool IsBusy => _loading || _saving;
     private bool CanSave => !IsBusy && (ArticleId is null || _isDirty || _saveFailed);
+    private bool CanPublishCurrent => Current.Status is PublicationStatusDto.Draft or PublicationStatusDto.Unpublished;
+    private string StatusClass => Current.Status switch
+    {
+        PublicationStatusDto.Published => "is-published",
+        PublicationStatusDto.Unpublished => "is-unpublished",
+        _ => "is-draft"
+    };
     private string SaveButtonLabel => _saving ? "Saving…" : _saveFailed ? "Retry" : _isDirty ? "Save changes" : "Save";
     private string SaveStatusClass => _saving ? "is-saving" : _saveFailed ? "is-error" : _isDirty ? "is-dirty" : "is-saved";
     private string SaveStatusText => _saving
@@ -540,7 +547,7 @@
     {
         if (ArticleId is null) return;
         _saving = true;
-        try { await ArticlesClient.UnpublishAsync(ArticleId.Value, Current.LanguageCode); Current.Status = PublicationStatusDto.Draft; ShowMessage("Localization returned to draft.", false); }
+        try { await ArticlesClient.UnpublishAsync(ArticleId.Value, Current.LanguageCode); Current.Status = PublicationStatusDto.Unpublished; ShowMessage("Localization unpublished.", false); }
         catch (Exception exception) when (exception is AdminApiException or HttpRequestException) { ShowMessage(exception.Message, true); }
         finally { _saving = false; }
     }
@@ -548,7 +555,7 @@
     private async Task DeleteAsync()
     {
         if (ArticleId is null
-            || !await JS.InvokeAsync<bool>("confirm", "Delete this article? This action cannot be undone."))
+            || !await JS.InvokeAsync<bool>("confirm", "Delete this article? It will be hidden from everyone, but kept in storage."))
         {
             return;
         }

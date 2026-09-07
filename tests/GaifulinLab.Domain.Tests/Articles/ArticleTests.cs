@@ -75,8 +75,66 @@ public sealed class ArticleTests
         article.UnpublishLocalization("en", CreatedAt.AddDays(2));
 
         var localization = article.FindLocalization("en")!;
-        Assert.Equal(PublicationStatus.Draft, localization.Status);
+        Assert.Equal(PublicationStatus.Unpublished, localization.Status);
         Assert.Equal(publishedAt, localization.PublishedAt);
+    }
+
+    [Fact]
+    public void Publish_AllowsDraftAndUnpublishedButNotPublished()
+    {
+        var article = Article.Create("test-owner", "en", CreatedAt, "Title", markdown: "Content", slug: "article");
+
+        article.PublishLocalization("en", CreatedAt.AddDays(1));
+        Assert.Throws<InvalidOperationException>(() => article.PublishLocalization("en", CreatedAt.AddDays(2)));
+
+        article.UnpublishLocalization("en", CreatedAt.AddDays(3));
+        article.PublishLocalization("en", CreatedAt.AddDays(4));
+
+        var localization = article.FindLocalization("en")!;
+        Assert.Equal(PublicationStatus.Published, localization.Status);
+        Assert.Equal(CreatedAt.AddDays(1), localization.PublishedAt);
+    }
+
+    [Fact]
+    public void Unpublish_RejectsDraftAndDoesNotReturnToDraft()
+    {
+        var article = Article.Create("test-owner", "en", CreatedAt, "Title", markdown: "Content", slug: "article");
+
+        Assert.Throws<InvalidOperationException>(() => article.UnpublishLocalization("en", CreatedAt.AddDays(1)));
+
+        article.PublishLocalization("en", CreatedAt.AddDays(2));
+        article.UnpublishLocalization("en", CreatedAt.AddDays(3));
+
+        Assert.Equal(PublicationStatus.Unpublished, article.FindLocalization("en")!.Status);
+    }
+
+    [Fact]
+    public void Delete_PreservesContentAndRejectsFurtherChanges()
+    {
+        var article = Article.Create("test-owner", "en", CreatedAt, "Title", markdown: "Content", slug: "article");
+
+        article.Delete(CreatedAt.AddDays(1));
+
+        Assert.True(article.IsDeleted);
+        Assert.Equal(CreatedAt.AddDays(1), article.DeletedAt);
+        Assert.Equal("Content", article.FindLocalization("en")!.Markdown);
+        Assert.Throws<InvalidOperationException>(() => article.UpdateLocalization(
+            "en", "Updated", null, "Updated", "updated", CreatedAt.AddDays(2)));
+        Assert.Throws<InvalidOperationException>(() => article.Delete(CreatedAt.AddDays(2)));
+    }
+
+    [Fact]
+    public void UpdateLocalization_TracksLastContentEditSeparatelyFromPublicationChanges()
+    {
+        var article = Article.Create("test-owner", "en", CreatedAt, "Title", markdown: "Content", slug: "article");
+        var localization = article.FindLocalization("en")!;
+        Assert.Equal(CreatedAt, localization.LastEditedAt);
+
+        article.PublishLocalization("en", CreatedAt.AddDays(1));
+        Assert.Equal(CreatedAt, localization.LastEditedAt);
+
+        article.UpdateLocalization("en", "Updated", null, "Updated content", "updated", CreatedAt.AddDays(2));
+        Assert.Equal(CreatedAt.AddDays(2), localization.LastEditedAt);
     }
 
     [Fact]

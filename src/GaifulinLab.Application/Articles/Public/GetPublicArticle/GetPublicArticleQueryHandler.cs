@@ -22,7 +22,7 @@ internal sealed class GetPublicArticleQueryHandler(
         var article = await dbContext.Articles
             .AsNoTracking()
             .Include(candidate => candidate.Localizations)
-            .SingleOrDefaultAsync(candidate => candidate.Localizations.Any(localization =>
+            .SingleOrDefaultAsync(candidate => candidate.DeletedAt == null && candidate.Localizations.Any(localization =>
                 localization.LanguageCode == languageCode
                 && localization.Slug == slug
                 && localization.Status == PublicationStatus.Published), cancellationToken)
@@ -47,6 +47,7 @@ internal sealed class GetPublicArticleQueryHandler(
             markdownRenderer.Render(localization.Markdown),
             localization.PublishedAt!.Value,
             localization.UpdatedAt,
+            localization.LastEditedAt,
             article.Localizations
                 .Where(item => item.Status == PublicationStatus.Published)
                 .OrderBy(item => item.LanguageCode)

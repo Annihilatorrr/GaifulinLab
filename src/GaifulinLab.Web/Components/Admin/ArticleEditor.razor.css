@@ -136,6 +136,15 @@
     color: var(--color-success, #027a48);
 }
 
+.publication-status.is-unpublished::before {
+    background: var(--color-warning, #9a6700);
+}
+
+.publication-status.is-unpublished {
+    background: color-mix(in srgb, var(--color-warning, #9a6700) 10%, var(--color-surface));
+    color: var(--color-warning, #9a6700);
+}
+
 .editor-actions {
     position: relative;
     display: flex;

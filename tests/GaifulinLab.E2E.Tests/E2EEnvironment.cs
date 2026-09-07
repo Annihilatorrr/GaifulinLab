@@ -136,16 +136,18 @@ public sealed class E2EEnvironment : IAsyncLifetime
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var ownerUserId = await GetUserIdAsync(connection, transaction, AdminLogin, cancellationToken);
 
         await using (var articleCommand = new NpgsqlCommand(
             """
-            INSERT INTO articles ("Id", "CreatedAt", "UpdatedAt")
-            VALUES (@articleId, @createdAt, @updatedAt)
+            INSERT INTO articles ("Id", "OwnerUserId", "CreatedAt", "UpdatedAt")
+            VALUES (@articleId, @ownerUserId, @createdAt, @updatedAt)
             """,
             connection,
             transaction))
         {
             articleCommand.Parameters.AddWithValue("articleId", article.Id);
+            articleCommand.Parameters.AddWithValue("ownerUserId", ownerUserId);
             articleCommand.Parameters.AddWithValue("createdAt", now);
             articleCommand.Parameters.AddWithValue("updatedAt", now);
             await articleCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -153,8 +155,8 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
         await using (var localizationCommand = new NpgsqlCommand(
             """
-            INSERT INTO article_localizations ("Id", "ArticleId", "LanguageCode", "Slug", "Title", "Summary", "Markdown", "Status", "PublishedAt", "UpdatedAt")
-            VALUES (@localizationId, @articleId, 'en', @slug, @title, NULL, @markdown, 'Published', @publishedAt, @updatedAt)
+            INSERT INTO article_localizations ("Id", "ArticleId", "LanguageCode", "Slug", "Title", "Summary", "Markdown", "Status", "PublishedAt", "UpdatedAt", "LastEditedAt")
+            VALUES (@localizationId, @articleId, 'en', @slug, @title, NULL, @markdown, 'Published', @publishedAt, @updatedAt, @lastEditedAt)
             """,
             connection,
             transaction))
@@ -166,11 +168,27 @@ public sealed class E2EEnvironment : IAsyncLifetime
             localizationCommand.Parameters.AddWithValue("markdown", markdown);
             localizationCommand.Parameters.AddWithValue("publishedAt", now);
             localizationCommand.Parameters.AddWithValue("updatedAt", now);
+            localizationCommand.Parameters.AddWithValue("lastEditedAt", now);
             await localizationCommand.ExecuteNonQueryAsync(cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);
         return article;
+    }
+
+    private static async Task<string> GetUserIdAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string userName,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT \"Id\" FROM \"AspNetUsers\" WHERE \"UserName\" = @userName",
+            connection,
+            transaction);
+        command.Parameters.AddWithValue("userName", userName);
+        return (string?)await command.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException($"The E2E administrator '{userName}' was not found.");
     }
 
     public async Task<long> CountArticleViewsAsync(Guid articleId, CancellationToken cancellationToken = default)

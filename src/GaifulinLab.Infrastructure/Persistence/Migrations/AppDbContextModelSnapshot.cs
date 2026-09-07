@@ -31,6 +31,9 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("OwnerUserId")
                         .IsRequired()
                         .HasColumnType("text");
@@ -40,8 +43,8 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OwnerUserId", "UpdatedAt")
-                        .HasDatabaseName("ix_articles_owner_user_id_updated_at");
+                    b.HasIndex("OwnerUserId", "DeletedAt", "UpdatedAt")
+                        .HasDatabaseName("ix_articles_owner_user_id_deleted_at_updated_at");
 
                     b.ToTable("articles", (string)null);
                 });
@@ -59,6 +62,9 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)");
+
+                    b.Property<DateTimeOffset>("LastEditedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Markdown")
                         .IsRequired()
@@ -110,7 +116,7 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_article_localizations_slug_format", "\"Slug\" IS NULL OR \"Slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'");
 
-                            t.HasCheckConstraint("ck_article_localizations_status", "\"Status\" IN ('Draft', 'Published')");
+                            t.HasCheckConstraint("ck_article_localizations_status", "\"Status\" IN ('Draft', 'Published', 'Unpublished', 'Deleted')");
                         });
                 });
 

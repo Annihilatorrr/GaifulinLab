@@ -1,5 +1,6 @@
 @inject AdminArticlesClient ArticlesClient
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <section class="articles-page" aria-labelledby="articles-title">
     <header class="page-heading">
@@ -82,6 +83,11 @@
 
     private async Task DeleteAsync(Guid articleId)
     {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete this article? It will be hidden from everyone, but kept in storage."))
+        {
+            return;
+        }
+
         _deleting = articleId;
         _error = null;
         try

@@ -14,7 +14,7 @@ internal sealed class GetAdminTaxonomyQueryHandler(IAppDbContext dbContext)
     {
         var ownedArticleIds = await dbContext.Articles
             .AsNoTracking()
-            .Where(article => article.OwnerUserId == request.UserId)
+            .Where(article => article.OwnerUserId == request.UserId && article.DeletedAt == null)
             .Select(article => article.Id)
             .ToArrayAsync(cancellationToken);
 

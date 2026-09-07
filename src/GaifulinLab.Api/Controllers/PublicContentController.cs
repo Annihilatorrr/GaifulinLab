@@ -73,7 +73,9 @@ public sealed class PublicContentController(
             .Where(localization =>
                 localization.LanguageCode == normalizedLanguageCode
                 && localization.Slug == normalizedSlug
-                && localization.Status == PublicationStatus.Published)
+                && localization.Status == PublicationStatus.Published
+                && dbContext.Articles.Any(article =>
+                    article.Id == localization.ArticleId && article.DeletedAt == null))
             .Select(localization => (Guid?)localization.ArticleId)
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new ResourceNotFoundException(
@@ -130,7 +132,9 @@ public sealed class PublicContentController(
             .SingleOrDefaultAsync(candidate =>
                 candidate.LanguageCode == normalizedLanguageCode
                 && candidate.Slug == normalizedSlug
-                && candidate.Status == PublicationStatus.Published,
+                && candidate.Status == PublicationStatus.Published
+                && dbContext.Articles.Any(article =>
+                    article.Id == candidate.ArticleId && article.DeletedAt == null),
                 cancellationToken)
             ?? throw new ResourceNotFoundException("Published article", $"{normalizedLanguageCode}/{normalizedSlug}");
         var typography = ArticleTypography.FromOptional(lineHeight, blockSpacing);
@@ -152,9 +156,7 @@ public sealed class PublicContentController(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var job = await dbContext.PdfExportJobs
-            .AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken)
+        var job = await GetPublishedPdfExport(id, cancellationToken)
             ?? throw new ResourceNotFoundException("PDF export", id.ToString());
         return Ok(ToStatusDto(job));
     }
@@ -165,9 +167,7 @@ public sealed class PublicContentController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DownloadPdfExport(Guid id, CancellationToken cancellationToken)
     {
-        var job = await dbContext.PdfExportJobs
-            .AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken)
+        var job = await GetPublishedPdfExport(id, cancellationToken)
             ?? throw new ResourceNotFoundException("PDF export", id.ToString());
         if (job.Status != PdfExportStatus.Completed || job.RelativePath is null)
         {
@@ -231,4 +231,17 @@ public sealed class PublicContentController(
             job.Status == PdfExportStatus.Completed
                 ? $"/api/public/pdf-exports/{job.Id}/download"
                 : null);
+
+    private Task<PdfExportJob?> GetPublishedPdfExport(Guid id, CancellationToken cancellationToken) =>
+        (
+            from job in dbContext.PdfExportJobs.AsNoTracking()
+            join localization in dbContext.ArticleLocalizations.AsNoTracking()
+                on job.ArticleLocalizationId equals localization.Id
+            join article in dbContext.Articles.AsNoTracking()
+                on localization.ArticleId equals article.Id
+            where job.Id == id
+                && article.DeletedAt == null
+                && localization.Status == PublicationStatus.Published
+            select job)
+        .SingleOrDefaultAsync(cancellationToken);
 }

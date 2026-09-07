@@ -44,6 +44,8 @@ public sealed class ArticleLocalization
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    public DateTimeOffset LastEditedAt { get; private set; }
+
     internal void UpdateContent(
         string? title,
         string? summary,
@@ -65,11 +67,18 @@ public sealed class ArticleLocalization
         Summary = normalizedSummary;
         Markdown = normalizedMarkdown;
         Slug = normalizedSlug;
-        UpdatedAt = DomainRules.AsUtc(updatedAt);
+        var timestamp = DomainRules.AsUtc(updatedAt);
+        UpdatedAt = timestamp;
+        LastEditedAt = timestamp;
     }
 
     internal void Publish(DateTimeOffset publishedAt)
     {
+        if (Status is not (PublicationStatus.Draft or PublicationStatus.Unpublished))
+        {
+            throw new InvalidOperationException("Only a draft or unpublished localization can be published.");
+        }
+
         EnsurePublishable(Title, Slug, Markdown);
 
         var timestamp = DomainRules.AsUtc(publishedAt);
@@ -80,7 +89,12 @@ public sealed class ArticleLocalization
 
     internal void Unpublish(DateTimeOffset updatedAt)
     {
-        Status = PublicationStatus.Draft;
+        if (Status != PublicationStatus.Published)
+        {
+            throw new InvalidOperationException("Only a published localization can be unpublished.");
+        }
+
+        Status = PublicationStatus.Unpublished;
         UpdatedAt = DomainRules.AsUtc(updatedAt);
     }
 

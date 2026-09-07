@@ -31,6 +31,10 @@ public sealed class Article
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
+    public DateTimeOffset? DeletedAt { get; private set; }
+
+    public bool IsDeleted => DeletedAt is not null;
+
     public IReadOnlyCollection<ArticleLocalization> Localizations => _localizations;
 
     public IReadOnlyCollection<ArticleTopic> Topics => _topics;
@@ -59,6 +63,7 @@ public sealed class Article
         string? markdown = null,
         string? slug = null)
     {
+        EnsureNotDeleted();
         var normalizedLanguageCode = DomainRules.NormalizeLanguageCode(languageCode);
         if (_localizations.Any(localization => localization.LanguageCode == normalizedLanguageCode))
         {
@@ -93,6 +98,7 @@ public sealed class Article
         string? slug,
         DateTimeOffset updatedAt)
     {
+        EnsureNotDeleted();
         var localization = GetRequiredLocalization(languageCode);
         localization.UpdateContent(title, summary, markdown, slug, updatedAt);
         Touch(updatedAt);
@@ -100,18 +106,28 @@ public sealed class Article
 
     public void PublishLocalization(string languageCode, DateTimeOffset publishedAt)
     {
+        EnsureNotDeleted();
         GetRequiredLocalization(languageCode).Publish(publishedAt);
         Touch(publishedAt);
     }
 
     public void UnpublishLocalization(string languageCode, DateTimeOffset updatedAt)
     {
+        EnsureNotDeleted();
         GetRequiredLocalization(languageCode).Unpublish(updatedAt);
         Touch(updatedAt);
     }
 
+    public void Delete(DateTimeOffset deletedAt)
+    {
+        EnsureNotDeleted();
+        DeletedAt = DomainRules.AsUtc(deletedAt);
+        Touch(deletedAt);
+    }
+
     public void AssignTopic(Topic topic, DateTimeOffset updatedAt)
     {
+        EnsureNotDeleted();
         ArgumentNullException.ThrowIfNull(topic);
         if (_topics.All(link => link.TopicId != topic.Id))
         {
@@ -122,6 +138,7 @@ public sealed class Article
 
     public void AssignTag(Tag tag, DateTimeOffset updatedAt)
     {
+        EnsureNotDeleted();
         ArgumentNullException.ThrowIfNull(tag);
         if (_tags.All(link => link.TagId != tag.Id))
         {
@@ -132,6 +149,7 @@ public sealed class Article
 
     public void ReplaceTopics(IEnumerable<Topic> topics, DateTimeOffset updatedAt)
     {
+        EnsureNotDeleted();
         ArgumentNullException.ThrowIfNull(topics);
 
         var requestedTopics = topics.DistinctBy(topic => topic.Id).ToArray();
@@ -147,6 +165,7 @@ public sealed class Article
 
     public void ReplaceTags(IEnumerable<Tag> tags, DateTimeOffset updatedAt)
     {
+        EnsureNotDeleted();
         ArgumentNullException.ThrowIfNull(tags);
 
         var requestedTags = tags.DistinctBy(tag => tag.Id).ToArray();
@@ -163,6 +182,14 @@ public sealed class Article
     private ArticleLocalization GetRequiredLocalization(string languageCode) =>
         FindLocalization(languageCode)
         ?? throw new InvalidOperationException($"The article does not have a '{languageCode}' localization.");
+
+    private void EnsureNotDeleted()
+    {
+        if (IsDeleted)
+        {
+            throw new InvalidOperationException("The article is deleted.");
+        }
+    }
 
     private void Touch(DateTimeOffset updatedAt) => UpdatedAt = DomainRules.AsUtc(updatedAt);
 

@@ -8,6 +8,7 @@ public sealed record PublicArticleDetailsDto(
     string Html,
     DateTimeOffset PublishedAt,
     DateTimeOffset UpdatedAt,
+    DateTimeOffset LastEditedAt,
     IReadOnlyList<AvailableLocalizationDto> AvailableLocalizations,
     IReadOnlyList<PublicArticleTaxonomyLinkDto> Topics,
     IReadOnlyList<PublicArticleTaxonomyLinkDto> Series,
