@@ -5,9 +5,12 @@ using GaifulinLab.Application;
 using GaifulinLab.Infrastructure;
 using GaifulinLab.Infrastructure.Analytics;
 using GaifulinLab.Infrastructure.Authentication;
+using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+var loginPermitLimit = builder.Configuration.GetValue("RateLimiting:LoginPermitLimit", 5);
+var registrationPermitLimit = builder.Configuration.GetValue("RateLimiting:RegistrationPermitLimit", 5);
 
 builder.Services.AddControllers(options => options.Filters.Add<ApiExceptionFilter>());
 builder.Services.AddProblemDetails();
@@ -33,7 +36,7 @@ builder.Services.AddRateLimiter(options =>
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = loginPermitLimit,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 AutoReplenishment = true
@@ -43,7 +46,7 @@ builder.Services.AddRateLimiter(options =>
             httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = registrationPermitLimit,
                 Window = TimeSpan.FromMinutes(10),
                 QueueLimit = 0,
                 AutoReplenishment = true
@@ -61,6 +64,11 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    await app.Services.SeedTaxonomyAsync(app.Configuration);
+}
 
 if (!app.Environment.IsDevelopment())
 {

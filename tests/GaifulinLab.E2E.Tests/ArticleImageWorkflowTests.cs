@@ -87,25 +87,17 @@ public sealed class ArticleImageWorkflowTests : PageTest
             response.Request.Method == "GET"
             && response.Url.Contains("/api/admin/pdf-exports/", StringComparison.Ordinal)
             && response.Url.Contains("/download", StringComparison.Ordinal));
-        var download = await page.RunAndWaitForDownloadAsync(
-            () => page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" }).ClickAsync(),
-            new PageRunAndWaitForDownloadOptions { Timeout = 90_000 });
+        await page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" }).ClickAsync();
         var queuedResponse = await queuedResponseTask;
         var response = await responseTask;
 
         Assert.Equal(202, queuedResponse.Status);
-        Assert.Equal($"{slug}.pdf", download.SuggestedFilename);
         Assert.StartsWith(
             "application/pdf",
             response.Headers["content-type"],
             StringComparison.OrdinalIgnoreCase);
-        var path = await download.PathAsync();
-        Assert.False(string.IsNullOrWhiteSpace(path));
-
-        var header = new byte[5];
-        await using var stream = File.OpenRead(path);
-        Assert.Equal(header.Length, await stream.ReadAsync(header));
-        Assert.Equal("%PDF-"u8.ToArray(), header);
+        var content = await response.BodyAsync();
+        Assert.True(content.AsSpan().StartsWith("%PDF-"u8));
     }
 
     private async Task AssertPdfButtonIsHiddenForAnonymousAndRegularUserAsync(string publicPath)

@@ -23,6 +23,7 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\GaifulinLab.Web\GaifulinLab.Web.csproj"
                       ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\GaifulinLab.Infrastructure\GaifulinLab.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -8,10 +8,13 @@ namespace GaifulinLab.E2E.Tests;
 public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
 {
     [Fact]
-    public async Task VisitorRegisters_AndAdministratorPublishesArticle_ThatIsPubliclyAvailable()
+    public async Task VisitorRegisters_AndPublishesArticle_ThatIsPubliclyAvailable()
     {
         const string password = "Strong-password-1!";
         const string displayName = "E2E Author";
+        const string topicName = "Digital Signal Processing";
+        const string topicSlug = "digital-signal-processing";
+        const string topicDescription = "Signals, filters, spectral analysis, and practical DSP.";
         var login = $"e2e-user-{Guid.NewGuid():N}@example.com";
         var uniqueId = Guid.NewGuid().ToString("N");
         var title = $"E2E registration article {uniqueId}";
@@ -19,11 +22,6 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         var body = $"Registration workflow verification {uniqueId}.";
         var summary = $"Article summary {uniqueId}.";
         var tag = $"e2e-tag-{uniqueId}";
-        var topic = await environment.SeedTopicAsync(
-            $"E2E topic {uniqueId}",
-            $"e2e-topic-{uniqueId}",
-            $"Topic description {uniqueId}.");
-
         await Page.GotoAsync(new Uri(environment.BaseUri, "/register").ToString());
 
         await Page.GetByLabel("Display name").FillAsync(displayName);
@@ -41,18 +39,13 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "My articles" }))
             .ToBeVisibleAsync();
 
-        await Page.EvaluateAsync("sessionStorage.clear()");
-        var (adminLogin, adminPassword) = environment.GetAdminCredentials();
-        await SignInAsync(adminLogin, adminPassword);
-        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles$"));
-
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
         await Page.GetByLabel("Article title").FillAsync(title);
         await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync(slug);
         await Page.GetByPlaceholder("Add summary…").FillAsync(summary);
         await Page.GetByLabel("Tags").FillAsync($"{tag}, {tag.ToUpperInvariant()}");
         await Page.GetByText("+ Add topic", new() { Exact = true }).ClickAsync();
-        await Page.GetByLabel(topic.Name, new() { Exact = true }).CheckAsync();
+        await Page.GetByLabel(topicName, new() { Exact = true }).CheckAsync();
         await Page.GetByLabel("Article Markdown").FillAsync(body);
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
@@ -70,15 +63,15 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Expect(Page.GetByText(new Regex("^Last edited "))).ToBeVisibleAsync();
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/topics").ToString());
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = topic.Name })).ToBeVisibleAsync();
-        await Expect(Page.GetByText(topic.Description!, new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = topicName })).ToBeVisibleAsync();
+        await Expect(Page.GetByText(topicDescription, new() { Exact = true })).ToBeVisibleAsync();
 
         var browserMessages = new List<string>();
         Page.PageError += (_, error) => browserMessages.Add($"page error: {error}");
         Page.Console += (_, message) => browserMessages.Add($"{message.Type}: {message.Text}");
         await Page.GotoAsync(new Uri(
             environment.BaseUri,
-            $"/articles?topic={topic.Slug}&tag={tag}").ToString());
+            $"/articles?topic={topicSlug}&tag={tag}").ToString());
         await Page.WaitForTimeoutAsync(250);
         if (await Page.Locator("#blazor-error-ui").IsVisibleAsync())
         {

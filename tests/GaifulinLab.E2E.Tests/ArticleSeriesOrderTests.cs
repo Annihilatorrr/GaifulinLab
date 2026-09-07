@@ -12,7 +12,7 @@ public sealed class ArticleSeriesOrderTests(E2EEnvironment environment) : PageTe
     {
         var suffix = Guid.NewGuid().ToString("N")[..6];
         var series = await environment.SeedSeriesAsync(
-            "Reading order",
+            $"Reading order {suffix}",
             $"reading-order-{suffix}",
             null);
         var (login, password) = environment.GetAdminCredentials();

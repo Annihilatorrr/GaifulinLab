@@ -69,6 +69,7 @@ public sealed class TokenAuthenticationStateProvider(AccessTokenStore tokenStore
             AddClaim(payload.RootElement, claims, "sub", ClaimTypes.NameIdentifier);
             AddClaim(payload.RootElement, claims, "unique_name", ClaimTypes.Name);
             AddClaims(payload.RootElement, claims, "role", ClaimTypes.Role);
+            AddClaims(payload.RootElement, claims, ClaimTypes.Role, ClaimTypes.Role);
 
             return new ClaimsPrincipal(new ClaimsIdentity(claims, "jwt"));
         }

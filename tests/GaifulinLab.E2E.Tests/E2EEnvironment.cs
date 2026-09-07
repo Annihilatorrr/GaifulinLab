@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Net.Sockets;
+using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace GaifulinLab.E2E.Tests;
@@ -74,55 +76,6 @@ public sealed class E2EEnvironment : IAsyncLifetime
     }
 
     public (string Login, string Password) GetAdminCredentials() => (AdminLogin, AdminPassword);
-
-    public async Task<SeededTopic> SeedTopicAsync(
-        string name,
-        string slug,
-        string? description,
-        CancellationToken cancellationToken = default)
-    {
-        var topic = new SeededTopic(Guid.NewGuid(), name, slug, description);
-        var now = DateTimeOffset.UtcNow;
-
-        await using var connection = new NpgsqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-
-        await using (var topicCommand = new NpgsqlCommand(
-            """
-            INSERT INTO topics ("Id", "CreatedAt", "UpdatedAt")
-            VALUES (@topicId, @createdAt, @updatedAt)
-            """,
-            connection,
-            transaction))
-        {
-            topicCommand.Parameters.AddWithValue("topicId", topic.Id);
-            topicCommand.Parameters.AddWithValue("createdAt", now);
-            topicCommand.Parameters.AddWithValue("updatedAt", now);
-            await topicCommand.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        await using (var localizationCommand = new NpgsqlCommand(
-            """
-            INSERT INTO topic_localizations ("Id", "TopicId", "LanguageCode", "Name", "Slug", "Description")
-            VALUES (@localizationId, @topicId, 'en', @name, @slug, @description)
-            """,
-            connection,
-            transaction))
-        {
-            localizationCommand.Parameters.AddWithValue("localizationId", Guid.NewGuid());
-            localizationCommand.Parameters.AddWithValue("topicId", topic.Id);
-            localizationCommand.Parameters.AddWithValue("name", topic.Name);
-            localizationCommand.Parameters.AddWithValue("slug", topic.Slug);
-            localizationCommand.Parameters.AddWithValue(
-                "description",
-                topic.Description is null ? DBNull.Value : topic.Description);
-            await localizationCommand.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        await transaction.CommitAsync(cancellationToken);
-        return topic;
-    }
 
     public async Task<SeededSeries> SeedSeriesAsync(
         string title,
@@ -388,6 +341,9 @@ public sealed class E2EEnvironment : IAsyncLifetime
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
         startInfo.Environment["ASPNETCORE_URLS"] = "http://localhost:5180";
         startInfo.Environment["ConnectionStrings__Postgres"] = _connectionString;
+        startInfo.Environment["MEDIA_STORAGE_PATH"] = Path.Combine(_repositoryRoot, "runtime", "media");
+        startInfo.Environment["RateLimiting__LoginPermitLimit"] = "100";
+        startInfo.Environment["RateLimiting__RegistrationPermitLimit"] = "100";
         startInfo.Environment["Logging__LogLevel__Microsoft.AspNetCore.DataProtection"] = "None";
         startInfo.Environment["Logging__EventLog__LogLevel__Default"] = "None";
         startInfo.ArgumentList.Add(apiAssembly);
@@ -398,20 +354,11 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
     private async Task ApplyMigrationsAsync()
     {
-        await RunCommandAsync("dotnet", _repositoryRoot, ["tool", "restore"]);
-        await RunCommandAsync(
-            "dotnet",
-            _repositoryRoot,
-            [
-                "tool", "run", "dotnet-ef", "database", "update", "--no-build",
-                "--project", "src/GaifulinLab.Infrastructure/GaifulinLab.Infrastructure.csproj",
-                "--startup-project", "src/GaifulinLab.Api/GaifulinLab.Api.csproj"
-            ],
-            environment: new Dictionary<string, string>
-            {
-                ["ASPNETCORE_ENVIRONMENT"] = "Development",
-                ["ConnectionStrings__Postgres"] = _connectionString
-            });
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_connectionString)
+            .Options;
+        await using var dbContext = new AppDbContext(options);
+        await dbContext.Database.MigrateAsync();
     }
 
     private async Task SeedAdminAsync()
@@ -753,8 +700,6 @@ public sealed class E2EEnvironment : IAsyncLifetime
         throw new InvalidOperationException("Could not find the repository root for E2E startup.");
     }
 }
-
-public sealed record SeededTopic(Guid Id, string Name, string Slug, string? Description);
 
 public sealed record SeededSeries(Guid Id, string Title, string Slug, string? Description);
 
