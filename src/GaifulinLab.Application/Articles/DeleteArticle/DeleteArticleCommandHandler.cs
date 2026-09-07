@@ -19,7 +19,18 @@ internal sealed class DeleteArticleCommandHandler(
             cancellationToken)
             ?? throw new ResourceNotFoundException("Article", request.ArticleId);
 
-        article.Delete(timeProvider.GetUtcNow());
+        var now = timeProvider.GetUtcNow();
+        var series = await dbContext.Series
+            .Include(candidate => candidate.Articles)
+            .Where(candidate => candidate.Articles.Any(link => link.ArticleId == article.Id))
+            .ToListAsync(cancellationToken);
+
+        foreach (var item in series)
+        {
+            item.RemoveArticle(article.Id, now);
+        }
+
+        article.Delete(now);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

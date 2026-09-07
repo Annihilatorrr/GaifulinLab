@@ -124,6 +124,55 @@ public sealed class E2EEnvironment : IAsyncLifetime
         return topic;
     }
 
+    public async Task<SeededSeries> SeedSeriesAsync(
+        string title,
+        string slug,
+        string? description,
+        CancellationToken cancellationToken = default)
+    {
+        var series = new SeededSeries(Guid.NewGuid(), title, slug, description);
+        var now = DateTimeOffset.UtcNow;
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (var seriesCommand = new NpgsqlCommand(
+            """
+            INSERT INTO series ("Id", "CreatedAt", "UpdatedAt")
+            VALUES (@seriesId, @createdAt, @updatedAt)
+            """,
+            connection,
+            transaction))
+        {
+            seriesCommand.Parameters.AddWithValue("seriesId", series.Id);
+            seriesCommand.Parameters.AddWithValue("createdAt", now);
+            seriesCommand.Parameters.AddWithValue("updatedAt", now);
+            await seriesCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var localizationCommand = new NpgsqlCommand(
+            """
+            INSERT INTO series_localizations ("Id", "SeriesId", "LanguageCode", "Title", "Slug", "Description")
+            VALUES (@localizationId, @seriesId, 'en', @title, @slug, @description)
+            """,
+            connection,
+            transaction))
+        {
+            localizationCommand.Parameters.AddWithValue("localizationId", Guid.NewGuid());
+            localizationCommand.Parameters.AddWithValue("seriesId", series.Id);
+            localizationCommand.Parameters.AddWithValue("title", series.Title);
+            localizationCommand.Parameters.AddWithValue("slug", series.Slug);
+            localizationCommand.Parameters.AddWithValue(
+                "description",
+                series.Description is null ? DBNull.Value : series.Description);
+            await localizationCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return series;
+    }
+
     public async Task<SeededArticle> SeedPublishedArticleAsync(
         string title,
         string slug,
@@ -671,5 +720,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
 }
 
 public sealed record SeededTopic(Guid Id, string Name, string Slug, string? Description);
+
+public sealed record SeededSeries(Guid Id, string Title, string Slug, string? Description);
 
 public sealed record SeededArticle(Guid Id, string Title, string Slug);

@@ -287,6 +287,83 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         Assert.Empty(details.Tags);
     }
 
+    [Fact]
+    public async Task DeleteArticle_ReleasesItsSeriesPositionWithoutChangingTheRemainingOrder()
+    {
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        Guid seriesId;
+
+        using (var scope = isolatedFactory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var series = Series.Create(
+                "en",
+                "Deletion test series",
+                $"deletion-test-series-{Guid.NewGuid():N}",
+                null,
+                DateTimeOffset.UtcNow);
+            dbContext.Series.Add(series);
+            await dbContext.SaveChangesAsync();
+            seriesId = series.Id;
+        }
+
+        using var client = await CreateAuthenticatedClient(isolatedFactory);
+        var first = await CreateArticle(client, "First");
+        var second = await CreateArticle(client, "Second");
+        var third = await CreateArticle(client, "Third");
+        var fourth = await CreateArticle(client, "Fourth");
+        var originalArticles = new[] { first, second, third, fourth };
+
+        foreach (var (articleId, position) in originalArticles.Select(
+                     (articleId, index) => (articleId, position: index + 1)))
+        {
+            var response = await client.PutAsJsonAsync(
+                $"/api/admin/articles/{articleId}/taxonomy",
+                new UpdateArticleTaxonomyRequest(
+                    [],
+                    [new SeriesAssignmentRequest(seriesId, position)],
+                    []));
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        }
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await client.DeleteAsync($"/api/admin/articles/{second}")).StatusCode);
+
+        var replacement = await CreateArticle(client, "Replacement");
+        var assignReplacement = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{replacement}/taxonomy",
+            new UpdateArticleTaxonomyRequest(
+                [],
+                [new SeriesAssignmentRequest(seriesId, 2)],
+                []));
+        Assert.Equal(HttpStatusCode.NoContent, assignReplacement.StatusCode);
+
+        await using var verificationScope = isolatedFactory.Services.CreateAsyncScope();
+        var verificationDbContext = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(verificationDbContext.ArticleSeries.Where(link => link.ArticleId == second));
+        var orderedArticleIds = verificationDbContext.ArticleSeries
+            .Where(link => link.SeriesId == seriesId)
+            .OrderBy(link => link.Position)
+            .Select(link => link.ArticleId)
+            .ToArray();
+        Assert.Equal([first, replacement, third, fourth], orderedArticleIds);
+    }
+
+    private static async Task<Guid> CreateArticle(HttpClient client, string title)
+    {
+        var response = await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest(
+                "en",
+                title,
+                null,
+                "# Content",
+                $"{title.ToLowerInvariant()}-{Guid.NewGuid():N}"));
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<CreateArticleResponse>())!.ArticleId;
+    }
+
     private async Task<HttpClient> CreateAuthenticatedClient()
     {
         return await CreateAuthenticatedClient(factory);
