@@ -221,6 +221,62 @@
     color: var(--color-text-muted);
 }
 
+.editor-conflict {
+    display: grid;
+    gap: var(--space-2);
+    border-block-end: 1px solid var(--color-danger, #b42318);
+    padding: var(--space-3) var(--space-4);
+    background: color-mix(in srgb, var(--color-danger, #b42318) 8%, var(--color-surface));
+    color: var(--color-text);
+}
+
+.editor-conflict h2,
+.editor-conflict p {
+    margin: 0;
+}
+
+.editor-conflict h2 {
+    font-size: var(--text-sm);
+}
+
+.editor-conflict p,
+.editor-conflict summary,
+.editor-conflict label {
+    font-size: var(--text-sm);
+}
+
+.editor-conflict details {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.editor-conflict label {
+    display: grid;
+    gap: var(--space-1);
+}
+
+.editor-conflict input,
+.editor-conflict textarea {
+    width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 0.6rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+}
+
+.editor-conflict textarea {
+    min-height: 5rem;
+    resize: vertical;
+}
+
+.editor-conflict-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
 .message-error {
     color: var(--color-danger, #b42318);
 }

@@ -15,7 +15,7 @@ internal sealed class ApiExceptionFilter : IAsyncExceptionFilter
             ResourceNotFoundException exception =>
                 (StatusCodes.Status404NotFound, "not_found", exception.Message),
             RequestConflictException exception =>
-                (StatusCodes.Status409Conflict, "conflict", exception.Message),
+                (StatusCodes.Status409Conflict, exception.Code, exception.Message),
             PdfRenderingException exception =>
                 (StatusCodes.Status503ServiceUnavailable, "pdf_renderer_unavailable", exception.Message),
             DbUpdateException =>

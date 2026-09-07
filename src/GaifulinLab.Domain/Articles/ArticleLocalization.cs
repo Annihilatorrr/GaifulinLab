@@ -26,6 +26,8 @@ public sealed class ArticleLocalization
 
     public Guid Id { get; private set; }
 
+    public long Version { get; private set; }
+
     public Guid ArticleId { get; private set; }
 
     public Article Article { get; private set; } = null!;
@@ -72,6 +74,7 @@ public sealed class ArticleLocalization
         var timestamp = DomainRules.AsUtc(updatedAt);
         UpdatedAt = timestamp;
         LastEditedAt = timestamp;
+        Version++;
     }
 
     internal void Publish(DateTimeOffset publishedAt)

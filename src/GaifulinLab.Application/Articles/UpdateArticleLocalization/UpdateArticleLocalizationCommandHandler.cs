@@ -7,9 +7,9 @@ namespace GaifulinLab.Application.Articles.UpdateArticleLocalization;
 
 internal sealed class UpdateArticleLocalizationCommandHandler(
     IAppDbContext dbContext,
-    TimeProvider timeProvider) : IRequestHandler<UpdateArticleLocalizationCommand>
+    TimeProvider timeProvider) : IRequestHandler<UpdateArticleLocalizationCommand, long>
 {
-    public async Task Handle(UpdateArticleLocalizationCommand request, CancellationToken cancellationToken)
+    public async Task<long> Handle(UpdateArticleLocalizationCommand request, CancellationToken cancellationToken)
     {
         var article = await dbContext.Articles
             .Include(candidate => candidate.Localizations)
@@ -24,6 +24,13 @@ internal sealed class UpdateArticleLocalizationCommandHandler(
         var localization = article.FindLocalization(request.LanguageCode);
         if (localization is null)
         {
+            if (request.ExpectedVersion is not null)
+            {
+                throw new RequestConflictException(
+                    "The localization no longer exists. Reload the article before saving.",
+                    "article_edit_conflict");
+            }
+
             localization = article.AddLocalization(
                 request.LanguageCode,
                 now,
@@ -35,6 +42,20 @@ internal sealed class UpdateArticleLocalizationCommandHandler(
         }
         else
         {
+            if (request.ExpectedVersion is null)
+            {
+                throw new ArgumentException(
+                    "ExpectedVersion is required when updating an existing localization.",
+                    nameof(request));
+            }
+
+            if (localization.Version != request.ExpectedVersion.Value)
+            {
+                throw new RequestConflictException(
+                    "This localization was changed elsewhere. Your draft was not saved.",
+                    "article_edit_conflict");
+            }
+
             article.UpdateLocalization(
                 request.LanguageCode,
                 request.Title,
@@ -58,6 +79,17 @@ internal sealed class UpdateArticleLocalizationCommandHandler(
             }
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new RequestConflictException(
+                "This localization was changed elsewhere. Your draft was not saved.",
+                "article_edit_conflict");
+        }
+
+        return localization.Version;
     }
 }

@@ -7,6 +7,7 @@ internal static class AdminArticleMappings
 {
     public static AdminArticleLocalizationDto ToDetails(this ArticleLocalization localization) => new(
         localization.Id,
+        localization.Version,
         localization.LanguageCode,
         localization.Slug,
         localization.Title,

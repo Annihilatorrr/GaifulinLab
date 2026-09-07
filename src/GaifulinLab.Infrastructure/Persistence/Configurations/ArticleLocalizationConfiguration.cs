@@ -26,6 +26,9 @@ internal sealed class ArticleLocalizationConfiguration : IEntityTypeConfiguratio
 
         builder.HasKey(localization => localization.Id);
 
+        builder.Property(localization => localization.Version)
+            .IsConcurrencyToken()
+            .IsRequired();
         builder.Property(localization => localization.LanguageCode)
             .HasMaxLength(2)
             .IsRequired();

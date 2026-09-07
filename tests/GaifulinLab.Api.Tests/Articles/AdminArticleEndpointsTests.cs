@@ -55,8 +55,8 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
                 "# Содержимое",
                 $"statya-{Guid.NewGuid():N}"));
         Assert.True(
-            updateResponse.StatusCode == HttpStatusCode.NoContent,
-            $"Expected 204, received {(int)updateResponse.StatusCode}: {await updateResponse.Content.ReadAsStringAsync()}");
+            updateResponse.StatusCode == HttpStatusCode.OK,
+            $"Expected 200, received {(int)updateResponse.StatusCode}: {await updateResponse.Content.ReadAsStringAsync()}");
 
         var publishResponse = await client.PostAsync(
             $"/api/admin/articles/{created.ArticleId}/localizations/en/publish",
@@ -150,6 +150,60 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
             $"/api/public/articles/en/{slug}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync(
             $"/api/admin/articles/{created.ArticleId}/localizations/en/publish", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateLocalization_RejectsAStaleVersionWithoutOverwritingNewerContent()
+    {
+        using var client = await CreateAuthenticatedClient();
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest(
+                "en",
+                "Original title",
+                null,
+                "# Original",
+                $"concurrency-{Guid.NewGuid():N}"));
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(created);
+
+        var firstCopy = await client.GetFromJsonAsync<AdminArticleDetailsDto>(
+            $"/api/admin/articles/{created!.ArticleId}");
+        var secondCopy = await client.GetFromJsonAsync<AdminArticleDetailsDto>(
+            $"/api/admin/articles/{created.ArticleId}");
+        var firstLocalization = Assert.Single(firstCopy!.Localizations);
+        var secondLocalization = Assert.Single(secondCopy!.Localizations);
+        Assert.Equal(firstLocalization.Version, secondLocalization.Version);
+
+        var firstUpdate = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest(
+                "First editor",
+                null,
+                "# Saved by first editor",
+                firstLocalization.Slug,
+                firstLocalization.Version));
+        Assert.Equal(HttpStatusCode.OK, firstUpdate.StatusCode);
+        Assert.Equal(firstLocalization.Version + 1, await firstUpdate.Content.ReadFromJsonAsync<long>());
+
+        var staleUpdate = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest(
+                "Second editor",
+                null,
+                "# Stale overwrite",
+                secondLocalization.Slug,
+                secondLocalization.Version));
+        Assert.Equal(HttpStatusCode.Conflict, staleUpdate.StatusCode);
+        var error = await staleUpdate.Content.ReadFromJsonAsync<ApiErrorResponse>();
+        Assert.Equal("article_edit_conflict", error?.Code);
+
+        var persisted = await client.GetFromJsonAsync<AdminArticleDetailsDto>(
+            $"/api/admin/articles/{created.ArticleId}");
+        var localization = Assert.Single(persisted!.Localizations);
+        Assert.Equal("First editor", localization.Title);
+        Assert.Equal("# Saved by first editor", localization.Markdown);
+        Assert.Equal(firstLocalization.Version + 1, localization.Version);
     }
 
     [Fact]

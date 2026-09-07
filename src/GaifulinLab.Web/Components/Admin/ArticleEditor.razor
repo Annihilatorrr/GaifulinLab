@@ -64,6 +64,26 @@
         </div>
     </header>
 
+    @if (_conflictLanguage is not null && _conflictServer is not null)
+    {
+        <section class="editor-conflict" role="alert" aria-labelledby="edit-conflict-title">
+            <div>
+                <h2 id="edit-conflict-title">This localization was changed elsewhere</h2>
+                <p>Your draft is still in the editor and has not overwritten the saved version.</p>
+            </div>
+            <details>
+                <summary>Compare with the saved version</summary>
+                <label>Saved title <input readonly value="@_conflictServer.Title" /></label>
+                <label>Saved summary <textarea readonly>@_conflictServer.Summary</textarea></label>
+                <label>Saved Markdown <textarea readonly>@_conflictServer.Markdown</textarea></label>
+            </details>
+            <div class="editor-conflict-actions">
+                <button class="button button-secondary" type="button" @onclick="UseServerConflictAsync">Use saved version</button>
+                <button class="button button-primary" type="button" @onclick="SaveMyConflictDraftAsync">Save my draft</button>
+            </div>
+        </section>
+    }
+
     @if (_loading)
     {
         <div class="editor-message surface" role="status">Loading article…</div>
@@ -238,7 +258,10 @@
     private bool _isDirty;
     private bool _saveFailed;
     private bool _autosavePending;
+    private bool _taxonomyDirty;
     private long _changeVersion;
+    private string? _conflictLanguage;
+    private LocalizationModel? _conflictServer;
     private bool _previewLoading;
     private bool _imageUploading;
     private EditorPane _activePane = EditorPane.Split;
@@ -262,7 +285,9 @@
     private DateTimeOffset? _savedAt;
     private LocalizationModel Current => _localizations[_activeLanguage];
     private bool IsBusy => _loading || _saving;
-    private bool CanSave => !IsBusy && (ArticleId is null || _isDirty || _saveFailed);
+    private bool CanSave => !IsBusy
+        && _conflictLanguage is null
+        && (ArticleId is null || _isDirty || _saveFailed);
     private bool CanPublishCurrent => Current.Status is PublicationStatusDto.Draft or PublicationStatusDto.Unpublished;
     private string StatusClass => Current.Status switch
     {
@@ -478,23 +503,46 @@
             var wasNew = ArticleId is null;
             if (ArticleId is null)
             {
-                var created = await ArticlesClient.CreateArticleAsync(Current.ToCreateRequest());
+                var createRequest = Current.ToCreateRequest();
+                var created = await ArticlesClient.CreateArticleAsync(createRequest);
                 ArticleId = created.ArticleId;
+                Current.MarkSaved(createRequest, created.LocalizationVersion);
             }
             foreach (var localization in _localizations.Values)
             {
-                if (!wasNew || localization != Current)
-                    await ArticlesClient.UpdateLocalizationAsync(ArticleId.Value, localization.LanguageCode, localization.ToUpdateRequest());
+                if (!localization.HasChanges)
+                {
+                    continue;
+                }
+
+                var request = localization.ToUpdateRequest();
+                try
+                {
+                    var version = await ArticlesClient.UpdateLocalizationAsync(
+                        ArticleId.Value,
+                        localization.LanguageCode,
+                        request);
+                    localization.MarkSaved(request, version);
+                }
+                catch (AdminApiException exception) when (exception.Code == "article_edit_conflict")
+                {
+                    await LoadConflictAsync(localization);
+                    throw;
+                }
             }
-            await ArticlesClient.UpdateTaxonomyAsync(ArticleId.Value, new(
-                _topicIds.ToArray(),
-                _series.Select(item => new SeriesAssignmentRequest(item.Key, item.Value)).ToArray(),
-                ParseTags()));
-            await ReloadLocalizationsAsync();
+            if (_taxonomyDirty)
+            {
+                await ArticlesClient.UpdateTaxonomyAsync(ArticleId.Value, new(
+                    _topicIds.ToArray(),
+                    _series.Select(item => new SeriesAssignmentRequest(item.Key, item.Value)).ToArray(),
+                    ParseTags()));
+            }
             if (_changeVersion == saveVersion)
             {
-                _isDirty = false;
+                _taxonomyDirty = false;
+                await ReloadLocalizationsAsync();
             }
+            RecalculateDirty();
             _savedAt = DateTimeOffset.Now;
             if (wasNew && navigateAfterCreate) Navigation.NavigateTo($"/admin/articles/{ArticleId}", replace: true);
         }
@@ -687,7 +735,7 @@
     private void HandleTagsInput(ChangeEventArgs eventArgs)
     {
         _tags = eventArgs.Value?.ToString() ?? "";
-        MarkDirty();
+        MarkDirty(taxonomy: true);
     }
 
     private async Task HandleImageSelected(InputFileChangeEventArgs eventArgs)
@@ -783,16 +831,72 @@
             : _localizations.Keys.First();
     }
 
+    private async Task LoadConflictAsync(LocalizationModel localization)
+    {
+        try
+        {
+            var article = await ArticlesClient.GetArticleAsync(ArticleId!.Value);
+            var saved = article.Localizations.SingleOrDefault(item =>
+                string.Equals(item.LanguageCode, localization.LanguageCode, StringComparison.OrdinalIgnoreCase));
+            if (saved is not null)
+            {
+                _conflictLanguage = localization.LanguageCode;
+                _conflictServer = new LocalizationModel(saved);
+            }
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            ShowMessage(
+                $"{localization.LanguageCode.ToUpperInvariant()} could not be saved, and the latest version could not be loaded. Your draft is still in the editor.",
+                true);
+        }
+    }
+
+    private async Task UseServerConflictAsync()
+    {
+        if (_conflictLanguage is null || _conflictServer is null)
+        {
+            return;
+        }
+
+        var languageCode = _conflictLanguage;
+        _localizations[languageCode] = _conflictServer;
+        _conflictLanguage = null;
+        _conflictServer = null;
+        _saveFailed = false;
+        RecalculateDirty();
+        if (string.Equals(_activeLanguage, languageCode, StringComparison.OrdinalIgnoreCase))
+        {
+            await RefreshPreview();
+        }
+    }
+
+    private async Task SaveMyConflictDraftAsync()
+    {
+        if (_conflictLanguage is null
+            || _conflictServer is null
+            || !_localizations.TryGetValue(_conflictLanguage, out var draft))
+        {
+            return;
+        }
+
+        draft.UseVersion(_conflictServer.Version
+            ?? throw new InvalidOperationException("The saved localization does not have a version."));
+        _conflictLanguage = null;
+        _conflictServer = null;
+        await SaveCoreAsync(navigateAfterCreate: false);
+    }
+
     private void ToggleTopic(Guid id, ChangeEventArgs args)
     {
         var changed = args.Value is true ? _topicIds.Add(id) : _topicIds.Remove(id);
-        if (changed) MarkDirty();
+        if (changed) MarkDirty(taxonomy: true);
     }
 
     private void ToggleSeries(Guid id, ChangeEventArgs args)
     {
         var changed = args.Value is true ? _series.TryAdd(id, 1) : _series.Remove(id);
-        if (changed) MarkDirty();
+        if (changed) MarkDirty(taxonomy: true);
     }
 
     private void SetSeriesPosition(Guid id, ChangeEventArgs args)
@@ -802,18 +906,18 @@
             && (!_series.TryGetValue(id, out var existing) || existing != value))
         {
             _series[id] = value;
-            MarkDirty();
+            MarkDirty(taxonomy: true);
         }
     }
 
-    private void RemoveTopic(Guid id) { if (_topicIds.Remove(id)) MarkDirty(); }
-    private void RemoveSeries(Guid id) { if (_series.Remove(id)) MarkDirty(); }
+    private void RemoveTopic(Guid id) { if (_topicIds.Remove(id)) MarkDirty(taxonomy: true); }
+    private void RemoveSeries(Guid id) { if (_series.Remove(id)) MarkDirty(taxonomy: true); }
     private void RemoveTag(string tag)
     {
         var tags = ParseTags().Where(item => !string.Equals(item, tag, StringComparison.OrdinalIgnoreCase)).ToArray();
         if (tags.Length == ParseTags().Length) return;
         _tags = string.Join(", ", tags);
-        MarkDirty();
+        MarkDirty(taxonomy: true);
     }
     private string TaxonomyName(IEnumerable<(string LanguageCode, string Name)> names) => names.FirstOrDefault(x => x.LanguageCode == _activeLanguage).Name ?? names.FirstOrDefault().Name ?? "Untitled";
     private static string LanguageName(string languageCode) => languageCode == "ru" ? "Russian" : "English";
@@ -831,8 +935,9 @@
     private bool CanOpenPublicArticle => Current.Status == PublicationStatusDto.Published && !string.IsNullOrWhiteSpace(Current.Slug);
     private string[] ParseTags() => _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
-    private void MarkDirty()
+    private void MarkDirty(bool taxonomy = false)
     {
+        _taxonomyDirty |= taxonomy;
         _isDirty = true;
         _changeVersion++;
         _saveFailed = false;
@@ -843,6 +948,9 @@
         _hasError = false;
         QueueAutosave();
     }
+
+    private void RecalculateDirty() =>
+        _isDirty = _taxonomyDirty || _localizations.Values.Any(localization => localization.HasChanges);
 
     private void QueueAutosave()
     {
@@ -957,10 +1065,16 @@
 
     private sealed class LocalizationModel
     {
+        private string _savedTitle = "";
+        private string _savedSummary = "";
+        private string _savedMarkdown = "";
+        private string _savedSlug = "";
+
         public LocalizationModel(string languageCode)
         {
             LanguageCode = languageCode;
             SlugIsAutomatic = true;
+            CaptureSavedValues();
         }
 
         public LocalizationModel(string languageCode, LocalizationModel source)
@@ -971,10 +1085,12 @@
             Markdown = source.Markdown;
             Slug = SlugSuggestion.FromTitle(Title);
             SlugIsAutomatic = true;
+            CaptureSavedValues();
         }
 
         public LocalizationModel(AdminArticleLocalizationDto dto)
         {
+            Version = dto.Version;
             LanguageCode = dto.LanguageCode;
             Title = dto.Title;
             Summary = dto.Summary ?? "";
@@ -987,7 +1103,9 @@
                         Slug,
                         SlugSuggestion.FromTitle(Title),
                         StringComparison.Ordinal));
+            CaptureSavedValues();
         }
+        public long? Version { get; private set; }
         public string LanguageCode { get; }
         public string Title { get; set; } = "";
         public string Summary { get; set; } = "";
@@ -995,8 +1113,35 @@
         public string Slug { get; set; } = "";
         public bool SlugIsAutomatic { get; set; }
         public PublicationStatusDto Status { get; set; } = PublicationStatusDto.Draft;
+        public bool HasChanges =>
+            !string.Equals(Title, _savedTitle, StringComparison.Ordinal)
+            || !string.Equals(Summary, _savedSummary, StringComparison.Ordinal)
+            || !string.Equals(Markdown, _savedMarkdown, StringComparison.Ordinal)
+            || !string.Equals(Slug, _savedSlug, StringComparison.Ordinal);
         public CreateArticleRequest ToCreateRequest() => new(LanguageCode, Title, Summary, Markdown, Slug);
-        public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Markdown, Slug);
+        public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Markdown, Slug, Version);
+        public void MarkSaved(CreateArticleRequest request, long version) =>
+            MarkSaved(new UpdateArticleLocalizationRequest(
+                request.Title,
+                request.Summary,
+                request.Markdown,
+                request.Slug), version);
+        public void MarkSaved(UpdateArticleLocalizationRequest request, long version)
+        {
+            Version = version;
+            _savedTitle = request.Title ?? "";
+            _savedSummary = request.Summary ?? "";
+            _savedMarkdown = request.Markdown ?? "";
+            _savedSlug = request.Slug ?? "";
+        }
+        public void UseVersion(long version) => Version = version;
+        private void CaptureSavedValues()
+        {
+            _savedTitle = Title;
+            _savedSummary = Summary;
+            _savedMarkdown = Markdown;
+            _savedSlug = Slug;
+        }
     }
     private enum EditorPane { Edit, Split, Preview }
 }

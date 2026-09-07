@@ -9,4 +9,5 @@ public sealed record UpdateArticleLocalizationCommand(
     string? Title,
     string? Summary,
     string? Markdown,
-    string? Slug) : IRequest;
+    string? Slug,
+    long? ExpectedVersion) : IRequest<long>;

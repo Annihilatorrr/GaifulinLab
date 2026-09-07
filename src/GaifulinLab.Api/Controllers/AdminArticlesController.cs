@@ -57,17 +57,17 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetAdminArticleQuery(articleId, GetCurrentUserId()), cancellationToken));
 
     [HttpPut("{articleId:guid}/localizations/{languageCode}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<long>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> UpsertLocalization(
+    public async Task<ActionResult<long>> UpsertLocalization(
         Guid articleId,
         string languageCode,
         UpdateArticleLocalizationRequest request,
         CancellationToken cancellationToken)
     {
-        await sender.Send(
+        var version = await sender.Send(
             new UpdateArticleLocalizationCommand(
                 articleId,
                 GetCurrentUserId(),
@@ -75,10 +75,11 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
                 request.Title,
                 request.Summary,
                 request.Markdown,
-                request.Slug),
+                request.Slug,
+                request.ExpectedVersion),
             cancellationToken);
 
-        return NoContent();
+        return Ok(version);
     }
 
     [HttpPost("{articleId:guid}/localizations/{languageCode}/publish")]

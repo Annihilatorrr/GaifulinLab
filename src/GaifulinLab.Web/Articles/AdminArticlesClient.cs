@@ -30,7 +30,7 @@ public sealed class AdminArticlesClient(HttpClient httpClient)
             ?? throw new AdminApiException("The server returned an empty response.");
     }
 
-    public async Task UpdateLocalizationAsync(
+    public async Task<long> UpdateLocalizationAsync(
         Guid articleId,
         string languageCode,
         UpdateArticleLocalizationRequest request,
@@ -41,6 +41,7 @@ public sealed class AdminArticlesClient(HttpClient httpClient)
             request,
             cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<long>(cancellationToken);
     }
 
     public Task PublishAsync(Guid articleId, string languageCode, CancellationToken cancellationToken = default) =>
@@ -102,8 +103,13 @@ public sealed class AdminArticlesClient(HttpClient httpClient)
         {
         }
 
-        throw new AdminApiException(error?.Message ?? "The request could not be completed.");
+        throw new AdminApiException(
+            error?.Message ?? "The request could not be completed.",
+            error?.Code);
     }
 }
 
-public sealed class AdminApiException(string message) : Exception(message);
+public sealed class AdminApiException(string message, string? code = null) : Exception(message)
+{
+    public string? Code { get; } = code;
+}

@@ -4,4 +4,5 @@ public sealed record UpdateArticleLocalizationRequest(
     string? Title,
     string? Summary,
     string? Markdown,
-    string? Slug);
+    string? Slug,
+    long? ExpectedVersion = null);

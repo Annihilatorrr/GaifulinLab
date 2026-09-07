@@ -30,7 +30,7 @@ internal sealed class CreateArticleCommandHandler(
         dbContext.Articles.Add(article);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new CreateArticleResponse(article.Id, localization.Id);
+        return new CreateArticleResponse(article.Id, localization.Id, localization.Version);
     }
 
     private async Task EnsureSlugIsAvailable(

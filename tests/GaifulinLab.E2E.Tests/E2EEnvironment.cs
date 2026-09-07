@@ -252,6 +252,41 @@ public sealed class E2EEnvironment : IAsyncLifetime
             ?? throw new InvalidOperationException("Article view count query returned no value."));
     }
 
+    public async Task ChangeArticleLocalizationAsync(
+        Guid articleId,
+        string languageCode,
+        string title,
+        string markdown,
+        CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE article_localizations
+            SET "Title" = @title,
+                "Markdown" = @markdown,
+                "UpdatedAt" = @updatedAt,
+                "LastEditedAt" = @lastEditedAt,
+                "Version" = "Version" + 1
+            WHERE "ArticleId" = @articleId
+              AND "LanguageCode" = @languageCode
+            """,
+            connection);
+        command.Parameters.AddWithValue("title", title);
+        command.Parameters.AddWithValue("markdown", markdown);
+        command.Parameters.AddWithValue("updatedAt", now);
+        command.Parameters.AddWithValue("lastEditedAt", now);
+        command.Parameters.AddWithValue("articleId", articleId);
+        command.Parameters.AddWithValue("languageCode", languageCode);
+        var changed = await command.ExecuteNonQueryAsync(cancellationToken);
+        if (changed != 1)
+        {
+            throw new InvalidOperationException($"Article localization '{languageCode}' was not found.");
+        }
+    }
+
     public async Task EnsurePdfWorkerAsync()
     {
         if (_usesExternalSite || _startedPdfWorker)

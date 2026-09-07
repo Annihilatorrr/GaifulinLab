@@ -2,6 +2,7 @@ namespace GaifulinLab.Contracts.Articles;
 
 public sealed record AdminArticleLocalizationDto(
     Guid Id,
+    long Version,
     string LanguageCode,
     string? Slug,
     string Title,
