@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using GaifulinLab.Application.Authors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
@@ -36,6 +37,7 @@ internal static class AuthenticationConfiguration
             .AddEntityFrameworkStores<Persistence.AppDbContext>()
             .AddDefaultTokenProviders();
         services.AddScoped<IUserAuthenticationService, UserAuthenticationService>();
+        services.AddScoped<IAuthorDisplayNameLookup, IdentityAuthorDisplayNameLookup>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>

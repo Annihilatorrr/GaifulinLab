@@ -48,9 +48,10 @@ internal sealed class UserAuthenticationService(
         return new IssuedAccessToken(new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
 
-    public async Task<UserRegistrationResult> RegisterAsync(string login, string password)
+    public async Task<UserRegistrationResult> RegisterAsync(string login, string displayName, string password)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(login);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
         ArgumentNullException.ThrowIfNull(password);
 
         var result = await userManager.CreateAsync(
@@ -58,6 +59,7 @@ internal sealed class UserAuthenticationService(
             {
                 UserName = login,
                 Email = login,
+                DisplayName = displayName,
                 SecurityStamp = Guid.NewGuid().ToString("N")
             },
             password);
@@ -74,5 +76,27 @@ internal sealed class UserAuthenticationService(
         return UserRegistrationResult.Failure(
             loginTaken,
             errors.Select(error => error.Description).ToArray());
+    }
+
+    public async Task<string?> GetDisplayNameAsync(string userId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        return (await userManager.FindByIdAsync(userId))?.DisplayName;
+    }
+
+    public async Task<bool> UpdateDisplayNameAsync(string userId, string displayName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+
+        var user = await userManager.FindByIdAsync(userId);
+        if (user is null)
+        {
+            return false;
+        }
+
+        user.DisplayName = displayName;
+        return (await userManager.UpdateAsync(user)).Succeeded;
     }
 }

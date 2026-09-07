@@ -1,3 +1,4 @@
+.profile-link,
 .sign-out {
     border: 0;
     padding: 0;
@@ -5,9 +6,11 @@
     color: var(--color-text-muted);
     font: inherit;
     font-size: var(--text-sm);
+    text-decoration: none;
     cursor: pointer;
 }
 
+.profile-link:hover,
 .sign-out:hover {
     color: var(--color-text);
 }

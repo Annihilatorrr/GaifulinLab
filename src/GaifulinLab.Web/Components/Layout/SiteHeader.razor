@@ -34,7 +34,10 @@
             }
             else
             {
-                <a href="/admin/login">Sign in</a>
+                @if (ShowSignInLink)
+                {
+                    <a href="/admin/login">Sign in</a>
+                }
                 @if (ShowRegistrationLink)
                 {
                     <a href="/register">Register</a>
@@ -67,7 +70,10 @@
                     }
                     else
                     {
-                        <a href="/admin/login">Sign in</a>
+                        @if (ShowSignInLink)
+                        {
+                            <a href="/admin/login">Sign in</a>
+                        }
                         @if (ShowRegistrationLink)
                         {
                             <a href="/register">Register</a>
@@ -80,14 +86,19 @@
 </header>
 
 @code {
+    private bool _signInLinkEnabled;
     private bool _registrationLinkEnabled;
     private bool _isLoggedIn;
+
+    private bool ShowSignInLink =>
+        SignInLinkVisibility.ShouldShow(_signInLinkEnabled, _isLoggedIn);
 
     private bool ShowRegistrationLink =>
         RegistrationLinkVisibility.ShouldShow(_registrationLinkEnabled, _isLoggedIn);
 
     protected override async Task OnInitializedAsync()
     {
+        _signInLinkEnabled = Configuration.GetValue<bool>("Features:SignInLinkEnabled");
         _registrationLinkEnabled = Configuration.GetValue<bool>("Features:RegistrationLinkEnabled");
         AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
 

@@ -1,0 +1,12 @@
+.profile-page { min-height: calc(100vh - 4.75rem); display: grid; place-items: center; padding-block: var(--space-12); }
+.profile-card { width: min(100%, 28rem); padding: clamp(var(--space-6), 5vw, var(--space-10)); background: var(--color-surface); box-shadow: var(--shadow-md); }
+.profile-card h1 { margin: var(--space-3) 0; font-size: var(--text-3xl); }
+.profile-card > p { margin-bottom: var(--space-8); }
+.profile-form { display: grid; gap: var(--space-5); }
+.field { display: grid; gap: var(--space-2); }
+.field label { font-size: var(--text-sm); font-weight: 700; }
+.field input { width: 100%; min-height: 3rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); padding: .7rem .85rem; background: var(--color-background); color: var(--color-text); }
+.field input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 16%, transparent); }
+.field ::deep .validation-message, .profile-error { margin: 0; color: var(--color-danger); font-size: var(--text-sm); }
+.profile-success { margin: 0; color: var(--color-accent); font-size: var(--text-sm); }
+@media (max-width: 40rem) { .profile-page { min-height: calc(100vh - 4.25rem); align-items: start; padding-block: var(--space-8); } .profile-card { padding: var(--space-6); } }

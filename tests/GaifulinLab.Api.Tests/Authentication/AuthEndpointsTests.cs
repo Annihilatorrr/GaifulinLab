@@ -25,11 +25,12 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     public async Task Register_WithValidCredentials_CreatesStandardUser()
     {
         var login = $"new-user-{Guid.NewGuid():N}@example.com";
+        const string displayName = "Ada Lovelace";
         using var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/register",
-            new RegisterRequest(login, "Strong-password-1!"));
+            new RegisterRequest(login, displayName, "Strong-password-1!"));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Equal("no-store", response.Headers.CacheControl?.ToString());
@@ -41,6 +42,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
         var user = await userManager.FindByNameAsync(login);
         Assert.NotNull(user);
         Assert.Equal(login, user.Email);
+        Assert.Equal(displayName, user.DisplayName);
         Assert.False(await userManager.IsInRoleAsync(user, IdentityRoles.Admin));
     }
 
@@ -49,7 +51,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     {
         var login = $"duplicate-{Guid.NewGuid():N}@example.com";
         using var client = factory.CreateClient();
-        var request = new RegisterRequest(login, "Strong-password-1!");
+        var request = new RegisterRequest(login, "Ada Lovelace", "Strong-password-1!");
 
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/auth/register", request)).StatusCode);
         var response = await client.PostAsJsonAsync("/api/auth/register", request);
@@ -66,7 +68,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/register",
-            new RegisterRequest("not-an-email", "Strong-password-1!"));
+            new RegisterRequest("not-an-email", "Ada Lovelace", "Strong-password-1!"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
@@ -81,7 +83,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
 
         var response = await client.PostAsJsonAsync(
             "/api/auth/register",
-            new RegisterRequest($"weak-{Guid.NewGuid():N}@example.com", "password"));
+            new RegisterRequest($"weak-{Guid.NewGuid():N}@example.com", "Ada Lovelace", "password"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
@@ -101,7 +103,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
             response?.Dispose();
             response = await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new RegisterRequest("x", "x"));
+                new RegisterRequest("x", "X", "x"));
         }
 
         using var finalResponse = Assert.IsType<HttpResponseMessage>(response);
@@ -157,6 +159,43 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task Profile_CanBeReadAndUpdatedByTheAuthenticatedUser()
+    {
+        using var client = factory.CreateClient();
+        var login = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(AuthWebApplicationFactory.AdminLogin, AuthWebApplicationFactory.AdminPassword));
+        var token = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+
+        var current = await client.GetFromJsonAsync<UserProfileResponse>("/api/auth/profile");
+        Assert.Equal("Administrator", current?.DisplayName);
+
+        var updated = await client.PutAsJsonAsync(
+            "/api/auth/profile",
+            new UpdateProfileRequest("Grace Hopper"));
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        Assert.Equal("Grace Hopper", (await updated.Content.ReadFromJsonAsync<UserProfileResponse>())?.DisplayName);
+        Assert.Equal("Grace Hopper", (await client.GetFromJsonAsync<UserProfileResponse>("/api/auth/profile"))?.DisplayName);
+    }
+
+    [Fact]
+    public async Task Register_WithInvalidDisplayName_ReturnsValidationError()
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new RegisterRequest($"invalid-name-{Guid.NewGuid():N}@example.com", " ", "Strong-password-1!"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+        Assert.Equal("invalid_registration", error?.Code);
+        Assert.Equal("Display name must be between 2 and 100 characters.", error?.Errors?["DisplayName"].Single());
+    }
+
+    [Fact]
     public async Task Login_WithIdentityUserWithoutAdminRole_ReturnsTokenAndWorkspaceSession()
     {
         const string userLogin = "second-user";
@@ -167,7 +206,7 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
             if (await userManager.FindByNameAsync(userLogin) is null)
             {
                 var result = await userManager.CreateAsync(
-                    new ApplicationUser { UserName = userLogin },
+                    new ApplicationUser { UserName = userLogin, DisplayName = "Second User" },
                     userPassword);
                 Assert.True(result.Succeeded, string.Join("; ", result.Errors.Select(error => error.Description)));
             }
@@ -240,7 +279,7 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         var user = userManager.FindByNameAsync(AdminLogin).GetAwaiter().GetResult();
         if (user is null)
         {
-            user = new ApplicationUser { UserName = AdminLogin };
+            user = new ApplicationUser { UserName = AdminLogin, DisplayName = "Administrator" };
             var userResult = userManager.CreateAsync(user, AdminPassword).GetAwaiter().GetResult();
             Assert.True(userResult.Succeeded, string.Join("; ", userResult.Errors.Select(error => error.Description)));
         }

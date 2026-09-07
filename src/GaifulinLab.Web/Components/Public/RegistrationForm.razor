@@ -3,12 +3,12 @@
 
 <section class="registration-section" aria-labelledby="registration-title">
     <div class="registration-card surface">
-        @if (_registeredLogin is not null)
+        @if (_registeredDisplayName is not null)
         {
             <div class="registration-success" role="status">
                 <span class="success-mark" aria-hidden="true">✓</span>
                 <span class="eyebrow">Account created</span>
-                <h1 id="registration-title">Welcome, @_registeredLogin</h1>
+                <h1 id="registration-title">Welcome, @_registeredDisplayName</h1>
                 <p>Your account is ready. Sign in to create and manage your own articles.</p>
                 <a class="button button-primary" href="/admin/login">Sign in</a>
             </div>
@@ -21,6 +21,19 @@
 
             <EditForm Model="_registration" OnValidSubmit="RegisterAsync" class="registration-form">
                 <DataAnnotationsValidator />
+
+                <div class="field">
+                    <label for="registration-display-name">Display name</label>
+                    <InputText id="registration-display-name"
+                               autocomplete="name"
+                               aria-describedby="registration-display-name-hint"
+                               disabled="@_isSubmitting"
+                               @bind-Value="_registration.DisplayName" />
+                    <span id="registration-display-name-hint" class="field-hint">
+                        This name will appear publicly on your articles.
+                    </span>
+                    <ValidationMessage For="() => _registration.DisplayName" />
+                </div>
 
                 <div class="field">
                     <label for="registration-email">Email</label>
@@ -78,7 +91,7 @@
 
 @code {
     private readonly RegistrationModel _registration = new();
-    private string? _registeredLogin;
+    private string? _registeredDisplayName;
     private string? _errorMessage;
     private bool _isSubmitting;
 
@@ -89,12 +102,13 @@
 
         var result = await RegistrationClient.RegisterAsync(
             _registration.Login.Trim(),
+            _registration.DisplayName.Trim(),
             _registration.Password);
 
         _isSubmitting = false;
         if (result.Succeeded)
         {
-            _registeredLogin = result.Login;
+            _registeredDisplayName = _registration.DisplayName.Trim();
             _registration.Password = string.Empty;
             _registration.ConfirmPassword = string.Empty;
             return;
@@ -107,6 +121,10 @@
 
     private sealed class RegistrationModel
     {
+        [Required(ErrorMessage = "Display name is required.")]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Display name must be between 2 and 100 characters.")]
+        public string DisplayName { get; set; } = string.Empty;
+
         [Required(ErrorMessage = "Email is required.")]
         [StringLength(254, ErrorMessage = "Email must not exceed 254 characters.")]
         [EmailAddress(ErrorMessage = "Enter a valid email address.")]

@@ -12,7 +12,7 @@
             <ol class="series-list surface">
                 @foreach (var article in _series.Articles)
                 {
-                    <li value="@article.Position"><a href="@($"/{_series.LanguageCode}/articles/{article.Slug}")"><strong>@article.Title</strong><span>@article.Summary</span></a></li>
+                    <li value="@article.Position"><a href="@($"/{_series.LanguageCode}/articles/{article.Slug}")"><strong>@article.Title</strong><span>By @article.AuthorDisplayName · @article.Summary</span></a></li>
                 }
             </ol>
         }

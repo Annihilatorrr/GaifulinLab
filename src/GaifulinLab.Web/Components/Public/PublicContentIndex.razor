@@ -24,7 +24,10 @@
                 @foreach (var article in _articles)
                 {
                     <article class="content-item">
-                        <time datetime="@article.PublishedAt.ToString("O")">@article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                        <div class="content-byline">
+                            <span>By @article.AuthorDisplayName</span>
+                            <time datetime="@article.PublishedAt.ToString("O")">@article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                        </div>
                         <h2><a href="@($"/{article.LanguageCode}/articles/{article.Slug}")">@article.Title</a></h2>
                         @if (!string.IsNullOrWhiteSpace(article.Summary)) { <p>@article.Summary</p> }
                         <div class="metadata">@string.Join(" · ", article.Tags)</div>

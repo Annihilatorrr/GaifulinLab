@@ -6,6 +6,7 @@ public sealed record PublicArticleListItemDto(
     string Title,
     string? Summary,
     DateTimeOffset PublishedAt,
+    string AuthorDisplayName,
     IReadOnlyList<PublicArticleTaxonomyLinkDto> Topics,
     IReadOnlyList<PublicArticleTaxonomyLinkDto> Series,
     IReadOnlyList<string> Tags);

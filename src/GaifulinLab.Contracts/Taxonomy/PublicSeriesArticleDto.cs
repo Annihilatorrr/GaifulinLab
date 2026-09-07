@@ -5,4 +5,5 @@ public sealed record PublicSeriesArticleDto(
     string Slug,
     string Title,
     string? Summary,
-    DateTimeOffset PublishedAt);
+    DateTimeOffset PublishedAt,
+    string AuthorDisplayName);

@@ -6,7 +6,8 @@
 .content-list { overflow: hidden; }
 .content-item { padding: var(--space-6); }
 .content-item + .content-item { border-top: 1px solid var(--color-border); }
-.content-item time, .metadata, .taxonomy-card span { color: var(--color-text-muted); font-size: var(--text-xs); }
+.content-byline { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); }
+.content-byline time, .metadata, .taxonomy-card span { color: var(--color-text-muted); font-size: var(--text-xs); }
 .content-item h2 { margin: var(--space-2) 0; font-size: var(--text-xl); }
 .content-item h2 a { color: var(--color-text); text-decoration: none; }
 .content-item h2 a:hover { color: var(--color-accent); }

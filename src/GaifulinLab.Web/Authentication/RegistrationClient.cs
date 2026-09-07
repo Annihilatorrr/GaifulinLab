@@ -9,6 +9,7 @@ public sealed class RegistrationClient(HttpClient httpClient)
 {
     public async Task<RegistrationAttemptResult> RegisterAsync(
         string login,
+        string displayName,
         string password,
         CancellationToken cancellationToken = default)
     {
@@ -16,7 +17,7 @@ public sealed class RegistrationClient(HttpClient httpClient)
         {
             using var response = await httpClient.PostAsJsonAsync(
                 "/api/auth/register",
-                new RegisterRequest(login, password),
+                new RegisterRequest(login, displayName, password),
                 cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.Created)

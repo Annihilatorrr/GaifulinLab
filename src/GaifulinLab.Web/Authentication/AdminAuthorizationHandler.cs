@@ -16,7 +16,8 @@ public sealed class AdminAuthorizationHandler(
         var isProtectedRequest = request.RequestUri?.AbsolutePath is { } path
             && (path.Equals("/api/admin", StringComparison.Ordinal)
                 || path.StartsWith("/api/admin/", StringComparison.Ordinal)
-                || path.Equals("/api/auth/session", StringComparison.Ordinal));
+                || path.Equals("/api/auth/session", StringComparison.Ordinal)
+                || path.Equals("/api/auth/profile", StringComparison.Ordinal));
 
         if (isProtectedRequest)
         {

@@ -11,6 +11,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
     public async Task VisitorRegisters_AndAdministratorPublishesArticle_ThatIsPubliclyAvailable()
     {
         const string password = "Strong-password-1!";
+        const string displayName = "E2E Author";
         var login = $"e2e-user-{Guid.NewGuid():N}@example.com";
         var uniqueId = Guid.NewGuid().ToString("N");
         var title = $"E2E registration article {uniqueId}";
@@ -25,12 +26,13 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/register").ToString());
 
+        await Page.GetByLabel("Display name").FillAsync(displayName);
         await Page.GetByLabel("Email").FillAsync(login);
         await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password);
         await Page.GetByLabel("Confirm password").FillAsync(password);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
 
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = $"Welcome, {login}" }))
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = $"Welcome, {displayName}" }))
             .ToBeVisibleAsync();
         await Expect(Page.GetByText("Your account is ready. Sign in to create and manage your own articles."))
             .ToBeVisibleAsync();
@@ -61,6 +63,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
 
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/articles/{slug}").ToString());
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = title })).ToBeVisibleAsync();
+        await Expect(Page.GetByText($"By {displayName}", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText(summary, new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.Locator("article.article-body")).ToContainTextAsync(body);
         await Expect(Page.Locator(".article-views")).ToContainTextAsync("1 views");

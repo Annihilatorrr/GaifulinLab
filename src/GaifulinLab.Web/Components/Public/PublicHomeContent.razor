@@ -5,7 +5,7 @@
         <section class="overview-column">
             <header class="overview-heading"><h2>Latest articles</h2><a href="/articles">View all →</a></header>
             @if (_articles.Count == 0) { <div class="overview-empty"><h3>No articles yet</h3><p>Published engineering notes will appear here.</p></div> }
-            else { @foreach (var article in _articles.Take(3)) { <a class="overview-link surface" href="@($"/{article.LanguageCode}/articles/{article.Slug}")"><strong>@article.Title</strong><span>@article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</span></a> } }
+            else { @foreach (var article in _articles.Take(3)) { <a class="overview-link surface" href="@($"/{article.LanguageCode}/articles/{article.Slug}")"><strong>@article.Title</strong><span>By @article.AuthorDisplayName · @article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</span></a> } }
         </section>
         <section class="overview-column">
             <header class="overview-heading"><h2>Browse topics</h2><a href="/topics">All topics →</a></header>

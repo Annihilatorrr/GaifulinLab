@@ -313,7 +313,9 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         await using (var scope = applicationFactory.Services.CreateAsyncScope())
         {
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-            var result = await userManager.CreateAsync(new ApplicationUser { UserName = login }, password);
+            var result = await userManager.CreateAsync(
+                new ApplicationUser { UserName = login, DisplayName = "Second User" },
+                password);
             Assert.True(result.Succeeded, string.Join("; ", result.Errors.Select(error => error.Description)));
         }
 

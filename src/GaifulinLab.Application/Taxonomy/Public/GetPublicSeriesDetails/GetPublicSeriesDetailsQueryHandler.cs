@@ -1,4 +1,5 @@
 using GaifulinLab.Application.Common;
+using GaifulinLab.Application.Authors;
 using GaifulinLab.Application.Persistence;
 using GaifulinLab.Contracts.Taxonomy;
 using GaifulinLab.Domain.Articles;
@@ -8,7 +9,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GaifulinLab.Application.Taxonomy.Public.GetPublicSeriesDetails;
 
-internal sealed class GetPublicSeriesDetailsQueryHandler(IAppDbContext dbContext)
+internal sealed class GetPublicSeriesDetailsQueryHandler(
+    IAppDbContext dbContext,
+    IAuthorDisplayNameLookup authorDisplayNameLookup)
     : IRequestHandler<GetPublicSeriesDetailsQuery, PublicSeriesDetailsDto>
 {
     public async Task<PublicSeriesDetailsDto> Handle(
@@ -39,9 +42,13 @@ internal sealed class GetPublicSeriesDetailsQueryHandler(IAppDbContext dbContext
                     articleLocalization.Slug,
                     articleLocalization.Title,
                     articleLocalization.Summary,
-                    articleLocalization.PublishedAt
+                    articleLocalization.PublishedAt,
+                    article.OwnerUserId
                 })
             .ToListAsync(cancellationToken);
+        var authorDisplayNames = await authorDisplayNameLookup.GetDisplayNamesAsync(
+            rows.Select(row => row.OwnerUserId).ToArray(),
+            cancellationToken);
 
         return new PublicSeriesDetailsDto(
             languageCode,
@@ -53,7 +60,8 @@ internal sealed class GetPublicSeriesDetailsQueryHandler(IAppDbContext dbContext
                     row.Slug!,
                     row.Title,
                     row.Summary,
-                    row.PublishedAt!.Value))
+                    row.PublishedAt!.Value,
+                    authorDisplayNames.GetValueOrDefault(row.OwnerUserId, "Author")))
                 .ToArray());
     }
 }

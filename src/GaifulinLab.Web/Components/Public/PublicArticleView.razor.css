@@ -2,7 +2,7 @@
 .article-header { margin-bottom: var(--space-10); }
 .article-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .article-meta-info { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
-.article-header time { color: var(--color-text-muted); font-size: var(--text-sm); }
+.article-header time, .article-author { color: var(--color-text-muted); font-size: var(--text-sm); }
 .article-views { display: inline-flex; align-items: center; gap: .35rem; color: var(--color-text-muted); font-size: var(--text-sm); }
 .article-views svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.75; }
 .article-download { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: .45rem .75rem; color: var(--color-text); background: transparent; font: inherit; font-size: var(--text-sm); font-weight: 700; text-decoration: none; cursor: pointer; }

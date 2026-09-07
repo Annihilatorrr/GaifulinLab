@@ -1,0 +1,95 @@
+@using System.ComponentModel.DataAnnotations
+@using GaifulinLab.Web.Authentication
+@inject ProfileClient ProfileClient
+
+<section class="profile-page" aria-labelledby="profile-title">
+    <div class="profile-card surface">
+        <span class="eyebrow">Your workspace</span>
+        <h1 id="profile-title">Profile</h1>
+        <p>Choose the name readers see on your articles.</p>
+
+        @if (_loading)
+        {
+            <div role="status">Loading profile…</div>
+        }
+        else
+        {
+            <EditForm Model="_profile" OnValidSubmit="SaveAsync" class="profile-form">
+                <DataAnnotationsValidator />
+                <div class="field">
+                    <label for="display-name">Display name</label>
+                    <InputText id="display-name"
+                               autocomplete="name"
+                               disabled="@_saving"
+                               @bind-Value="_profile.DisplayName" />
+                    <ValidationMessage For="() => _profile.DisplayName" />
+                </div>
+
+                @if (_errorMessage is not null)
+                {
+                    <p class="profile-error" role="alert">@_errorMessage</p>
+                }
+                @if (_saved)
+                {
+                    <p class="profile-success" role="status">Profile saved.</p>
+                }
+
+                <button class="button button-primary" type="submit" disabled="@_saving">
+                    @(_saving ? "Saving…" : "Save profile")
+                </button>
+            </EditForm>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly ProfileModel _profile = new();
+    private bool _loading = true;
+    private bool _saving;
+    private bool _saved;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _profile.DisplayName = (await ProfileClient.GetAsync()).DisplayName;
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "Unable to load your profile.";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _saved = false;
+        _errorMessage = null;
+        try
+        {
+            var profile = await ProfileClient.UpdateAsync(_profile.DisplayName.Trim());
+            _profile.DisplayName = profile.DisplayName;
+            _saved = true;
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "Unable to save your profile.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class ProfileModel
+    {
+        [Required(ErrorMessage = "Display name is required.")]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Display name must be between 2 and 100 characters.")]
+        public string DisplayName { get; set; } = string.Empty;
+    }
+}

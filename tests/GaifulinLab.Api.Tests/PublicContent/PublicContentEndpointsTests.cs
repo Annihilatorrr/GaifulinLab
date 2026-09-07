@@ -7,6 +7,7 @@ using GaifulinLab.Domain.Articles;
 using GaifulinLab.Domain.Tags;
 using GaifulinLab.Domain.Topics;
 using GaifulinLab.Infrastructure.Persistence;
+using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Api.Tests.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,7 @@ public sealed class PublicContentEndpointsTests
         Assert.NotNull(article);
         Assert.Equal("en", article.LanguageCode);
         Assert.Equal("Understanding FFT", article.Title);
+        Assert.Equal("Test Author", article.AuthorDisplayName);
         Assert.Contains("<strong>safe</strong>", article.Html);
         Assert.DoesNotContain("<script", article.Html, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, article.ViewCount);
@@ -103,6 +105,20 @@ public sealed class PublicContentEndpointsTests
     }
 
     [Fact]
+    public async Task ArticleDetails_ExposeDisplayNameButNotIdentityFields()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        await SeedContent(factory.Services);
+        using var client = factory.CreateClient();
+
+        var payload = await client.GetStringAsync("/api/public/articles/en/understanding-fft");
+
+        Assert.Contains("Test Author", payload);
+        Assert.DoesNotContain("test-owner", payload);
+        Assert.DoesNotContain("private-owner@example.com", payload);
+    }
+
+    [Fact]
     public async Task ArticleView_ForDraftLocalization_ReturnsNotFound()
     {
         await using var factory = new AuthWebApplicationFactory();
@@ -137,6 +153,7 @@ public sealed class PublicContentEndpointsTests
 
         var article = Assert.Single(filtered!);
         Assert.Equal("understanding-fft", article.Slug);
+        Assert.Equal("Test Author", article.AuthorDisplayName);
         Assert.Equal("Signal processing", Assert.Single(article.Topics).DisplayName);
         Assert.Equal("Fourier notes", Assert.Single(article.Series).DisplayName);
         Assert.Equal([".NET"], article.Tags);
@@ -145,6 +162,7 @@ public sealed class PublicContentEndpointsTests
         Assert.Equal(1, Assert.Single(series!).ArticleCount);
         Assert.Equal(1, Assert.Single(tags!).ArticleCount);
         Assert.Equal("understanding-fft", Assert.Single(seriesDetails!.Articles).Slug);
+        Assert.Equal("Test Author", Assert.Single(seriesDetails.Articles).AuthorDisplayName);
 
         var allEnglish = await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
             "/api/public/articles?languageCode=en");
@@ -239,6 +257,12 @@ public sealed class PublicContentEndpointsTests
         using var scope = services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var now = DateTimeOffset.UtcNow.AddDays(-1);
+        dbContext.Users.Add(new ApplicationUser
+        {
+            Id = "test-owner",
+            UserName = "private-owner@example.com",
+            DisplayName = "Test Author"
+        });
 
         var article = Article.Create(
             "test-owner",

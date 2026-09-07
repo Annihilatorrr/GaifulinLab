@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using GaifulinLab.Api.Configuration;
 using GaifulinLab.Contracts.Auth;
 using GaifulinLab.Contracts.Common;
@@ -14,6 +15,8 @@ namespace GaifulinLab.Api.Controllers;
 public sealed class AuthController(IUserAuthenticationService authenticationService) : ControllerBase
 {
     private const int MaximumEmailLength = 254;
+    private const int MinimumDisplayNameLength = 2;
+    private const int MaximumDisplayNameLength = 100;
     private const int MaximumPasswordLength = 128;
 
     [HttpPost("login")]
@@ -49,7 +52,8 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
         Response.Headers.CacheControl = "no-store";
 
         var email = request.Login?.Trim() ?? string.Empty;
-        var validationErrors = ValidateRegistration(email, request.Password);
+        var displayName = request.DisplayName?.Trim() ?? string.Empty;
+        var validationErrors = ValidateRegistration(email, displayName, request.Password);
         if (validationErrors.Count > 0)
         {
             return BadRequest(new ApiErrorResponse(
@@ -58,7 +62,7 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
                 validationErrors));
         }
 
-        var result = await authenticationService.RegisterAsync(email, request.Password);
+        var result = await authenticationService.RegisterAsync(email, displayName, request.Password);
         if (result.Succeeded)
         {
             return StatusCode(StatusCodes.Status201Created, new RegisterResponse(email));
@@ -83,10 +87,43 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult GetSession() => NoContent();
 
+    [HttpGet("profile")]
+    [Authorize]
+    [ProducesResponseType<UserProfileResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<UserProfileResponse>> GetProfile()
+    {
+        var displayName = await authenticationService.GetDisplayNameAsync(GetCurrentUserId());
+        return displayName is null ? NotFound() : Ok(new UserProfileResponse(displayName));
+    }
+
+    [HttpPut("profile")]
+    [Authorize]
+    [ProducesResponseType<UserProfileResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<UserProfileResponse>> UpdateProfile(UpdateProfileRequest request)
+    {
+        var displayName = request.DisplayName?.Trim() ?? string.Empty;
+        var errors = ValidateDisplayName(displayName);
+        if (errors.Count > 0)
+        {
+            return BadRequest(new ApiErrorResponse(
+                "invalid_profile",
+                "Please correct the highlighted fields.",
+                errors));
+        }
+
+        return await authenticationService.UpdateDisplayNameAsync(GetCurrentUserId(), displayName)
+            ? Ok(new UserProfileResponse(displayName))
+            : NotFound();
+    }
+
     private UnauthorizedObjectResult InvalidCredentials() =>
         Unauthorized(new ApiErrorResponse("invalid_credentials", "Invalid login or password."));
 
-    private static Dictionary<string, string[]> ValidateRegistration(string email, string? password)
+    private static Dictionary<string, string[]> ValidateRegistration(
+        string email,
+        string displayName,
+        string? password)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(email))
@@ -99,6 +136,11 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
             errors["Login"] = ["Enter a valid email address."];
         }
 
+        foreach (var (field, messages) in ValidateDisplayName(displayName))
+        {
+            errors[field] = messages;
+        }
+
         if (string.IsNullOrEmpty(password) || password.Length > MaximumPasswordLength)
         {
             errors["Password"] =
@@ -109,4 +151,24 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
 
         return errors;
     }
+
+    private static Dictionary<string, string[]> ValidateDisplayName(string displayName)
+    {
+        if (displayName.Length is >= MinimumDisplayNameLength and <= MaximumDisplayNameLength)
+        {
+            return [];
+        }
+
+        return new Dictionary<string, string[]>
+        {
+            ["DisplayName"] =
+            [
+                $"Display name must be between {MinimumDisplayNameLength} and {MaximumDisplayNameLength} characters."
+            ]
+        };
+    }
+
+    private string GetCurrentUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? throw new InvalidOperationException("Authenticated user id is missing.");
 }

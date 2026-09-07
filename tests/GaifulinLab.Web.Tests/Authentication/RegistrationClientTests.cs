@@ -22,11 +22,12 @@ public sealed class RegistrationClientTests
         };
         var client = new RegistrationClient(httpClient);
 
-        var result = await client.RegisterAsync("new-user@example.com", "Strong-password-1!");
+        var result = await client.RegisterAsync("new-user@example.com", "Ada Lovelace", "Strong-password-1!");
 
         Assert.True(result.Succeeded);
         Assert.Equal("new-user@example.com", result.Login);
         Assert.Equal("new-user@example.com", request?.Login);
+        Assert.Equal("Ada Lovelace", request?.DisplayName);
         Assert.Equal("Strong-password-1!", request?.Password);
     }
 
@@ -45,7 +46,7 @@ public sealed class RegistrationClientTests
         };
         var client = new RegistrationClient(httpClient);
 
-        var result = await client.RegisterAsync("new-user@example.com", "password");
+        var result = await client.RegisterAsync("new-user@example.com", "Ada Lovelace", "password");
 
         Assert.False(result.Succeeded);
         Assert.Equal("Password needs a symbol.", result.ErrorMessage);
@@ -61,7 +62,7 @@ public sealed class RegistrationClientTests
         };
         var client = new RegistrationClient(httpClient);
 
-        var result = await client.RegisterAsync("new-user@example.com", "Strong-password-1!");
+        var result = await client.RegisterAsync("new-user@example.com", "Ada Lovelace", "Strong-password-1!");
 
         Assert.False(result.Succeeded);
         Assert.Contains("Too many", result.ErrorMessage);

@@ -72,6 +72,11 @@ public sealed class AppDbContextModelTests
             index.Properties.Select(property => property.Name).SequenceEqual(
                 [nameof(Article.OwnerUserId), nameof(Article.DeletedAt), nameof(Article.UpdatedAt)]));
         Assert.NotNull(articleType.FindProperty(nameof(Article.DeletedAt)));
+        var userType = context.Model.FindEntityType(typeof(ApplicationUser))!;
+        var displayName = userType.FindProperty(nameof(ApplicationUser.DisplayName));
+        Assert.NotNull(displayName);
+        Assert.False(displayName.IsNullable);
+        Assert.Equal(100, displayName.GetMaxLength());
         Assert.NotNull(context.Model.FindEntityType(typeof(ArticleLocalization))!
             .FindProperty(nameof(ArticleLocalization.LastEditedAt)));
         Assert.Contains(articleType.GetForeignKeys(), foreignKey =>
@@ -109,6 +114,7 @@ public sealed class AppDbContextModelTests
         Assert.Contains("pdf_export_jobs", script);
         Assert.Contains("article_views", script);
         Assert.Contains("AspNetUsers", script);
+        Assert.Contains("DisplayName", script);
         Assert.Contains("AspNetRoles", script);
     }
 
