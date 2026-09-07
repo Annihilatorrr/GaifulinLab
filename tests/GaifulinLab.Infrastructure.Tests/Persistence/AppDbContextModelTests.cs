@@ -1,4 +1,5 @@
 using GaifulinLab.Domain.Articles;
+using GaifulinLab.Domain.Common;
 using GaifulinLab.Domain.Media;
 using GaifulinLab.Domain.Pdf;
 using GaifulinLab.Domain.Series;
@@ -79,6 +80,19 @@ public sealed class AppDbContextModelTests
         Assert.Equal(100, displayName.GetMaxLength());
         Assert.NotNull(context.Model.FindEntityType(typeof(ArticleLocalization))!
             .FindProperty(nameof(ArticleLocalization.LastEditedAt)));
+        var localizationType = context.Model.FindEntityType(typeof(ArticleLocalization))!;
+        Assert.Equal(
+            ContentLimits.ArticleTitle,
+            localizationType.FindProperty(nameof(ArticleLocalization.Title))!.GetMaxLength());
+        Assert.Equal(
+            ContentLimits.ArticleSlug,
+            localizationType.FindProperty(nameof(ArticleLocalization.Slug))!.GetMaxLength());
+        Assert.Equal(
+            ContentLimits.ArticleSummary,
+            localizationType.FindProperty(nameof(ArticleLocalization.Summary))!.GetMaxLength());
+        var tagType = context.Model.FindEntityType(typeof(Tag))!;
+        Assert.Equal(ContentLimits.TagName, tagType.FindProperty(nameof(Tag.Name))!.GetMaxLength());
+        Assert.Equal(ContentLimits.TagName, tagType.FindProperty(nameof(Tag.NormalizedName))!.GetMaxLength());
         Assert.Contains(articleType.GetForeignKeys(), foreignKey =>
             foreignKey.Properties.Select(property => property.Name).SequenceEqual([nameof(Article.OwnerUserId)])
             && foreignKey.PrincipalEntityType.ClrType == typeof(ApplicationUser)

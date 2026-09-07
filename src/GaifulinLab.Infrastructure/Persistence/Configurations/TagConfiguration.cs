@@ -1,4 +1,5 @@
 using GaifulinLab.Domain.Tags;
+using GaifulinLab.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -16,10 +17,10 @@ internal sealed class TagConfiguration : IEntityTypeConfiguration<Tag>
         builder.HasKey(tag => tag.Id);
 
         builder.Property(tag => tag.Name)
-            .HasMaxLength(100)
+            .HasMaxLength(ContentLimits.TagName)
             .IsRequired();
         builder.Property(tag => tag.NormalizedName)
-            .HasMaxLength(100)
+            .HasMaxLength(ContentLimits.TagName)
             .IsRequired();
 
         builder.HasIndex(tag => tag.NormalizedName)

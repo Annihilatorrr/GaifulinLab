@@ -3,6 +3,7 @@ using GaifulinLab.Contracts.Common;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace GaifulinLab.Api.Filters;
 
@@ -18,7 +19,12 @@ internal sealed class ApiExceptionFilter : IAsyncExceptionFilter
                 (StatusCodes.Status409Conflict, exception.Code, exception.Message),
             PdfRenderingException exception =>
                 (StatusCodes.Status503ServiceUnavailable, "pdf_renderer_unavailable", exception.Message),
-            DbUpdateException =>
+            DbUpdateConcurrencyException =>
+                (
+                    StatusCodes.Status409Conflict,
+                    "persistence_conflict",
+                    "The requested change conflicts with existing data."),
+            DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } =>
                 (
                     StatusCodes.Status409Conflict,
                     "persistence_conflict",
@@ -35,7 +41,14 @@ internal sealed class ApiExceptionFilter : IAsyncExceptionFilter
             return Task.CompletedTask;
         }
 
-        context.Result = new ObjectResult(new ApiErrorResponse(code, message))
+        var errors = context.Exception is ArgumentException { ParamName: { Length: > 0 } parameterName }
+            ? new Dictionary<string, string[]>
+            {
+                [char.ToUpperInvariant(parameterName[0]) + parameterName[1..]] = [message]
+            }
+            : null;
+
+        context.Result = new ObjectResult(new ApiErrorResponse(code, message, errors))
         {
             StatusCode = statusCode
         };

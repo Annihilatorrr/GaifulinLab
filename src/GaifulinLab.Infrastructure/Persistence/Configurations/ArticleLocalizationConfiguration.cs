@@ -1,4 +1,5 @@
 using GaifulinLab.Domain.Articles;
+using GaifulinLab.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -33,12 +34,12 @@ internal sealed class ArticleLocalizationConfiguration : IEntityTypeConfiguratio
             .HasMaxLength(2)
             .IsRequired();
         builder.Property(localization => localization.Slug)
-            .HasMaxLength(200);
+            .HasMaxLength(ContentLimits.ArticleSlug);
         builder.Property(localization => localization.Title)
-            .HasMaxLength(300)
+            .HasMaxLength(ContentLimits.ArticleTitle)
             .IsRequired();
         builder.Property(localization => localization.Summary)
-            .HasMaxLength(1_000);
+            .HasMaxLength(ContentLimits.ArticleSummary);
         builder.Property(localization => localization.Markdown)
             .HasColumnType("text")
             .IsRequired();

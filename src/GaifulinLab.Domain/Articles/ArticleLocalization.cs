@@ -62,6 +62,10 @@ public sealed class ArticleLocalization
         var normalizedMarkdown = markdown ?? string.Empty;
         var normalizedSlug = DomainRules.NormalizeOptionalSlug(slug);
 
+        DomainRules.EnsureMaximumLength(normalizedTitle, ContentLimits.ArticleTitle, nameof(title));
+        DomainRules.EnsureMaximumLength(normalizedSummary, ContentLimits.ArticleSummary, nameof(summary));
+        DomainRules.EnsureMaximumLength(normalizedSlug, ContentLimits.ArticleSlug, nameof(slug));
+
         if (Status == PublicationStatus.Published)
         {
             EnsurePublishable(normalizedTitle, normalizedSlug, normalizedMarkdown);

@@ -1,4 +1,5 @@
 using GaifulinLab.Domain.Articles;
+using GaifulinLab.Domain.Common;
 
 namespace GaifulinLab.Domain.Tests.Articles;
 
@@ -155,6 +156,64 @@ public sealed class ArticleTests
         Assert.Equal("Title", localization.Title);
         Assert.Equal("Content", localization.Markdown);
         Assert.Equal("article", localization.Slug);
+    }
+
+    [Fact]
+    public void UpdateLocalization_RejectsValuesThatExceedPersistedContentLimits()
+    {
+        var article = Article.Create(
+            "test-owner",
+            "en",
+            CreatedAt,
+            "Original title",
+            "Original summary",
+            "Original content",
+            "original-slug");
+
+        Assert.Throws<ArgumentException>(() => article.UpdateLocalization(
+            "en",
+            new string('t', ContentLimits.ArticleTitle + 1),
+            "Original summary",
+            "Original content",
+            "original-slug",
+            CreatedAt.AddDays(1)));
+        Assert.Throws<ArgumentException>(() => article.UpdateLocalization(
+            "en",
+            "Original title",
+            new string('s', ContentLimits.ArticleSummary + 1),
+            "Original content",
+            "original-slug",
+            CreatedAt.AddDays(1)));
+        Assert.Throws<ArgumentException>(() => article.UpdateLocalization(
+            "en",
+            "Original title",
+            "Original summary",
+            "Original content",
+            new string('a', ContentLimits.ArticleSlug + 1),
+            CreatedAt.AddDays(1)));
+
+        var localization = article.FindLocalization("en")!;
+        Assert.Equal("Original title", localization.Title);
+        Assert.Equal("Original summary", localization.Summary);
+        Assert.Equal("original-slug", localization.Slug);
+    }
+
+    [Fact]
+    public void Create_AcceptsValuesAtPersistedContentLimits()
+    {
+        var article = Article.Create(
+            "test-owner",
+            "en",
+            CreatedAt,
+            new string('t', ContentLimits.ArticleTitle),
+            new string('s', ContentLimits.ArticleSummary),
+            "Content",
+            new string('a', ContentLimits.ArticleSlug));
+
+        var localization = Assert.Single(article.Localizations);
+        Assert.Equal(ContentLimits.ArticleTitle, localization.Title.Length);
+        Assert.Equal(ContentLimits.ArticleSummary, localization.Summary!.Length);
+        Assert.Equal(ContentLimits.ArticleSlug, localization.Slug!.Length);
     }
 
     [Fact]

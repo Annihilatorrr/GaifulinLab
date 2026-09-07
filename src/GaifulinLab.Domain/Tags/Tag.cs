@@ -25,6 +25,8 @@ public sealed class Tag
     public void Rename(string name)
     {
         Name = DomainRules.RequireTrimmed(name, nameof(name));
+        DomainRules.EnsureMaximumLength(Name, ContentLimits.TagName, nameof(name));
         NormalizedName = Name.ToLowerInvariant();
+        DomainRules.EnsureMaximumLength(NormalizedName, ContentLimits.TagName, nameof(name));
     }
 }

@@ -6,6 +6,7 @@ using GaifulinLab.Contracts.Auth;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Contracts.Taxonomy;
 using GaifulinLab.Domain.Series;
+using GaifulinLab.Domain.Common;
 using GaifulinLab.Domain.Topics;
 using GaifulinLab.Infrastructure.Persistence;
 using GaifulinLab.Api.Tests.Authentication;
@@ -220,6 +221,59 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
         var error = await secondResponse.Content.ReadFromJsonAsync<ApiErrorResponse>();
         Assert.Equal("conflict", error?.Code);
+    }
+
+    [Fact]
+    public async Task ContentLongerThanPersistedLimits_ReturnsFieldValidationErrorsBeforeSaving()
+    {
+        using var client = await CreateAuthenticatedClient();
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest(
+                "en",
+                new string('t', ContentLimits.ArticleTitle + 1),
+                null,
+                "Content",
+                "too-long-title"));
+        await AssertInvalidFieldAsync(createResponse, "Title");
+
+        var validResponse = await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest("en", "Original title", "Summary", "Content", $"limits-{Guid.NewGuid():N}"));
+        var created = await validResponse.Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(created);
+
+        var summaryResponse = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created!.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest(
+                "Original title",
+                new string('s', ContentLimits.ArticleSummary + 1),
+                "Content",
+                "valid-slug",
+                created.LocalizationVersion));
+        await AssertInvalidFieldAsync(summaryResponse, "Summary");
+
+        var slugResponse = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest(
+                "Original title",
+                "Summary",
+                "Content",
+                new string('a', ContentLimits.ArticleSlug + 1),
+                created.LocalizationVersion));
+        await AssertInvalidFieldAsync(slugResponse, "Slug");
+
+        var tagsResponse = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created.ArticleId}/taxonomy",
+            new UpdateArticleTaxonomyRequest([], [], [new string('t', ContentLimits.TagName + 1)]));
+        await AssertInvalidFieldAsync(tagsResponse, "Tags");
+
+        var persisted = await client.GetFromJsonAsync<AdminArticleDetailsDto>(
+            $"/api/admin/articles/{created.ArticleId}");
+        var localization = Assert.Single(persisted!.Localizations);
+        Assert.Equal("Original title", localization.Title);
+        Assert.Equal("Summary", localization.Summary);
     }
 
     [Fact]
@@ -468,5 +522,14 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         client.DefaultRequestHeaders.Add(
             "X-Forwarded-For",
             $"10.{address >> 16 & 255}.{address >> 8 & 255}.{address & 255}");
+    }
+
+    private static async Task AssertInvalidFieldAsync(HttpResponseMessage response, string field)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+        Assert.Equal("invalid_request", error?.Code);
+        Assert.NotNull(error?.Errors);
+        Assert.True(error.Errors!.ContainsKey(field), $"Expected validation error for '{field}'.");
     }
 }

@@ -71,5 +71,15 @@ public static class DomainRules
         return value.Trim();
     }
 
+    public static void EnsureMaximumLength(string? value, int maximumLength, string parameterName)
+    {
+        if (value?.Length > maximumLength)
+        {
+            throw new ArgumentException(
+                $"{parameterName} must not exceed {maximumLength} characters.",
+                parameterName);
+        }
+    }
+
     public static DateTimeOffset AsUtc(DateTimeOffset value) => value.ToUniversalTime();
 }

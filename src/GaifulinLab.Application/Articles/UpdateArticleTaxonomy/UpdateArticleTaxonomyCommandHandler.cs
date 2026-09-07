@@ -1,5 +1,6 @@
 using GaifulinLab.Application.Common;
 using GaifulinLab.Application.Persistence;
+using GaifulinLab.Domain.Common;
 using GaifulinLab.Domain.Tags;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -113,6 +114,13 @@ internal sealed class UpdateArticleTaxonomyCommandHandler(
         if (request.Tags.Any(string.IsNullOrWhiteSpace))
         {
             throw new ArgumentException("Tags cannot be empty.", nameof(request));
+        }
+
+        if (request.Tags.Any(tag => tag.Trim().Length > ContentLimits.TagName))
+        {
+            throw new ArgumentException(
+                $"Each tag must not exceed {ContentLimits.TagName} characters.",
+                "Tags");
         }
     }
 }
