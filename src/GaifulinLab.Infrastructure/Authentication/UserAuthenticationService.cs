@@ -2,14 +2,21 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace GaifulinLab.Infrastructure.Authentication;
 
 internal sealed class UserAuthenticationService(
     JwtAuthenticationSettings settings,
-    UserManager<ApplicationUser> userManager) : IUserAuthenticationService
+    UserManager<ApplicationUser> userManager,
+    IServiceScopeFactory scopeFactory,
+    ILogger<UserAuthenticationService> logger) : IUserAuthenticationService
 {
+    private const int MaximumIdentityConcurrencyRetries = 3;
+    private const string ConcurrencyFailureCode = "ConcurrencyFailure";
+
     public async Task<IssuedAccessToken?> AuthenticateAsync(string login, string password)
     {
         ArgumentNullException.ThrowIfNull(login);
@@ -23,11 +30,14 @@ internal sealed class UserAuthenticationService(
 
         if (!await userManager.CheckPasswordAsync(user, password))
         {
-            await userManager.AccessFailedAsync(user);
+            await RecordFailedAccessAsync(user);
             return null;
         }
 
-        await userManager.ResetAccessFailedCountAsync(user);
+        if (!await ResetFailedAccessCountAsync(user))
+        {
+            return null;
+        }
 
         var issuedAt = DateTimeOffset.UtcNow;
         var expiresAt = issuedAt.Add(settings.TokenLifetime);
@@ -106,5 +116,85 @@ internal sealed class UserAuthenticationService(
 
         user.DisplayName = displayName;
         return (await userManager.UpdateAsync(user)).Succeeded;
+    }
+
+    private async Task RecordFailedAccessAsync(ApplicationUser user)
+    {
+        IdentityResult? result = await userManager.AccessFailedAsync(user);
+        if (IsConcurrencyFailure(result))
+        {
+            result = await RetryIdentityUpdateAsync(
+                user.Id,
+                static (manager, currentUser) => manager.AccessFailedAsync(currentUser));
+        }
+
+        if (result is not null && !result.Succeeded)
+        {
+            LogIdentityUpdateFailure("record a failed sign-in", user.Id, result);
+        }
+    }
+
+    private async Task<bool> ResetFailedAccessCountAsync(ApplicationUser user)
+    {
+        IdentityResult? result = await userManager.ResetAccessFailedCountAsync(user);
+        if (IsConcurrencyFailure(result))
+        {
+            result = await RetryIdentityUpdateAsync(
+                user.Id,
+                static (manager, currentUser) => manager.ResetAccessFailedCountAsync(currentUser));
+        }
+
+        if (result is null)
+        {
+            return false;
+        }
+
+        if (result.Succeeded)
+        {
+            return true;
+        }
+
+        LogIdentityUpdateFailure("reset failed sign-ins", user.Id, result);
+        return false;
+    }
+
+    private async Task<IdentityResult?> RetryIdentityUpdateAsync(
+        string userId,
+        Func<UserManager<ApplicationUser>, ApplicationUser, Task<IdentityResult>> update)
+    {
+        for (var retry = 0; retry < MaximumIdentityConcurrencyRetries; retry++)
+        {
+            // Identity keeps the stale user tracked after a conflict, so retries need a new scope.
+            using var scope = scopeFactory.CreateScope();
+            var retryUserManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var currentUser = await retryUserManager.FindByIdAsync(userId);
+            if (currentUser is null || await retryUserManager.IsLockedOutAsync(currentUser))
+            {
+                return null;
+            }
+
+            var result = await update(retryUserManager, currentUser);
+            if (!IsConcurrencyFailure(result))
+            {
+                return result;
+            }
+        }
+
+        return IdentityResult.Failed(new IdentityError { Code = ConcurrencyFailureCode });
+    }
+
+    private static bool IsConcurrencyFailure(IdentityResult? result) =>
+        result?.Errors.Any(error => string.Equals(error.Code, ConcurrencyFailureCode, StringComparison.Ordinal)) is true;
+
+    private void LogIdentityUpdateFailure(string operation, string userId, IdentityResult result)
+    {
+        if (!result.Succeeded)
+        {
+            logger.LogWarning(
+                "Identity could not {Operation} for user {UserId}: {ErrorCodes}.",
+                operation,
+                userId,
+                string.Join(", ", result.Errors.Select(error => error.Code)));
+        }
     }
 }
