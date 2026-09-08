@@ -89,46 +89,107 @@ internal sealed class PdfExportWorker(
 
     private async Task ProcessAsync(PdfExportSnapshot job, CancellationToken cancellationToken)
     {
+        string? relativePath = null;
         try
         {
             using var scope = scopeFactory.CreateScope();
             var renderer = scope.ServiceProvider.GetRequiredService<IArticlePdfRenderer>();
             var storage = scope.ServiceProvider.GetRequiredService<IMediaStorage>();
             var pdf = await renderer.RenderAsync(job.Document, job.Typography, cancellationToken);
-            var relativePath = $"pdf-exports/{job.Id:N}-{job.AttemptCount}.pdf";
+            relativePath = $"pdf-exports/{job.Id:N}-{job.AttemptCount}.pdf";
             await using var content = new MemoryStream(pdf, writable: false);
             await storage.SaveAsync(relativePath, content, cancellationToken);
 
-            using var completionScope = scopeFactory.CreateScope();
-            var dbContext = completionScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var persisted = await dbContext.PdfExportJobs.SingleAsync(candidate => candidate.Id == job.Id, cancellationToken);
-            persisted.Complete(relativePath, pdf.LongLength, timeProvider.GetUtcNow());
-            await dbContext.SaveChangesAsync(cancellationToken);
+            if (!await CompleteAsync(job, relativePath, pdf.LongLength, cancellationToken))
+            {
+                await DeleteOutputAsync(relativePath);
+                logger.LogInformation(
+                    "Discarded PDF export {PdfExportId} from superseded attempt {AttemptCount}.",
+                    job.Id,
+                    job.AttemptCount);
+                return;
+            }
+
             logger.LogInformation("Generated PDF export {PdfExportId} ({Size} bytes).", job.Id, pdf.LongLength);
         }
         catch (PdfRenderingException exception)
         {
-            await FailAsync(job.Id, exception.Message, cancellationToken);
+            await FailAsync(job.Id, job.AttemptCount, exception.Message, cancellationToken);
         }
         catch (Exception exception)
         {
             logger.LogError(exception, "PDF export {PdfExportId} failed.", job.Id);
-            await FailAsync(job.Id, "The PDF export failed.", cancellationToken);
+            await FailAsync(job.Id, job.AttemptCount, "The PDF export failed.", cancellationToken);
         }
     }
 
-    private async Task FailAsync(Guid jobId, string message, CancellationToken cancellationToken)
+    private async Task<bool> CompleteAsync(
+        PdfExportSnapshot job,
+        string relativePath,
+        long outputSize,
+        CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var job = await dbContext.PdfExportJobs.SingleOrDefaultAsync(candidate => candidate.Id == jobId, cancellationToken);
-        if (job is null || job.Status != PdfExportStatus.Processing)
+        var completedAt = timeProvider.GetUtcNow();
+        // A lease may have been reclaimed while rendering, so only this active attempt may complete.
+        var changed = await dbContext.PdfExportJobs
+            .Where(candidate =>
+                candidate.Id == job.Id
+                && candidate.AttemptCount == job.AttemptCount
+                && candidate.Status == PdfExportStatus.Processing)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(candidate => candidate.Status, PdfExportStatus.Completed)
+                .SetProperty(candidate => candidate.RelativePath, relativePath)
+                .SetProperty(candidate => candidate.OutputSize, outputSize)
+                .SetProperty(candidate => candidate.CompletedAt, completedAt)
+                .SetProperty(candidate => candidate.LeaseExpiresAt, (DateTimeOffset?)null)
+                .SetProperty(candidate => candidate.ErrorMessage, (string?)null), cancellationToken);
+
+        return changed == 1;
+    }
+
+    private async Task FailAsync(
+        Guid jobId,
+        int attemptCount,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        var errorMessage = string.IsNullOrWhiteSpace(message)
+            ? "The PDF export failed."
+            : message[..Math.Min(message.Length, 1_000)];
+
+        using var scope = scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // Do not let an expired attempt mark the worker that reclaimed its lease as failed.
+        await dbContext.PdfExportJobs
+            .Where(candidate =>
+                candidate.Id == jobId
+                && candidate.AttemptCount == attemptCount
+                && candidate.Status == PdfExportStatus.Processing)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(candidate => candidate.Status, PdfExportStatus.Failed)
+                .SetProperty(candidate => candidate.LeaseExpiresAt, (DateTimeOffset?)null)
+                .SetProperty(candidate => candidate.ErrorMessage, errorMessage), cancellationToken);
+    }
+
+    private async Task DeleteOutputAsync(string? relativePath)
+    {
+        if (relativePath is null)
         {
             return;
         }
 
-        job.Fail(message);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var storage = scope.ServiceProvider.GetRequiredService<IMediaStorage>();
+            await storage.DeleteAsync(relativePath, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Could not delete discarded PDF export at {RelativePath}.", relativePath);
+        }
     }
 
     private sealed record PdfExportSnapshot(
