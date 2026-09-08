@@ -93,6 +93,11 @@
     padding-right: max(var(--site-gutter), env(safe-area-inset-right));
 }
 
+/* The skip link programmatically focuses this non-interactive landmark. */
+.admin-main:focus-visible {
+    outline: none;
+}
+
 @media (max-width: 40rem) {
     .admin-header-inner {
         min-height: 4.25rem;

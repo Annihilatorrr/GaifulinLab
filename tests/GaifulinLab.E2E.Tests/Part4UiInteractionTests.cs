@@ -267,6 +267,12 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
         Assert.True(await skip.EvaluateAsync<bool>("element => element === document.activeElement"));
         await Page.Keyboard.PressAsync("Enter");
         Assert.Equal("admin-main-content", await Page.EvaluateAsync<string>("document.activeElement.id"));
+
+        // Keyboard navigation keeps the skip-link destination focus-visible.
+        Assert.True(await Page.EvaluateAsync<bool>("document.activeElement.matches(':focus-visible')"));
+
+        // Its full-width landmark must not receive the global focus outline.
+        Assert.Equal("none", await Page.EvaluateAsync<string>("getComputedStyle(document.activeElement).outlineStyle"));
         await Page.GetByLabel("Return to Gaifulin Lab").FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Page).ToHaveURLAsync(new Regex("/$"));

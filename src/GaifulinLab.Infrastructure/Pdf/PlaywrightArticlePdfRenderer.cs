@@ -244,6 +244,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
                     h2 { margin-top: 1.8rem; font-size: 19pt; line-height: 1.2; break-after: avoid-page; }
                     h3 { margin-top: 1.5rem; font-size: 15pt; line-height: 1.25; break-after: avoid-page; }
                     h4, h5, h6 { margin-top: 1.25rem; break-after: avoid-page; }
+                    hr { display: none; }
                     .summary { color: #40547c; font-size: 13pt; }
                     p, ul, ol, blockquote, pre, table { margin: 0 0 __BLOCK_SPACING__rem; }
                     .math { margin: 0; break-inside: avoid-page; }
