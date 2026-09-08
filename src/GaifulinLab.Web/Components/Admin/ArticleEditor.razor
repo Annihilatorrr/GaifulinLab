@@ -2,6 +2,7 @@
 @inject AdminArticlesClient ArticlesClient
 @inject AdminMarkdownClient MarkdownClient
 @inject AdminMediaClient MediaClient
+@inject PublicContentClient ContentClient
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @using System.Globalization
@@ -110,6 +111,22 @@
                           value="@Current.Summary" @oninput="HandleSummaryInput"></textarea>
             </label>
             <div class="metadata-controls">
+                <div class="metadata-assignment cover-setting">
+                    <span class="metadata-label">Cover</span>
+                    <details class="metadata-popover" data-dismiss-on-outside-click>
+                        <summary>@(Current.CoverMediaAssetId is null ? "+ Add cover" : "Change cover")</summary>
+                        <div class="metadata-popover-content">
+                            @if (Current.CoverMediaAssetId is { } coverId)
+                            {
+                                <img class="editor-cover-preview" src="@(ContentClient.AssetBaseUrl.TrimEnd('/') + $"/media/{coverId}")" alt="Article cover" />
+                                <button type="button" class="button button-secondary" disabled="@IsBusy" @onclick="RemoveCover">Remove cover</button>
+                            }
+                            <label>Upload cover<InputFile OnChange="HandleCoverSelected" accept="image/png,image/jpeg,image/webp,image/gif" disabled="@IsBusy" /></label>
+                            @if (_coverUploading) { <span role="status">Uploading cover…</span> }
+                            @if (_coverError is not null) { <span role="alert">@_coverError</span> }
+                        </div>
+                    </details>
+                </div>
                 <div class="metadata-assignment">
                     <span class="metadata-label">Topic</span>
                     <details class="metadata-popover" data-dismiss-on-outside-click>
@@ -284,7 +301,7 @@
     private ArticleTypography _typography = ArticleTypography.Default;
     private DateTimeOffset? _savedAt;
     private LocalizationModel Current => _localizations[_activeLanguage];
-    private bool IsBusy => _loading || _saving;
+    private bool IsBusy => _loading || _saving || _coverUploading;
     private bool CanSave => !IsBusy
         && _conflictLanguage is null
         && (ArticleId is null || _isDirty || _saveFailed);
@@ -766,6 +783,27 @@
         finally { _imageUploading = false; }
     }
 
+    private bool _coverUploading;
+    private string? _coverError;
+    private void RemoveCover() { Current.CoverMediaAssetId = null; MarkDirty(); }
+    private async Task HandleCoverSelected(InputFileChangeEventArgs eventArgs)
+    {
+        var localization = Current;
+        _coverUploading = true;
+        _coverError = null;
+        try
+        {
+            var file = eventArgs.File;
+            await using var content = file.OpenReadStream(MediaUploadLimits.MaximumFileSize);
+            var uploaded = await MediaClient.UploadAsync(content, file.Name, file.ContentType);
+            localization.CoverMediaAssetId = uploaded.Id;
+            MarkDirty();
+        }
+        catch (IOException) { _coverError = "The image is larger than 10 MB."; }
+        catch (Exception exception) when (exception is MediaUploadException or HttpRequestException) { _coverError = exception.Message; }
+        finally { _coverUploading = false; }
+    }
+
     private async Task RefreshPreview()
     {
         _previewCancellation?.Cancel();
@@ -1069,6 +1107,7 @@
         private string _savedSummary = "";
         private string _savedMarkdown = "";
         private string _savedSlug = "";
+        private Guid? _savedCover;
 
         public LocalizationModel(string languageCode)
         {
@@ -1082,6 +1121,7 @@
             LanguageCode = languageCode;
             Title = source.Title;
             Summary = source.Summary;
+            CoverMediaAssetId = source.CoverMediaAssetId;
             Markdown = source.Markdown;
             Slug = SlugSuggestion.FromTitle(Title);
             SlugIsAutomatic = true;
@@ -1094,6 +1134,7 @@
             LanguageCode = dto.LanguageCode;
             Title = dto.Title;
             Summary = dto.Summary ?? "";
+            CoverMediaAssetId = dto.CoverMediaAssetId;
             Markdown = dto.Markdown;
             Slug = dto.Slug ?? "";
             Status = dto.Status;
@@ -1109,6 +1150,7 @@
         public string LanguageCode { get; }
         public string Title { get; set; } = "";
         public string Summary { get; set; } = "";
+        public Guid? CoverMediaAssetId { get; set; }
         public string Markdown { get; set; } = "";
         public string Slug { get; set; } = "";
         public bool SlugIsAutomatic { get; set; }
@@ -1117,15 +1159,16 @@
             !string.Equals(Title, _savedTitle, StringComparison.Ordinal)
             || !string.Equals(Summary, _savedSummary, StringComparison.Ordinal)
             || !string.Equals(Markdown, _savedMarkdown, StringComparison.Ordinal)
-            || !string.Equals(Slug, _savedSlug, StringComparison.Ordinal);
-        public CreateArticleRequest ToCreateRequest() => new(LanguageCode, Title, Summary, Markdown, Slug);
-        public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Markdown, Slug, Version);
+            || !string.Equals(Slug, _savedSlug, StringComparison.Ordinal)
+            || CoverMediaAssetId != _savedCover;
+        public CreateArticleRequest ToCreateRequest() => new(LanguageCode, Title, Summary, Markdown, Slug, CoverMediaAssetId);
+        public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Markdown, Slug, Version, CoverMediaAssetId);
         public void MarkSaved(CreateArticleRequest request, long version) =>
             MarkSaved(new UpdateArticleLocalizationRequest(
                 request.Title,
                 request.Summary,
                 request.Markdown,
-                request.Slug), version);
+                request.Slug, CoverMediaAssetId: request.CoverMediaAssetId), version);
         public void MarkSaved(UpdateArticleLocalizationRequest request, long version)
         {
             Version = version;
@@ -1133,6 +1176,7 @@
             _savedSummary = request.Summary ?? "";
             _savedMarkdown = request.Markdown ?? "";
             _savedSlug = request.Slug ?? "";
+            _savedCover = request.CoverMediaAssetId;
         }
         public void UseVersion(long version) => Version = version;
         private void CaptureSavedValues()
@@ -1141,6 +1185,7 @@
             _savedSummary = Summary;
             _savedMarkdown = Markdown;
             _savedSlug = Slug;
+            _savedCover = CoverMediaAssetId;
         }
     }
     private enum EditorPane { Edit, Split, Preview }

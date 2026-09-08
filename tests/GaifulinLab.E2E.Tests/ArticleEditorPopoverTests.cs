@@ -25,7 +25,7 @@ public sealed class ArticleEditorPopoverTests : PageTest
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
 
         var popovers = Page.Locator("details[data-dismiss-on-outside-click]");
-        await Expect(popovers).ToHaveCountAsync(3);
+        await Expect(popovers).ToHaveCountAsync(4);
 
         for (var index = 0; index < await popovers.CountAsync(); index++)
         {

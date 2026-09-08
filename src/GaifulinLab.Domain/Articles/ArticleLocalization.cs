@@ -42,6 +42,20 @@ public sealed class ArticleLocalization
 
     public string Markdown { get; private set; } = string.Empty;
 
+    public Guid? CoverMediaAssetId { get; private set; }
+
+    public string? SearchText { get; private set; }
+
+    public int ReadingMinutes { get; private set; } = 1;
+
+    public void SetCover(Guid? mediaAssetId) => CoverMediaAssetId = mediaAssetId;
+
+    public void UpdateSearchText(string text, int readingMinutes)
+    {
+        SearchText = text;
+        ReadingMinutes = Math.Max(1, readingMinutes);
+    }
+
     public PublicationStatus Status { get; private set; }
 
     public DateTimeOffset? PublishedAt { get; private set; }

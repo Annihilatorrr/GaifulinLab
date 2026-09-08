@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IAppDbContext>(serviceProvider =>
             serviceProvider.GetRequiredService<AppDbContext>());
         services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
+        services.AddScoped<GaifulinLab.Application.Articles.Public.IArticleSearch, Content.ArticleSearch>();
         services.AddSingleton<IMediaStorage>(_ => new FileSystemMediaStorage(
             configuration["MEDIA_STORAGE_PATH"]
             ?? configuration["MediaStorage:RootPath"]

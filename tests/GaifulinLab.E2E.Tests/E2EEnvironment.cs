@@ -359,6 +359,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
             .Options;
         await using var dbContext = new AppDbContext(options);
         await dbContext.Database.MigrateAsync();
+        await dbContext.BackfillArticleSearchAsync();
     }
 
     private async Task SeedAdminAsync()

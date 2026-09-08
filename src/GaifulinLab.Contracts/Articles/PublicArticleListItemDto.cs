@@ -9,4 +9,8 @@ public sealed record PublicArticleListItemDto(
     string AuthorDisplayName,
     IReadOnlyList<PublicArticleTaxonomyLinkDto> Topics,
     IReadOnlyList<PublicArticleTaxonomyLinkDto> Series,
-    IReadOnlyList<string> Tags);
+    IReadOnlyList<string> Tags,
+    Guid? CoverMediaAssetId = null,
+    int ReadingMinutes = 1,
+    string? SearchSnippet = null,
+    string? SearchTitle = null);

@@ -16,7 +16,8 @@ internal static class AdminArticleMappings
         (PublicationStatusDto)localization.Status,
         localization.PublishedAt,
         localization.UpdatedAt,
-        localization.LastEditedAt);
+        localization.LastEditedAt,
+        localization.CoverMediaAssetId);
 
     public static AdminArticleLocalizationSummaryDto ToSummary(this ArticleLocalization localization) => new(
         localization.Id,

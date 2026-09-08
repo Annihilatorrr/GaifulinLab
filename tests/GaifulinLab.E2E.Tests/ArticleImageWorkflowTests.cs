@@ -38,7 +38,7 @@ public sealed class ArticleImageWorkflowTests : PageTest
 
         await Page.GetByLabel("Article title").FillAsync(title);
         await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync(slug);
-        await Page.Locator("input[type=file]").SetInputFilesAsync(new FilePayload
+        await Page.Locator(".image-upload input[type=file]").SetInputFilesAsync(new FilePayload
         {
             Name = "e2e-diagram.png",
             MimeType = "image/png",

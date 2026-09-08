@@ -22,6 +22,19 @@ public sealed class PublicArticlesController(
     AppDbContext dbContext,
     ArticleViewVisitorHasher articleViewVisitorHasher) : ControllerBase
 {
+    [HttpGet("search")]
+    [ProducesResponseType<ArticleSearchResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ArticleSearchResponse>> Search(
+        [FromQuery] ArticleSearchRequest request,
+        [FromQuery(Name = "q")] string? query,
+        [FromServices] GaifulinLab.Application.Articles.Public.IArticleSearch search,
+        CancellationToken cancellationToken)
+    {
+        request.Query = query ?? request.Query;
+        return Ok(await search.SearchAsync(request, cancellationToken));
+    }
+
     [HttpGet("articles")]
     [ProducesResponseType<IReadOnlyList<PublicArticleListItemDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]

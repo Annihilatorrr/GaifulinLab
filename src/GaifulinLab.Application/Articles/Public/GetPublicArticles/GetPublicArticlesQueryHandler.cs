@@ -76,6 +76,8 @@ internal sealed class GetPublicArticlesQueryHandler(
                 Slug = localization.Slug!,
                 localization.Title,
                 localization.Summary,
+                localization.CoverMediaAssetId,
+                localization.ReadingMinutes,
                 PublishedAt = localization.PublishedAt!.Value
             })
             .ToListAsync(cancellationToken);
@@ -98,7 +100,9 @@ internal sealed class GetPublicArticlesQueryHandler(
                 authorDisplayNames.GetValueOrDefault(article.OwnerUserId, "Author"),
                 taxonomy.TopicsFor(article.ArticleId),
                 taxonomy.SeriesFor(article.ArticleId),
-                taxonomy.TagsFor(article.ArticleId)))
+                taxonomy.TagsFor(article.ArticleId),
+                article.CoverMediaAssetId,
+                article.ReadingMinutes))
             .ToArray();
     }
 }

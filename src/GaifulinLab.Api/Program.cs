@@ -7,6 +7,7 @@ using GaifulinLab.Infrastructure.Analytics;
 using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 var loginPermitLimit = builder.Configuration.GetValue("RateLimiting:LoginPermitLimit", 5);
@@ -64,6 +65,12 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+await using (var searchScope = app.Services.CreateAsyncScope())
+{
+    var database = searchScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (database.Database.IsRelational()) await database.BackfillArticleSearchAsync();
+}
 
 if (app.Environment.IsDevelopment())
 {

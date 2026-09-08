@@ -9,4 +9,5 @@ public sealed record CreateArticleCommand(
     string? Title,
     string? Summary,
     string? Markdown,
-    string? Slug) : IRequest<CreateArticleResponse>;
+    string? Slug,
+    Guid? CoverMediaAssetId = null) : IRequest<CreateArticleResponse>;

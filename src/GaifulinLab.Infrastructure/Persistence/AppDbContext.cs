@@ -41,9 +41,34 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<PdfExportJob> PdfExportJobs => Set<PdfExportJob>();
 
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        PrepareSearchText();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        PrepareSearchText();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void PrepareSearchText()
+    {
+        foreach (var entry in ChangeTracker.Entries<ArticleLocalization>())
+        {
+            if (entry.State == EntityState.Added || entry.Property(x => x.Markdown).IsModified)
+            {
+                var text = Content.ArticleSearchText.Extract(entry.Entity.Markdown);
+                entry.Entity.UpdateSearchText(text, Content.ArticleSearchText.ReadingMinutes(text));
+            }
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        if (Database.IsNpgsql()) Configurations.SearchVectorConfiguration.Configure(modelBuilder);
     }
 }

@@ -42,7 +42,8 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
                 request.Title,
                 request.Summary,
                 request.Markdown,
-                request.Slug),
+                request.Slug,
+                request.CoverMediaAssetId),
             cancellationToken);
 
         return Created($"/api/admin/articles/{result.ArticleId}", result);
@@ -76,7 +77,8 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
                 request.Summary,
                 request.Markdown,
                 request.Slug,
-                request.ExpectedVersion),
+                request.ExpectedVersion,
+                request.CoverMediaAssetId),
             cancellationToken);
 
         return Ok(version);

@@ -5,4 +5,5 @@ public sealed record UpdateArticleLocalizationRequest(
     string? Summary,
     string? Markdown,
     string? Slug,
-    long? ExpectedVersion = null);
+    long? ExpectedVersion = null,
+    Guid? CoverMediaAssetId = null);

@@ -65,6 +65,13 @@ internal sealed class UpdateArticleLocalizationCommandHandler(
                 now);
         }
 
+        if (request.CoverMediaAssetId is { } coverId && !await dbContext.MediaAssets.AnyAsync(
+            asset => asset.Id == coverId && asset.ContentType.StartsWith("image/"), cancellationToken))
+        {
+            throw new ArgumentException("Select an existing image for the article cover.");
+        }
+        localization.SetCover(request.CoverMediaAssetId);
+
         if (localization.Slug is not null)
         {
             var slugExists = await dbContext.ArticleLocalizations.AnyAsync(

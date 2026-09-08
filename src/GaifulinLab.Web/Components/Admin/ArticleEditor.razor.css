@@ -1179,3 +1179,6 @@
         padding: var(--space-4);
     }
 }
+.editor-cover-preview { display: block; width: 100%; max-height: 10rem; object-fit: cover; border-radius: var(--radius-sm); margin-bottom: .5rem; }
+.cover-setting .metadata-popover-content { display: grid; gap: .6rem; }
+.cover-setting input[type=file] { max-width: 100%; margin-top: .5rem; }

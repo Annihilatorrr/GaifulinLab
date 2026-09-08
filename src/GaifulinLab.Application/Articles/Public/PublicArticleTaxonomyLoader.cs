@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GaifulinLab.Application.Articles.Public;
 
-internal static class PublicArticleTaxonomyLoader
+public static class PublicArticleTaxonomyLoader
 {
     public static async Task<PublicArticleTaxonomy> Load(
         IAppDbContext dbContext,
@@ -83,7 +83,7 @@ internal static class PublicArticleTaxonomyLoader
     }
 }
 
-internal sealed record PublicArticleTaxonomy(
+public sealed record PublicArticleTaxonomy(
     IReadOnlyDictionary<Guid, IReadOnlyList<PublicArticleTaxonomyLinkDto>> Topics,
     IReadOnlyDictionary<Guid, IReadOnlyList<PublicArticleTaxonomyLinkDto>> Series,
     IReadOnlyDictionary<Guid, IReadOnlyList<string>> Tags)

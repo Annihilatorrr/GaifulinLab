@@ -27,6 +27,11 @@ internal sealed class ArticleLocalizationConfiguration : IEntityTypeConfiguratio
 
         builder.HasKey(localization => localization.Id);
 
+        builder.Property(localization => localization.SearchText).HasColumnType("text").IsRequired(false);
+        builder.Property(localization => localization.ReadingMinutes).HasDefaultValue(1);
+        builder.HasOne<GaifulinLab.Domain.Media.MediaAsset>().WithMany()
+            .HasForeignKey(localization => localization.CoverMediaAssetId).OnDelete(DeleteBehavior.SetNull);
+
         builder.Property(localization => localization.Version)
             .IsConcurrencyToken()
             .IsRequired();

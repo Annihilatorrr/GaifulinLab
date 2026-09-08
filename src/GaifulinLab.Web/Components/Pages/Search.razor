@@ -1,9 +1,184 @@
 @page "/search"
+@implements IDisposable
+@inject PublicContentClient ContentClient
+@inject NavigationManager Navigation
+@using System.Globalization
 
 <PageTitle>Search · Gaifulin Lab</PageTitle>
+<main id="main-content" class="search-page">
+    <section class="search-hero" aria-labelledby="search-title">
+        <div class="site-container">
+            <span class="eyebrow">Explore the lab</span>
+            <h1 id="search-title">Find your next idea.</h1>
+            <p>Search topics, tags, titles and the articles themselves.</p>
+            <form class="search-bar" @onsubmit="Submit" @onsubmit:preventDefault role="search">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+                <label for="article-search" class="visually-hidden">Search articles</label>
+                <input id="article-search" type="search" placeholder="Enter keywords…" maxlength="200" autocomplete="off" @bind="_text" @bind:event="oninput" />
+                <button type="submit">Search <span aria-hidden="true">→</span></button>
+            </form>
+            <div class="search-filters" aria-label="Search filters">
+                <label><span class="visually-hidden">Topic</span><select aria-label="Topic" @bind="_request.Topic" @bind:after="Apply">
+                    <option value="">All topics</option>
+                    @foreach (var topic in _topics) { <option value="@topic.Slug">@topic.Name</option> }
+                </select></label>
+                <details class="tag-picker" data-dismiss-on-outside-click>
+                    <summary>Tags @(_request.Tag.Length > 0 ? $"({_request.Tag.Length})" : "") <span aria-hidden="true">⌄</span></summary>
+                    <div class="tag-options">
+                        <p class="tag-hint">Match any selected tag · up to 20</p>
+                        <label class="visually-hidden" for="tag-filter">Find a tag</label>
+                        <input id="tag-filter" type="search" placeholder="Find a tag…" @bind="_tagFilter" @bind:event="oninput" />
+                        @foreach (var tag in _tags.Where(t => t.Name.Contains(_tagFilter, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            <label><input type="checkbox" checked="@_request.Tag.Contains(tag.Name)" disabled="@(_request.Tag.Length >= 20 && !_request.Tag.Contains(tag.Name))" @onchange="() => ToggleTag(tag.Name)" /> #@tag.Name <small>@tag.ArticleCount</small></label>
+                        }
+                        @if (_tags.Count == 0) { <p>No tags yet.</p> }
+                    </div>
+                </details>
+                <label><span class="visually-hidden">Search in</span><select aria-label="Search in" @bind="_request.Scope" @bind:after="Apply">
+                    <option value="all">Everywhere</option><option value="title">Titles only</option><option value="content">Content only</option><option value="topics">Topics only</option><option value="tags">Tags only</option>
+                </select></label>
+                <label><span class="visually-hidden">Published</span><select aria-label="Published" @bind="_request.Period" @bind:after="Apply">
+                    <option value="all">All time</option><option value="week">Past week</option><option value="month">Past month</option><option value="year">Past year</option>
+                </select></label>
+                <label><span class="visually-hidden">Language</span><select aria-label="Language" @bind="_request.LanguageCode" @bind:after="ChangeLanguage"><option value="en">English</option><option value="ru">Русский</option></select></label>
+            </div>
+        </div>
+    </section>
+    <section class="site-container search-results" aria-label="Search results" aria-busy="@_loading.ToString().ToLowerInvariant()">
+        @if (HasFilters)
+        {
+            <div class="active-filters" aria-label="Active filters">
+                @if (!string.IsNullOrEmpty(_request.Topic)) { <button @onclick="ClearTopic">@(_topics.FirstOrDefault(t => t.Slug == _request.Topic)?.Name ?? _request.Topic) ×<span class="visually-hidden"> Remove topic</span></button> }
+                @foreach (var tag in _request.Tag) { <button @onclick="() => ToggleTag(tag)">#@tag ×<span class="visually-hidden"> Remove tag</span></button> }
+                @if (_request.Scope != "all") { <button @onclick="ClearScope">@ScopeLabel ×<span class="visually-hidden"> Remove scope</span></button> }
+                @if (_request.Period != "all") { <button @onclick="ClearPeriod">Past @_request.Period ×<span class="visually-hidden"> Remove period</span></button> }
+                <button class="reset-filters" @onclick="ResetFilters">Reset filters</button>
+            </div>
+        }
+        <div class="results-toolbar">
+            <p role="status" aria-live="polite">@(_loading ? "Searching…" : _error ? "Search unavailable" : $"{_result.TotalCount:N0} {(_result.TotalCount == 1 ? "article" : "articles")} found")</p>
+            <label>Sort by <select aria-label="Sort by" @bind="_request.Sort" @bind:after="Apply"><option value="relevance">Relevance</option><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+        </div>
+        @if (_loading)
+        {
+            <div class="search-skeletons" aria-hidden="true">@for (var i = 0; i < 3; i++) { <div class="search-skeleton"><span></span><div><i></i><i></i><i></i></div></div> }</div>
+        }
+        else if (_error)
+        {
+            <div class="search-state" role="alert"><h2>Search is temporarily unavailable</h2><p>Please try again in a moment.</p><button class="button button-primary" @onclick="LoadAsync">Try again</button></div>
+        }
+        else if (_result.Items.Count == 0)
+        {
+            <div class="search-state"><span class="state-icon" aria-hidden="true">⌕</span><h2>No articles found</h2><p>Try different keywords or broaden your filters.</p><button class="button button-secondary" @onclick="ClearSearch">Clear search</button></div>
+        }
+        else
+        {
+            <div class="search-list">
+                @foreach (var article in _result.Items)
+                {
+                    <article class="search-card" @key="article.Slug">
+                        @if (article.CoverMediaAssetId is { } cover)
+                        { <a class="search-cover" href="@ArticleUrl(article)" tabindex="-1" aria-hidden="true"><img src="@(ContentClient.AssetBaseUrl.TrimEnd('/') + $"/media/{cover}")" alt="" loading="lazy" /></a> }
+                        <div class="search-card-body">
+                            <div class="article-topics">@foreach (var topic in article.Topics) { <a href="@TopicUrl(topic.Slug)"><SearchHighlight Text="@topic.DisplayName" Query="@_request.Query" /></a> }</div>
+                            <h2><a href="@ArticleUrl(article)"><SearchHighlight Text="@(article.SearchTitle ?? article.Title)" Query="@_request.Query" /></a></h2>
+                            <p class="search-excerpt"><SearchHighlight Text="@(article.SearchSnippet ?? article.Summary ?? "")" Query="@_request.Query" /></p>
+                            <div class="article-meta"><span>@article.AuthorDisplayName</span><span aria-hidden="true">·</span><time datetime="@article.PublishedAt.ToString("O")">@article.PublishedAt.ToString("d MMM yyyy", CultureInfo.GetCultureInfo(article.LanguageCode))</time><span aria-hidden="true">·</span><span>@article.ReadingMinutes min read</span></div>
+                            <div class="article-tags">@foreach (var tag in article.Tags) { <a href="@TagUrl(tag)">#<SearchHighlight Text="@tag" Query="@_request.Query" /></a> }</div>
+                        </div>
+                    </article>
+                }
+            </div>
+            @if (_result.TotalPages > 1)
+            {
+                <nav class="search-pagination" aria-label="Search pages">
+                    @if (_result.Page > 1) { <a href="@PageUrl(_result.Page - 1)" rel="prev" aria-label="Previous page">← <span>Previous</span></a> } else { <span class="disabled">← <span>Previous</span></span> }
+                    @foreach (var page in PageNumbers())
+                    {
+                        if (page == 0) { <span class="ellipsis">…</span> }
+                        else { <a class="@(page == _result.Page ? "current" : null)" href="@PageUrl(page)" aria-label="@($"Page {page}")" aria-current="@(page == _result.Page ? "page" : null)">@(page)</a> }
+                    }
+                    @if (_result.Page < _result.TotalPages) { <a href="@PageUrl(_result.Page + 1)" rel="next" aria-label="Next page"><span>Next</span> →</a> } else { <span class="disabled"><span>Next</span> →</span> }
+                </nav>
+                <p class="page-summary">Page @_result.Page of @_result.TotalPages</p>
+            }
+        }
+    </section>
+</main>
 
-<EmptyPublicPage Eyebrow="Find"
-                 Title="Search"
-                 Description="Search across Gaifulin Lab articles."
-                 EmptyTitle="Nothing to search yet"
-                 EmptyDescription="Search will become useful after the first article is published." />
+@code {
+    [SupplyParameterFromQuery(Name = "q")] public string? Query { get; set; }
+    [SupplyParameterFromQuery(Name = "languageCode")] public string? Language { get; set; }
+    [SupplyParameterFromQuery(Name = "scope")] public string? Scope { get; set; }
+    [SupplyParameterFromQuery(Name = "topic")] public string? Topic { get; set; }
+    [SupplyParameterFromQuery(Name = "tag")] public string[]? Tags { get; set; }
+    [SupplyParameterFromQuery(Name = "period")] public string? Period { get; set; }
+    [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public string? Page { get; set; }
+    private ArticleSearchRequest _request = new();
+    private ArticleSearchResponse _result = new([], 0, 1, 10, 0);
+    private IReadOnlyList<PublicTopicDto> _topics = [];
+    private IReadOnlyList<PublicTagDto> _tags = [];
+    private string _text = "", _tagFilter = "", _taxonomyLanguage = "";
+    private bool _loading = true, _error;
+    private CancellationTokenSource? _cancellation;
+    private bool HasFilters => !string.IsNullOrEmpty(_request.Topic) || _request.Tag.Length > 0 || _request.Scope != "all" || _request.Period != "all";
+    private string ScopeLabel => _request.Scope switch { "title" => "Titles only", "content" => "Content only", "topics" => "Topics only", _ => "Tags only" };
+
+    protected override Task OnParametersSetAsync()
+    {
+        _text = (Query ?? "")[..Math.Min(Query?.Length ?? 0, 200)];
+        _request = new() { Query = _text, LanguageCode = Language == "ru" ? "ru" : "en",
+            Scope = Scope is "title" or "content" or "topics" or "tags" ? Scope : "all", Topic = Topic,
+            Tag = (Tags ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase).Take(20).ToArray(),
+            Period = Period is "week" or "month" or "year" ? Period : "all",
+            Sort = Sort is "newest" or "oldest" ? Sort : "relevance", Page = int.TryParse(Page, out var page) && page > 0 ? page : 1 };
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _cancellation?.Cancel(); _cancellation?.Dispose();
+        var cancellation = _cancellation = new();
+        _loading = true; _error = false;
+        var request = _request;
+        try
+        {
+            var searchTask = ContentClient.SearchAsync(request, cancellation.Token);
+            var topicsTask = _taxonomyLanguage == request.LanguageCode ? Task.FromResult(_topics) : ContentClient.GetTopicsAsync(request.LanguageCode, cancellation.Token);
+            var tagsTask = _taxonomyLanguage == request.LanguageCode ? Task.FromResult(_tags) : ContentClient.GetTagsAsync(request.LanguageCode, cancellation.Token);
+            await Task.WhenAll(searchTask, topicsTask, tagsTask);
+            if (_cancellation != cancellation) return;
+            _result = await searchTask; _topics = await topicsTask; _tags = await tagsTask;
+            _taxonomyLanguage = request.LanguageCode;
+            if (_result.Page != request.Page) Navigation.NavigateTo(PageUrl(_result.Page), replace: true);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is HttpRequestException or System.Text.Json.JsonException or OperationCanceledException)
+        { if (_cancellation == cancellation) _error = true; }
+        finally { if (_cancellation == cancellation) _loading = false; }
+    }
+
+    private void Submit() { _request.Query = _text.Trim(); Apply(); }
+    private void Apply() { _request.Page = 1; Navigation.NavigateTo(PageUrl(1)); }
+    private void ChangeLanguage() { _request.Topic = null; _request.Tag = []; Apply(); }
+    private void ToggleTag(string tag) { _request.Tag = _request.Tag.Contains(tag) ? _request.Tag.Where(t => t != tag).ToArray() : _request.Tag.Append(tag).Take(20).ToArray(); Apply(); }
+    private void ClearTopic() { _request.Topic = null; Apply(); }
+    private void ClearScope() { _request.Scope = "all"; Apply(); }
+    private void ClearPeriod() { _request.Period = "all"; Apply(); }
+    private void ResetFilters() { _request.Topic = null; _request.Tag = []; _request.Scope = "all"; _request.Period = "all"; Apply(); }
+    private void ClearSearch() { _text = ""; _request.Query = null; ResetFilters(); }
+    private string PageUrl(int page) => "/search?" + PublicContentClient.SearchQueryString(new() { Query = _request.Query, LanguageCode = _request.LanguageCode,
+        Scope = _request.Scope, Topic = _request.Topic, Tag = _request.Tag, Period = _request.Period, Sort = _request.Sort, Page = page });
+    private string TopicUrl(string slug) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = _request.LanguageCode, Topic = slug });
+    private string TagUrl(string tag) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = _request.LanguageCode, Tag = [tag] });
+    private static string ArticleUrl(PublicArticleListItemDto article) => $"/{article.LanguageCode}/articles/{article.Slug}";
+    private IEnumerable<int> PageNumbers()
+    {
+        var previous = 0;
+        foreach (var page in Enumerable.Range(Math.Max(1, _result.Page - 1), Math.Min(_result.TotalPages, _result.Page + 1) - Math.Max(1, _result.Page - 1) + 1).Append(1).Append(_result.TotalPages).Distinct().Order())
+        { if (previous > 0 && page - previous > 1) yield return 0; yield return page; previous = page; }
+    }
+    public void Dispose() { _cancellation?.Cancel(); _cancellation?.Dispose(); }
+}

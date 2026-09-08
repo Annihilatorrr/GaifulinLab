@@ -11,4 +11,5 @@ public sealed record AdminArticleLocalizationDto(
     PublicationStatusDto Status,
     DateTimeOffset? PublishedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset LastEditedAt);
+    DateTimeOffset LastEditedAt,
+    Guid? CoverMediaAssetId = null);

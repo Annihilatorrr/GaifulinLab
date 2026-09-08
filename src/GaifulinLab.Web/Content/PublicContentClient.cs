@@ -9,6 +9,24 @@ public sealed class PublicContentClient(HttpClient httpClient)
 {
     public string AssetBaseUrl => httpClient.BaseAddress!.AbsoluteUri;
 
+    public Task<ArticleSearchResponse> SearchAsync(ArticleSearchRequest request, CancellationToken cancellationToken = default) =>
+        GetAsync<ArticleSearchResponse>("/api/public/search?" + SearchQueryString(request), cancellationToken);
+
+    public static string SearchQueryString(ArticleSearchRequest request)
+    {
+        var parameters = new List<string>();
+        Add(parameters, "languageCode", request.LanguageCode);
+        Add(parameters, "q", request.Query);
+        Add(parameters, "scope", request.Scope);
+        Add(parameters, "topic", request.Topic);
+        foreach (var tag in request.Tag) Add(parameters, "tag", tag);
+        Add(parameters, "period", request.Period);
+        Add(parameters, "sort", request.Sort);
+        parameters.Add($"page={request.Page}");
+        parameters.Add($"pageSize={request.PageSize}");
+        return string.Join('&', parameters);
+    }
+
     public async Task<PdfExportStatusDto> CreateArticlePdfExportAsync(
         string languageCode,
         string slug,

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 
 #nullable disable
 
@@ -58,6 +59,14 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("ArticleId")
                         .HasColumnType("uuid");
 
+                    b.Property<NpgsqlTsVector>("BodySearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasComputedColumnSql("to_tsvector(CASE \"LanguageCode\" WHEN 'ru' THEN 'russian'::regconfig WHEN 'en' THEN 'english'::regconfig ELSE 'simple'::regconfig END, regexp_replace(regexp_replace(regexp_replace(lower(coalesce(\"SearchText\", '')),\n    '\\mc\\+\\+(?=$|\\W)', 'glcpp', 'g'), '\\mc#(?=$|\\W)', 'glcsharp', 'g'), '\\.net\\M', 'gldotnet', 'g'))", true);
+
+                    b.Property<Guid?>("CoverMediaAssetId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("LanguageCode")
                         .IsRequired()
                         .HasMaxLength(2)
@@ -73,6 +82,14 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("ReadingMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<string>("SearchText")
+                        .HasColumnType("text");
+
                     b.Property<string>("Slug")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -86,10 +103,20 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<NpgsqlTsVector>("SummarySearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasComputedColumnSql("to_tsvector(CASE \"LanguageCode\" WHEN 'ru' THEN 'russian'::regconfig WHEN 'en' THEN 'english'::regconfig ELSE 'simple'::regconfig END, regexp_replace(regexp_replace(regexp_replace(lower(coalesce(\"Summary\", '')),\n    '\\mc\\+\\+(?=$|\\W)', 'glcpp', 'g'), '\\mc#(?=$|\\W)', 'glcsharp', 'g'), '\\.net\\M', 'gldotnet', 'g'))", true);
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
+
+                    b.Property<NpgsqlTsVector>("TitleSearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasComputedColumnSql("to_tsvector(CASE \"LanguageCode\" WHEN 'ru' THEN 'russian'::regconfig WHEN 'en' THEN 'english'::regconfig ELSE 'simple'::regconfig END, regexp_replace(regexp_replace(regexp_replace(lower(coalesce(\"Title\", '')),\n    '\\mc\\+\\+(?=$|\\W)', 'glcpp', 'g'), '\\mc#(?=$|\\W)', 'glcsharp', 'g'), '\\.net\\M', 'gldotnet', 'g'))", true);
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -99,6 +126,23 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BodySearchVector")
+                        .HasDatabaseName("ix_article_search_body_vector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("BodySearchVector"), "GIN");
+
+                    b.HasIndex("CoverMediaAssetId");
+
+                    b.HasIndex("SummarySearchVector")
+                        .HasDatabaseName("ix_article_search_summary_vector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SummarySearchVector"), "GIN");
+
+                    b.HasIndex("TitleSearchVector")
+                        .HasDatabaseName("ix_article_search_title_vector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("TitleSearchVector"), "GIN");
 
                     b.HasIndex("ArticleId", "LanguageCode")
                         .IsUnique()
@@ -412,6 +456,11 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<NpgsqlTsVector>("EnglishSearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasComputedColumnSql("to_tsvector('english'::regconfig, regexp_replace(regexp_replace(regexp_replace(lower(coalesce(\"Name\", '')),\n    '\\mc\\+\\+(?=$|\\W)', 'glcpp', 'g'), '\\mc#(?=$|\\W)', 'glcsharp', 'g'), '\\.net\\M', 'gldotnet', 'g'))", true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -422,11 +471,36 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<NpgsqlTsVector>("RussianSearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasComputedColumnSql("to_tsvector('russian'::regconfig, regexp_replace(regexp_replace(regexp_replace(lower(coalesce(\"Name\", '')),\n    '\\mc\\+\\+(?=$|\\W)', 'glcpp', 'g'), '\\mc#(?=$|\\W)', 'glcsharp', 'g'), '\\.net\\M', 'gldotnet', 'g'))", true);
+
+                    b.Property<NpgsqlTsVector>("SimpleSearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasComputedColumnSql("to_tsvector('simple'::regconfig, regexp_replace(regexp_replace(regexp_replace(lower(coalesce(\"Name\", '')),\n    '\\mc\\+\\+(?=$|\\W)', 'glcpp', 'g'), '\\mc#(?=$|\\W)', 'glcsharp', 'g'), '\\.net\\M', 'gldotnet', 'g'))", true);
+
                     b.HasKey("Id");
+
+                    b.HasIndex("EnglishSearchVector")
+                        .HasDatabaseName("ix_tag_search_en_vector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("EnglishSearchVector"), "GIN");
 
                     b.HasIndex("NormalizedName")
                         .IsUnique()
                         .HasDatabaseName("ux_tags_normalized_name");
+
+                    b.HasIndex("RussianSearchVector")
+                        .HasDatabaseName("ix_tag_search_ru_vector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("RussianSearchVector"), "GIN");
+
+                    b.HasIndex("SimpleSearchVector")
+                        .HasDatabaseName("ix_tag_search_simple_vector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SimpleSearchVector"), "GIN");
 
                     b.ToTable("tags", null, t =>
                         {
@@ -471,6 +545,11 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<NpgsqlTsVector>("NameSearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasComputedColumnSql("to_tsvector(CASE \"LanguageCode\" WHEN 'ru' THEN 'russian'::regconfig WHEN 'en' THEN 'english'::regconfig ELSE 'simple'::regconfig END, regexp_replace(regexp_replace(regexp_replace(lower(coalesce(\"Name\", '')),\n    '\\mc\\+\\+(?=$|\\W)', 'glcpp', 'g'), '\\mc#(?=$|\\W)', 'glcsharp', 'g'), '\\.net\\M', 'gldotnet', 'g'))", true);
+
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -480,6 +559,11 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("NameSearchVector")
+                        .HasDatabaseName("ix_topic_search_name_vector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("NameSearchVector"), "GIN");
 
                     b.HasIndex("LanguageCode", "Slug")
                         .IsUnique()
@@ -513,6 +597,7 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -714,6 +799,12 @@ namespace GaifulinLab.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ArticleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("GaifulinLab.Domain.Media.MediaAsset", null)
+                        .WithMany()
+                        .HasForeignKey("CoverMediaAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Article");
                 });
 
