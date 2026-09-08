@@ -196,10 +196,10 @@ TCP 80/443 должны быть доступны из интернета.
    .\deployment\client\setup-certificate.ps1 -SkipSync
    ```
 
-4. Примените migration и разверните приложение:
+4. Разверните приложение. `deploy.ps1` сам применит все ожидающие EF Core migrations
+   до запуска новых контейнеров:
 
    ```powershell
-   .\deployment\client\apply-migration.ps1 -SkipSync
    .\deployment\client\deploy.ps1 -SkipSync
    ```
 
@@ -214,9 +214,9 @@ TCP 80/443 должны быть доступны из интернета.
   обновляет серверный `deployment/.env` путями к выданному сертификату.
 - `apply-migration.ps1` запускает одноразовый .NET SDK-контейнер и применяет EF
   Core migrations. После завершения контейнер удаляется; API и Web не запускаются.
-- `deploy.ps1` выполняет финальный выпуск: собирает образы API, Web и PDF-worker,
-  запускает их через Docker Compose, устанавливает постоянную HTTPS-конфигурацию host nginx
-  и проверяет `/health/live` и `/health/ready`.
+- `deploy.ps1` перед сборкой образов применяет ожидающие EF Core migrations, затем
+  собирает образы API, Web и PDF-worker, запускает их через Docker Compose, устанавливает
+  постоянную HTTPS-конфигурацию host nginx и проверяет `/health/live` и `/health/ready`.
 
 Поэтому финальный `deploy.ps1` обязателен даже после успешной migration: без него
 схема БД будет готова, но сайт и API не будут собраны и запущены, а временная
@@ -234,35 +234,24 @@ TCP 80/443 должны быть доступны из интернета.
 этой последовательности запускаются с `-SkipSync`: это быстрее и сохраняет
 серверные изменения сертификата.
 
-При обычном выпуске первая команда запускается без `-SkipSync`, чтобы доставить
-новый checkout. Следующая команда получает `-SkipSync` и использует уже
-синхронизированные файлы:
-
-```powershell
-.\deployment\client\apply-migration.ps1
-.\deployment\client\deploy.ps1 -SkipSync
-```
+При обычном выпуске `deploy.ps1` запускается без `-SkipSync`, чтобы доставить
+новый checkout. Затем сервер применяет migrations из доставленных исходников и
+запускает новые контейнеры.
 
 ## Обычный выпуск
 
-Без изменений схемы БД:
+Для любого выпуска, в том числе с изменениями схемы БД:
 
 ```powershell
 .\deployment\client\deploy.ps1
 ```
 
-С migrations:
-
-```powershell
-.\deployment\client\apply-migration.ps1
-.\deployment\client\deploy.ps1 -SkipSync
-```
-
 `server/deploy.sh` при каждом deploy выполняет
 `ALTER ROLE ... WITH LOGIN PASSWORD ...`, используя
 `GAIFULINLAB_DB_PASSWORD` из `deployment/.env`, и проверяет подключение из
-одноразового PostgreSQL-контейнера до пересборки приложения. Данные PostgreSQL
-при этом не удаляются.
+одноразового PostgreSQL-контейнера. Затем он применяет все ожидающие EF Core
+migrations до пересборки и запуска приложения. Данные PostgreSQL при этом не
+удаляются.
 
 `server/reset-database.sh --confirm-reset-gaifulinlab` — отдельная разрушительная
 аварийная команда. Обычный deploy её никогда не вызывает.
