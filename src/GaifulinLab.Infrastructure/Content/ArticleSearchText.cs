@@ -23,6 +23,14 @@ internal static partial class ArticleSearchText
     public static string NormalizeQuery(string text) => DotNet().Replace(
         CSharp().Replace(CPlusPlus().Replace(text.ToLowerInvariant(), "glcpp"), "glcsharp"), "gldotnet");
 
+    /// <summary>
+    /// Converts untrusted search text into a tsquery expression that matches each
+    /// word by its prefix. Keeping only lexeme characters prevents query operators
+    /// in user input from changing the query semantics.
+    /// </summary>
+    public static string ToPrefixTsQuery(string normalizedText) => string.Join(" & ",
+        Words().Matches(normalizedText).Select(match => $"{match.Value}:*"));
+
     [GeneratedRegex(@"\bc\+\+(?=$|\W)")]
     private static partial Regex CPlusPlus();
 

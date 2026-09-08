@@ -21,6 +21,14 @@ public sealed class ArticleSearchTextTests
     }
 
     [Fact]
+    public void ToPrefixTsQuery_UsesEveryNormalizedWordAsASafePrefix()
+    {
+        var query = ArticleSearchText.ToPrefixTsQuery(ArticleSearchText.NormalizeQuery("C++ lesson-22"));
+
+        Assert.Equal("glcpp:* & lesson:* & 22:*", query);
+    }
+
+    [Fact]
     public async Task SavingContent_RefreshesSearchTextAndReadingTimeWithoutExtraEditVersion()
     {
         await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);

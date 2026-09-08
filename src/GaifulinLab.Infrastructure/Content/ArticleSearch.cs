@@ -20,6 +20,7 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
 
         var text = request.Query?.Trim() ?? "";
         var normalizedText = ArticleSearchText.NormalizeQuery(text);
+        var prefixQuery = ArticleSearchText.ToPrefixTsQuery(normalizedText);
         var config = request.LanguageCode switch { "ru" => "russian", "en" => "english", _ => "simple" };
         var tagVector = request.LanguageCode switch
         {
@@ -56,18 +57,18 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
         {
             Localization = localization,
             Title = searchTitle && EF.Property<NpgsqlTsVector>(localization, "TitleSearchVector")
-                .Matches(EF.Functions.PlainToTsQuery(config, normalizedText)),
+                .Matches(EF.Functions.ToTsQuery(config, prefixQuery)),
             Summary = searchContent && EF.Property<NpgsqlTsVector>(localization, "SummarySearchVector")
-                .Matches(EF.Functions.PlainToTsQuery(config, normalizedText)),
+                .Matches(EF.Functions.ToTsQuery(config, prefixQuery)),
             Body = searchContent && EF.Property<NpgsqlTsVector>(localization, "BodySearchVector")
-                .Matches(EF.Functions.PlainToTsQuery(config, normalizedText)),
+                .Matches(EF.Functions.ToTsQuery(config, prefixQuery)),
             Topic = searchTopics && db.ArticleTopics.Any(link => link.ArticleId == localization.ArticleId
                 && db.TopicLocalizations.Any(value => value.TopicId == link.TopicId
                     && value.LanguageCode == request.LanguageCode && EF.Property<NpgsqlTsVector>(value, "NameSearchVector")
-                        .Matches(EF.Functions.PlainToTsQuery(config, normalizedText)))),
+                        .Matches(EF.Functions.ToTsQuery(config, prefixQuery)))),
             Tag = searchTags && db.ArticleTags.Any(link => link.ArticleId == localization.ArticleId
                 && db.Tags.Any(tag => tag.Id == link.TagId && EF.Property<NpgsqlTsVector>(tag, tagVector)
-                    .Matches(EF.Functions.PlainToTsQuery(config, normalizedText))))
+                    .Matches(EF.Functions.ToTsQuery(config, prefixQuery))))
         });
         if (text.Length > 0) matches = matches.Where(row => row.Title || row.Summary || row.Body || row.Topic || row.Tag);
 
@@ -91,7 +92,7 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
                         : EF.Property<NpgsqlTsVector>(row.Localization, "TitleSearchVector")
                             .Concat(EF.Property<NpgsqlTsVector>(row.Localization, "SummarySearchVector"))
                             .Concat(EF.Property<NpgsqlTsVector>(row.Localization, "BodySearchVector")))
-                    .Rank(EF.Functions.PlainToTsQuery(config, normalizedText), NpgsqlTsRankingNormalization.DivideByItselfPlusOne) : 0)
+                    .Rank(EF.Functions.ToTsQuery(config, prefixQuery), NpgsqlTsRankingNormalization.DivideByItselfPlusOne) : 0)
         });
         var ordered = request.Sort == "oldest"
             ? ranked.OrderBy(row => row.Localization.PublishedAt).ThenBy(row => row.Localization.Id)
@@ -112,12 +113,12 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
             Snippet = text.Length == 0
                 ? (row.Localization.Summary == null || row.Localization.Summary == ""
                     ? row.Localization.SearchText ?? "" : row.Localization.Summary).Substring(0, 260)
-                : EF.Functions.PlainToTsQuery(config, text).GetResultHeadline(config: config,
+                : EF.Functions.ToTsQuery(config, prefixQuery).GetResultHeadline(config: config,
                     document: ((row.Localization.Summary ?? "") + " " + (row.Localization.SearchText ?? ""))
                         .Replace("\uE000", "").Replace("\uE001", ""),
                     options: "StartSel=\uE000, StopSel=\uE001, MaxWords=42, MinWords=16, MaxFragments=1"),
             Headline = text.Length == 0 ? row.Localization.Title
-                : EF.Functions.PlainToTsQuery(config, text).GetResultHeadline(config: config,
+                : EF.Functions.ToTsQuery(config, prefixQuery).GetResultHeadline(config: config,
                     document: row.Localization.Title.Replace("\uE000", "").Replace("\uE001", ""),
                     options: "StartSel=\uE000, StopSel=\uE001, HighlightAll=true")
         }).ToListAsync(cancellationToken);

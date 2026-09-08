@@ -188,6 +188,10 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page.Locator(".search-card h2 mark").First).ToBeVisibleAsync();
         await Page.GetByLabel("Search in", new() { Exact = true }).SelectOptionAsync("title");
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10);
+        await Page.GetByLabel("Search articles", new() { Exact = true }).FillAsync("less");
+        await Page.GetByLabel("Search articles", new() { Exact = true }).PressAsync("Enter");
+        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("23 articles found");
+        await Expect(Page.Locator(".search-card h2 mark").First).ToBeVisibleAsync();
         await Page.GetByLabel("Sort by", new() { Exact = true }).SelectOptionAsync("oldest");
         await Expect(Page.Locator(".search-card h2").First).ToHaveTextAsync("Search interface lesson 00");
         Directory.CreateDirectory(Path.Combine("TestResults", "search"));
