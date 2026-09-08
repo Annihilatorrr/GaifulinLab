@@ -28,8 +28,17 @@ public sealed class ArticleEditorScrollTests : PageTest
         var markdown = Page.Locator("#article-markdown");
         var preview = Page.Locator(".preview-pane");
         var previewHeading = preview.Locator(".pane-heading");
-        await markdown.FillAsync(CreateLongMarkdown());
-        await Expect(Page.Locator("article.article-preview")).ToContainTextAsync("Paragraph 140");
+        var articlePreview = Page.Locator("article.article-preview");
+        await markdown.FillAsync($"Before thematic break\n\n---\n\n{CreateLongMarkdown()}");
+        await Expect(articlePreview).ToContainTextAsync("Paragraph 140");
+
+        // The preview gutter and article must form one continuous surface.
+        Assert.Equal(
+            await BackgroundColorAsync(articlePreview),
+            await BackgroundColorAsync(preview));
+
+        // Markdown thematic breaks must not introduce a visual divider in the editor preview.
+        await Expect(articlePreview.Locator("hr")).ToBeHiddenAsync();
 
         await AssertScrollableAsync(markdown);
         await AssertScrollableAsync(preview);
@@ -128,4 +137,7 @@ public sealed class ArticleEditorScrollTests : PageTest
 
     private static Task<double> ScrollTopAsync(ILocator locator) =>
         locator.EvaluateAsync<double>("element => element.scrollTop");
+
+    private static Task<string> BackgroundColorAsync(ILocator locator) =>
+        locator.EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor");
 }

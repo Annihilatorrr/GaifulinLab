@@ -916,7 +916,6 @@
 .preview-pane {
     overflow-y: auto;
     overscroll-behavior: contain;
-    background: var(--color-surface-subtle);
 }
 
 .preview-pane .pane-heading {
@@ -981,6 +980,10 @@
     border-left: 3px solid var(--color-accent);
     padding-left: var(--space-5);
     color: var(--color-text-muted);
+}
+
+.article-preview ::deep hr {
+    display: none;
 }
 
 .article-preview ::deep code {
