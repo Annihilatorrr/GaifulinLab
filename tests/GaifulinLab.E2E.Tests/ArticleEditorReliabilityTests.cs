@@ -709,11 +709,219 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         Assert.Empty(article.Tags);
     }
 
+    [Fact]
+    public async Task EditorPdfExport_RequiresExplicitSaveUsesCurrentTypographyAndPreventsDuplicates()
+    {
+        Page.SetDefaultTimeout(5_000);
+        var article = new MockArticle();
+        var exportId = Guid.NewGuid();
+        var releaseExport = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var exportStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveRequests = 0;
+        var exportRequests = 0;
+        await AuthenticateAsync();
+        await RouteEditorAsync(article);
+        await Page.RouteAsync($"**/api/admin/articles/en/{article.Slug}/pdf-exports**", async route =>
+        {
+            exportRequests++;
+            Assert.Equal("POST", route.Request.Method);
+            var query = new Uri(route.Request.Url).Query;
+            Assert.Contains("lineHeight=2", query, StringComparison.Ordinal);
+            Assert.Contains("blockSpacing=1.1", query, StringComparison.Ordinal);
+            exportStarted.TrySetResult();
+            await releaseExport.Task;
+            await JsonAsync(route, new
+            {
+                id = exportId,
+                status = "completed",
+                errorMessage = (string?)null,
+                downloadUrl = $"/api/admin/pdf-exports/{exportId}/download"
+            }, 202);
+        });
+        await Page.RouteAsync($"**/api/admin/pdf-exports/{exportId}/download", route => route.FulfillAsync(new()
+        {
+            Status = 200,
+            ContentType = "application/pdf",
+            BodyBytes = [37, 80, 68, 70, 45, 49, 46, 52]
+        }));
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/en", async route =>
+        {
+            if (route.Request.Method != "PUT")
+            {
+                await route.ContinueAsync();
+                return;
+            }
+
+            saveRequests++;
+            using var request = JsonDocument.Parse(route.Request.PostData!);
+            ApplyUpdateRequest(article, request.RootElement);
+            article.Version++;
+            await JsonAsync(route, article.Version);
+        });
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+        var exportButton = Page.GetByRole(AriaRole.Button, new() { Name = "Export PDF", Exact = true });
+        await Expect(exportButton).ToBeEnabledAsync();
+        await Page.Locator(".preview-settings input[type=range]").Nth(0).EvaluateAsync("input => { input.value = '2'; input.dispatchEvent(new Event('input', { bubbles: true })); }");
+        await Page.Locator(".preview-settings input[type=range]").Nth(1).EvaluateAsync("input => { input.value = '1.1'; input.dispatchEvent(new Event('input', { bubbles: true })); }");
+
+        // A changed editor must be explicitly saved before its current snapshot can be exported.
+        await Page.GetByLabel("Article Markdown").FillAsync("Saved before export");
+        await Expect(exportButton).ToBeDisabledAsync();
+        await exportButton.EvaluateAsync("button => button.click()");
+        Assert.Equal(0, exportRequests);
+        Assert.Equal(0, saveRequests);
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
+        await Expect(exportButton).ToBeEnabledAsync();
+        Assert.Equal(1, saveRequests);
+
+        await exportButton.ClickAsync();
+        await exportStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Preparing PDF…", Exact = true })).ToBeDisabledAsync();
+        await exportButton.EvaluateAsync("button => button.click()");
+        Assert.Equal(1, exportRequests);
+
+        var downloadTask = Page.WaitForDownloadAsync();
+        releaseExport.TrySetResult();
+        var download = await downloadTask;
+        Assert.Equal("original-slug.pdf", download.SuggestedFilename);
+        await Expect(exportButton).ToBeEnabledAsync();
+    }
+
+    [Fact]
+    public async Task EditorPdfExportFailureRestoresTheButtonAndShowsAnAccessibleError()
+    {
+        var article = new MockArticle();
+        var exportId = Guid.NewGuid();
+        await AuthenticateAsync();
+        await RouteEditorAsync(article);
+        await Page.RouteAsync($"**/api/admin/articles/en/{article.Slug}/pdf-exports**", route => JsonAsync(route, new
+        {
+            id = exportId,
+            status = "failed",
+            errorMessage = "Renderer could not create the PDF.",
+            downloadUrl = (string?)null
+        }, 202));
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+        var exportButton = Page.GetByRole(AriaRole.Button, new() { Name = "Export PDF", Exact = true });
+        await exportButton.ClickAsync();
+
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveTextAsync("Renderer could not create the PDF.");
+        await Expect(exportButton).ToBeEnabledAsync();
+    }
+
+    [Fact]
+    public async Task EditorPdfExport_EditDuringExportResumesAutosaveButStillRequiresManualSaveForAnotherExport()
+    {
+        Page.SetDefaultTimeout(5_000);
+        var article = new MockArticle();
+        var exportId = Guid.NewGuid();
+        var releaseExport = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var exportStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var autosaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveRequests = 0;
+        await AuthenticateAsync();
+        await RouteEditorAsync(article);
+        await Page.RouteAsync($"**/api/admin/articles/en/{article.Slug}/pdf-exports**", async route =>
+        {
+            exportStarted.TrySetResult();
+            await releaseExport.Task;
+            await JsonAsync(route, new
+            {
+                id = exportId,
+                status = "completed",
+                errorMessage = (string?)null,
+                downloadUrl = $"/api/admin/pdf-exports/{exportId}/download"
+            }, 202);
+        });
+        await Page.RouteAsync($"**/api/admin/pdf-exports/{exportId}/download", route => route.FulfillAsync(new()
+        {
+            Status = 200,
+            ContentType = "application/pdf",
+            BodyBytes = [37, 80, 68, 70, 45, 49, 46, 52]
+        }));
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/en", async route =>
+        {
+            if (route.Request.Method != "PUT")
+            {
+                await route.ContinueAsync();
+                return;
+            }
+
+            saveRequests++;
+            using var request = JsonDocument.Parse(route.Request.PostData!);
+            ApplyUpdateRequest(article, request.RootElement);
+            article.Version++;
+            autosaveStarted.TrySetResult();
+            await JsonAsync(route, article.Version);
+        });
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+        var exportButton = Page.GetByRole(AriaRole.Button, new() { Name = "Export PDF", Exact = true });
+        await exportButton.ClickAsync();
+        await exportStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await Page.GetByLabel("Article Markdown").FillAsync("Autosaved after export");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Preparing PDF…", Exact = true })).ToBeDisabledAsync();
+
+        var downloadTask = Page.WaitForDownloadAsync();
+        releaseExport.TrySetResult();
+        await downloadTask;
+        await autosaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Page.WaitForTimeoutAsync(1_500);
+
+        Assert.Equal(1, saveRequests);
+        await Expect(exportButton).ToBeDisabledAsync();
+    }
+
+    [Fact]
+    public async Task NewArticle_PdfExportIsDisabledUntilTheInitialSave()
+    {
+        var exportRequests = 0;
+        await AuthenticateAsync();
+        await RouteNewEditorAsync();
+        await Page.RouteAsync("**/api/admin/articles/**/pdf-exports**", async route =>
+        {
+            exportRequests++;
+            await JsonAsync(route, new { });
+        });
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
+        await Page.GetByLabel("Article title").FillAsync("Save before exporting");
+        await Page.GetByLabel("Article Markdown").FillAsync("A draft needs its initial save.");
+        var exportButton = Page.GetByRole(AriaRole.Button, new() { Name = "Export PDF", Exact = true });
+
+        await Expect(exportButton).ToBeDisabledAsync();
+        await exportButton.EvaluateAsync("button => button.click()");
+        Assert.Equal(0, exportRequests);
+    }
+
+    [Fact]
+    public async Task ArticleEditor_HidesPdfExportForAnAuthor()
+    {
+        var article = new MockArticle();
+        await AuthenticateAsAuthorAsync(Page);
+        await RouteEditorAsync(article);
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Export PDF", Exact = true })).ToHaveCountAsync(0);
+    }
+
     private Task AuthenticateAsync() => AuthenticateAsync(Page);
 
     private static async Task AuthenticateAsync(IPage page)
     {
         var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{{\"sub\":\"editor\",\"role\":\"Admin\",\"exp\":{DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()}}}"))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        await page.AddInitScriptAsync($"sessionStorage.setItem('gaifulinlab.admin.access_token','header.{payload}.signature');");
+    }
+
+    private static async Task AuthenticateAsAuthorAsync(IPage page)
+    {
+        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{{\"sub\":\"author\",\"role\":\"Author\",\"exp\":{DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()}}}"))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
         await page.AddInitScriptAsync($"sessionStorage.setItem('gaifulinlab.admin.access_token','header.{payload}.signature');");
     }

@@ -3,7 +3,6 @@ using GaifulinLab.Application.Common;
 using GaifulinLab.Application.Media;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Contracts.Common;
-using GaifulinLab.Domain.Articles;
 using GaifulinLab.Domain.Common;
 using GaifulinLab.Domain.Pdf;
 using GaifulinLab.Infrastructure.Authentication;
@@ -41,11 +40,10 @@ public sealed class AdminPdfExportController(
             .SingleOrDefaultAsync(candidate =>
                 candidate.LanguageCode == normalizedLanguageCode
                 && candidate.Slug == normalizedSlug
-                && candidate.Status == PublicationStatus.Published
                 && dbContext.Articles.Any(article =>
                     article.Id == candidate.ArticleId && article.DeletedAt == null),
                 cancellationToken)
-            ?? throw new ResourceNotFoundException("Published article", $"{normalizedLanguageCode}/{normalizedSlug}");
+            ?? throw new ResourceNotFoundException("Article", $"{normalizedLanguageCode}/{normalizedSlug}");
         var typography = ArticleTypography.FromOptional(lineHeight, blockSpacing);
         var job = PdfExportJob.Create(
             localization,
@@ -65,7 +63,7 @@ public sealed class AdminPdfExportController(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var job = await GetPublishedPdfExport(id, cancellationToken)
+        var job = await GetAvailablePdfExport(id, cancellationToken)
             ?? throw new ResourceNotFoundException("PDF export", id.ToString());
         return Ok(ToStatusDto(job));
     }
@@ -76,7 +74,7 @@ public sealed class AdminPdfExportController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DownloadPdfExport(Guid id, CancellationToken cancellationToken)
     {
-        var job = await GetPublishedPdfExport(id, cancellationToken)
+        var job = await GetAvailablePdfExport(id, cancellationToken)
             ?? throw new ResourceNotFoundException("PDF export", id.ToString());
         if (job.Status != PdfExportStatus.Completed || job.RelativePath is null)
         {
@@ -105,13 +103,12 @@ public sealed class AdminPdfExportController(
                 ? $"/api/admin/pdf-exports/{job.Id}/download"
                 : null);
 
-    private Task<PdfExportJob?> GetPublishedPdfExport(Guid id, CancellationToken cancellationToken) =>
+    private Task<PdfExportJob?> GetAvailablePdfExport(Guid id, CancellationToken cancellationToken) =>
         dbContext.PdfExportJobs
             .AsNoTracking()
             .Where(job => job.Id == id
                 && dbContext.ArticleLocalizations.Any(localization =>
                     localization.Id == job.ArticleLocalizationId
-                    && localization.Article.DeletedAt == null
-                    && localization.Status == PublicationStatus.Published))
+                    && localization.Article.DeletedAt == null))
             .SingleOrDefaultAsync(cancellationToken);
 }

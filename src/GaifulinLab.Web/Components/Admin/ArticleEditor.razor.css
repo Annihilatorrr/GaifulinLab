@@ -166,6 +166,30 @@
     gap: var(--space-2);
 }
 
+.export-action {
+    position: relative;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+}
+
+.export-status {
+    position: absolute;
+    z-index: 4;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    width: max-content;
+    max-width: min(22rem, 85vw);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 0.7rem;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-md);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    line-height: 1.35;
+}
+
 .save-status {
     position: absolute;
     z-index: 4;
@@ -1130,7 +1154,16 @@
         flex: 1;
     }
 
+    .export-action {
+        flex: 1;
+    }
+
     .save-action .button {
+        width: auto;
+        flex: 1;
+    }
+
+    .export-action .button {
         width: auto;
         flex: 1;
     }

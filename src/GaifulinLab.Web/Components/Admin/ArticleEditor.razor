@@ -33,7 +33,7 @@
         <div class="editor-actions" aria-label="Article actions">
             <div class="save-action">
                 <button class="button button-primary" type="button" disabled="@(!CanSave)" @onclick="SaveAsync">@SaveButtonLabel</button>
-                @if (_saving || _isDirty || _saveFailed)
+                @if (_saving || _isDirty || _saveFailed || _exportRequiresManualSave)
                 {
                     <span class="save-status @SaveStatusClass" role="status">@SaveStatusText</span>
                 }
@@ -43,6 +43,18 @@
                           role="@(_hasError ? "alert" : "status")">@_message</span>
                 }
             </div>
+            <AuthorizeView Roles="Admin">
+                <Authorized>
+                    <div class="export-action">
+                        <button class="button button-secondary" type="button" disabled="@(!CanExportPdf)" @onclick="ExportPdfAsync">@PdfExportButtonLabel</button>
+                        @if (_pdfExportInProgress || _pdfExportError is not null)
+                        {
+                            <span class="export-status @(_pdfExportError is not null ? "message-error" : null)"
+                                  role="@(_pdfExportError is not null ? "alert" : "status")">@PdfExportStatusText</span>
+                        }
+                    </div>
+                </Authorized>
+            </AuthorizeView>
             @if (CanPublishCurrent)
             {
                 <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="PublishAsync">Publish</button>
@@ -267,13 +279,16 @@
     private string _tags = "";
     private string _renderedHtml = "";
     private string? _previewError;
+    private string? _pdfExportError;
     private string? _imageUploadError;
     private string? _message;
     private bool _hasError;
     private bool _loading = true;
     private bool _saving;
+    private bool _pdfExportInProgress;
     private bool _isDirty;
     private bool _saveFailed;
+    private bool _exportRequiresManualSave;
     private bool _autosavePending;
     private bool _taxonomyDirty;
     private long _changeVersion;
@@ -291,37 +306,53 @@
     private bool _mathTypesetPending;
     private bool _typographyLoaded;
     private bool _editorSplitLoaded;
+    private bool _disposed;
     private bool _markdownEnhancementsAttached;
     private bool _responsiveLayoutAttached;
     private bool _isCompactLayout;
     private CancellationTokenSource? _messageCancellation;
     private CancellationTokenSource? _autosaveCancellation;
+    private CancellationTokenSource? _pdfExportCancellation;
     private DotNetObjectReference<ArticleEditor>? _splitterReference;
     private ArticleTypography _typography = ArticleTypography.Default;
     private DateTimeOffset? _savedAt;
     private LocalizationModel Current => _localizations[_activeLanguage];
-    private bool IsBusy => _loading || _saving || _coverUploading;
+    private bool IsBusy => _loading || _saving || _coverUploading || _pdfExportInProgress;
     private bool CanSave => !IsBusy
         && _conflictLanguage is null
-        && (ArticleId is null || _isDirty || _saveFailed);
+        && (ArticleId is null || _isDirty || _saveFailed || _exportRequiresManualSave);
     private bool CanPublishCurrent => Current.Status is PublicationStatusDto.Draft or PublicationStatusDto.Unpublished;
+    private bool CanExportPdf => !IsBusy
+        && ArticleId is not null
+        && Current.Version is not null
+        && !_isDirty
+        && !_saveFailed
+        && !_exportRequiresManualSave
+        && _conflictLanguage is null
+        && !string.IsNullOrWhiteSpace(Current.Title)
+        && !string.IsNullOrWhiteSpace(Current.Slug)
+        && !string.IsNullOrWhiteSpace(Current.Markdown);
     private string StatusClass => Current.Status switch
     {
         PublicationStatusDto.Published => "is-published",
         PublicationStatusDto.Unpublished => "is-unpublished",
         _ => "is-draft"
     };
-    private string SaveButtonLabel => _saving ? "Saving…" : _saveFailed ? "Retry" : _isDirty ? "Save changes" : "Save";
-    private string SaveStatusClass => _saving ? "is-saving" : _saveFailed ? "is-error" : _isDirty ? "is-dirty" : "is-saved";
+    private string SaveButtonLabel => _saving ? "Saving…" : _saveFailed ? "Retry" : _isDirty || _exportRequiresManualSave ? "Save changes" : "Save";
+    private string SaveStatusClass => _saving ? "is-saving" : _saveFailed ? "is-error" : _isDirty || _exportRequiresManualSave ? "is-dirty" : "is-saved";
     private string SaveStatusText => _saving
         ? "Saving…"
         : _saveFailed
             ? "Save failed"
-            : _isDirty
-                ? "Unsaved changes"
-                : _savedAt is { } savedAt
+        : _isDirty
+            ? "Unsaved changes"
+            : _exportRequiresManualSave
+                ? "Save changes before exporting PDF"
+            : _savedAt is { } savedAt
                     ? $"Saved {savedAt.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)}"
                     : ArticleId is null ? "Not saved" : "All changes saved";
+    private string PdfExportButtonLabel => _pdfExportInProgress ? "Preparing PDF…" : "Export PDF";
+    private string PdfExportStatusText => _pdfExportError ?? "Preparing PDF…";
     private string TypographyStyle =>
         $"--article-line-height: {FormatTypographyValue(_typography.LineHeight)}; --article-block-spacing: {FormatTypographyValue(_typography.BlockSpacing)}rem; --editor-split: {FormatTypographyValue(_editorSplit)}%; --editor-preview-split: {FormatTypographyValue(100m - _editorSplit)}%;";
     private string EditorSplitValueText => $"{FormatTypographyValue(_editorSplit)}% Markdown, {FormatTypographyValue(100m - _editorSplit)}% Preview";
@@ -482,6 +513,77 @@
 
     private Task SaveAsync() => SaveCoreAsync(navigateAfterCreate: true);
 
+    private async Task ExportPdfAsync()
+    {
+        if (!CanExportPdf)
+        {
+            return;
+        }
+
+        var languageCode = Current.LanguageCode;
+        var slug = Current.Slug;
+        var typography = _typography;
+        var cancellation = new CancellationTokenSource();
+        _pdfExportCancellation = cancellation;
+        _pdfExportInProgress = true;
+        _pdfExportError = null;
+        try
+        {
+            var export = await ContentClient.CreateArticlePdfExportAsync(
+                languageCode,
+                slug,
+                typography,
+                cancellation.Token);
+            for (var attempt = 0; attempt < 60; attempt++)
+            {
+                if (string.Equals(export.Status, "completed", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(export.DownloadUrl))
+                {
+                    var pdf = await ContentClient.DownloadPdfExportAsync(export.Id, cancellation.Token);
+                    await JS.InvokeVoidAsync("articleAssets.download", cancellation.Token, pdf, $"{slug}.pdf");
+                    return;
+                }
+
+                if (string.Equals(export.Status, "failed", StringComparison.OrdinalIgnoreCase))
+                {
+                    _pdfExportError = export.ErrorMessage ?? "The PDF export failed.";
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellation.Token);
+                export = await ContentClient.GetPdfExportAsync(export.Id, cancellation.Token);
+            }
+
+            _pdfExportError = "The PDF export is taking longer than expected. Please try again.";
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            // Navigation away cancels polling and must not surface a stale editor error.
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JSException)
+        {
+            _pdfExportError = "Unable to export the PDF.";
+        }
+        finally
+        {
+            if (_pdfExportCancellation == cancellation)
+            {
+                _pdfExportCancellation.Dispose();
+                _pdfExportCancellation = null;
+                _pdfExportInProgress = false;
+                if (!_disposed && !_saveFailed && _autosavePending && _isDirty && ArticleId is not null)
+                {
+                    QueueAutosave();
+                }
+            }
+
+            if (!_disposed)
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
     [JSInvokable]
     public Task SaveArticleAsync() => CanSave ? SaveAsync() : Task.CompletedTask;
 
@@ -575,6 +677,10 @@
         finally
         {
             _saving = false;
+            if (!isAutomaticSave && !_saveFailed)
+            {
+                _exportRequiresManualSave = false;
+            }
             if (!_saveFailed && _autosavePending && _isDirty && ArticleId is not null)
             {
                 QueueAutosave();
@@ -980,6 +1086,7 @@
     {
         _taxonomyDirty |= taxonomy;
         _isDirty = true;
+        _exportRequiresManualSave = true;
         _changeVersion++;
         _saveFailed = false;
         if (_message is not null)
@@ -1001,7 +1108,7 @@
         }
 
         _autosavePending = true;
-        if (_saving)
+        if (_saving || _pdfExportInProgress)
         {
             return;
         }
@@ -1024,7 +1131,7 @@
 
             await InvokeAsync(async () =>
             {
-                if (cancellation.IsCancellationRequested || _saving || !_isDirty || ArticleId is null)
+                if (cancellation.IsCancellationRequested || _saving || _pdfExportInProgress || !_isDirty || ArticleId is null)
                 {
                     return;
                 }
@@ -1096,11 +1203,14 @@
 
     public void Dispose()
     {
+        _disposed = true;
         _previewCancellation?.Cancel();
         _previewCancellation?.Dispose();
         _messageCancellation?.Cancel();
         _messageCancellation?.Dispose();
         CancelAutosaveDelay();
+        _pdfExportCancellation?.Cancel();
+        _pdfExportCancellation?.Dispose();
         _splitterReference?.Dispose();
     }
 

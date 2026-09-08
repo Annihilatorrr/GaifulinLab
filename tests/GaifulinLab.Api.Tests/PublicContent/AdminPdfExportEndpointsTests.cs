@@ -6,6 +6,7 @@ using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Infrastructure.Authentication;
 using GaifulinLab.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -57,14 +58,42 @@ public sealed class AdminPdfExportEndpointsTests
     }
 
     [Fact]
-    public async Task ArticlePdf_ForDraftOrDeletedArticle_ReturnsNotFound()
+    public async Task ArticlePdfExport_ForSavedDraftAndUnpublishedLocalizations_QueuesExport()
     {
         await using var factory = new AuthWebApplicationFactory();
         await PublicContentTestData.SeedAsync(factory.Services);
         using var client = await CreateAdminClientAsync(factory);
 
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync(
-            "/api/admin/articles/en/future-draft/pdf-exports", null)).StatusCode);
+        var draft = await client.PostAsync(
+            "/api/admin/articles/en/future-draft/pdf-exports", null);
+        Assert.Equal(HttpStatusCode.Accepted, draft.StatusCode);
+        var draftExport = await draft.Content.ReadFromJsonAsync<PdfExportStatusDto>();
+        Assert.NotNull(draftExport);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var article = dbContext.Articles.Include(item => item.Localizations).Single(item => item.Localizations.Any(
+                localization => localization.Slug == "understanding-fft"));
+            article.UnpublishLocalization("en", DateTimeOffset.UtcNow);
+            await dbContext.SaveChangesAsync();
+        }
+
+        var unpublished = await client.PostAsync(
+            "/api/admin/articles/en/understanding-fft/pdf-exports", null);
+        Assert.Equal(HttpStatusCode.Accepted, unpublished.StatusCode);
+        var unpublishedExport = await unpublished.Content.ReadFromJsonAsync<PdfExportStatusDto>();
+        Assert.NotNull(unpublishedExport);
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(
+            $"/api/admin/pdf-exports/{draftExport.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(
+            $"/api/admin/pdf-exports/{unpublishedExport.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.GetAsync(
+            $"/api/admin/pdf-exports/{draftExport.Id}/download")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.GetAsync(
+            $"/api/admin/pdf-exports/{unpublishedExport.Id}/download")).StatusCode);
+
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync(
             "/api/admin/articles/en/deleted-published/pdf-exports", null)).StatusCode);
     }
