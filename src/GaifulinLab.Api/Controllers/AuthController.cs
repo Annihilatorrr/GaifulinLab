@@ -100,6 +100,7 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
     [Authorize]
     [ProducesResponseType<UserProfileResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<UserProfileResponse>> UpdateProfile(UpdateProfileRequest request)
     {
         var displayName = request.DisplayName?.Trim() ?? string.Empty;
@@ -112,9 +113,15 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
                 errors));
         }
 
-        return await authenticationService.UpdateDisplayNameAsync(GetCurrentUserId(), displayName)
-            ? Ok(new UserProfileResponse(displayName))
-            : NotFound();
+        return await authenticationService.UpdateDisplayNameAsync(GetCurrentUserId(), displayName) switch
+        {
+            UpdateDisplayNameResult.Updated => Ok(new UserProfileResponse(displayName)),
+            UpdateDisplayNameResult.NotFound => NotFound(),
+            UpdateDisplayNameResult.Conflict => Conflict(new ApiErrorResponse(
+                "profile_update_conflict",
+                "The profile was changed by another request. Please retry.")),
+            _ => throw new InvalidOperationException("The profile update returned an unknown result.")
+        };
     }
 
     private UnauthorizedObjectResult InvalidCredentials() =>

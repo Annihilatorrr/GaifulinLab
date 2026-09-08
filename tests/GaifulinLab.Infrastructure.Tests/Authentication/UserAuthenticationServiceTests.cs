@@ -33,6 +33,31 @@ public sealed class UserAuthenticationServiceTests
         Assert.Equal(2, state.UpdateAttempts);
     }
 
+    [Fact]
+    public async Task UpdateDisplayNameAsync_WhenExistingUserSaveConflicts_ReturnsConflict()
+    {
+        // Arrange: the user exists, but Identity rejects its save because another request updated it.
+        var state = new UserStoreState(CreateUser());
+        using var serviceProvider = CreateServiceProvider(state);
+        using var scope = serviceProvider.CreateScope();
+        var service = new UserAuthenticationService(
+            new JwtAuthenticationSettings(
+                "GaifulinLab.Tests",
+                "GaifulinLab.Tests.Client",
+                "test-signing-key-that-is-at-least-32-bytes-long",
+                TimeSpan.FromMinutes(5)),
+            scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(),
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            scope.ServiceProvider.GetRequiredService<ILogger<UserAuthenticationService>>());
+
+        // Act.
+        var result = await service.UpdateDisplayNameAsync("admin-id", "Grace Hopper");
+
+        // Assert: a conflict is distinct from an account that cannot be found.
+        Assert.Equal(UpdateDisplayNameResult.Conflict, result);
+        Assert.Equal("Administrator", state.Current.DisplayName);
+    }
+
     private static ServiceProvider CreateServiceProvider(UserStoreState state)
     {
         var services = new ServiceCollection();

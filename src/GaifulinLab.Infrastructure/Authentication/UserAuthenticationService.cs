@@ -103,7 +103,7 @@ internal sealed class UserAuthenticationService(
         return (await userManager.FindByIdAsync(userId))?.DisplayName;
     }
 
-    public async Task<bool> UpdateDisplayNameAsync(string userId, string displayName)
+    public async Task<UpdateDisplayNameResult> UpdateDisplayNameAsync(string userId, string displayName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
@@ -111,11 +111,24 @@ internal sealed class UserAuthenticationService(
         var user = await userManager.FindByIdAsync(userId);
         if (user is null)
         {
-            return false;
+            return UpdateDisplayNameResult.NotFound;
         }
 
         user.DisplayName = displayName;
-        return (await userManager.UpdateAsync(user)).Succeeded;
+        var result = await userManager.UpdateAsync(user);
+        if (result.Succeeded)
+        {
+            return UpdateDisplayNameResult.Updated;
+        }
+
+        if (IsConcurrencyFailure(result))
+        {
+            return UpdateDisplayNameResult.Conflict;
+        }
+
+        throw new InvalidOperationException(
+            $"Identity could not update the display name for user '{userId}': "
+            + string.Join(", ", result.Errors.Select(error => error.Code)));
     }
 
     private async Task RecordFailedAccessAsync(ApplicationUser user)

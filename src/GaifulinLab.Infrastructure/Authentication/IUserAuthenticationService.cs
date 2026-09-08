@@ -8,5 +8,12 @@ public interface IUserAuthenticationService
 
     Task<string?> GetDisplayNameAsync(string userId);
 
-    Task<bool> UpdateDisplayNameAsync(string userId, string displayName);
+    Task<UpdateDisplayNameResult> UpdateDisplayNameAsync(string userId, string displayName);
+}
+
+public enum UpdateDisplayNameResult
+{
+    Updated,
+    NotFound,
+    Conflict
 }

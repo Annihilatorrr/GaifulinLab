@@ -1,9 +1,13 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using GaifulinLab.Api.Controllers;
 using GaifulinLab.Contracts.Auth;
 using GaifulinLab.Contracts.Common;
 using GaifulinLab.Infrastructure.Authentication;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
@@ -256,6 +260,29 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task Profile_WhenDisplayNameSaveConflicts_ReturnsConflict()
+    {
+        var controller = new AuthController(new ConflictingProfileAuthenticationService())
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.NameIdentifier, "admin-id")],
+                        "test"))
+                }
+            }
+        };
+
+        var result = await controller.UpdateProfile(new UpdateProfileRequest("Grace Hopper"));
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result.Result);
+        var error = Assert.IsType<ApiErrorResponse>(conflict.Value);
+        Assert.Equal("profile_update_conflict", error.Code);
+    }
+
+    [Fact]
     public async Task Register_WithInvalidDisplayName_ReturnsValidationError()
     {
         await using var isolatedFactory = new AuthWebApplicationFactory();
@@ -300,6 +327,21 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
             new AuthenticationHeaderValue("Bearer", login.AccessToken);
 
         Assert.Equal(HttpStatusCode.NoContent, (await client.GetAsync("/api/auth/session")).StatusCode);
+    }
+
+    private sealed class ConflictingProfileAuthenticationService : IUserAuthenticationService
+    {
+        public Task<IssuedAccessToken?> AuthenticateAsync(string login, string password) =>
+            throw new NotSupportedException();
+
+        public Task<UserRegistrationResult> RegisterAsync(string login, string displayName, string password) =>
+            throw new NotSupportedException();
+
+        public Task<string?> GetDisplayNameAsync(string userId) =>
+            throw new NotSupportedException();
+
+        public Task<UpdateDisplayNameResult> UpdateDisplayNameAsync(string userId, string displayName) =>
+            Task.FromResult(UpdateDisplayNameResult.Conflict);
     }
 }
 

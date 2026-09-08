@@ -63,6 +63,8 @@ Worker A захватил попытку 1, затем задержался до
 
 ### B6 — Minor: конфликт обновления профиля выдаётся за отсутствие пользователя
 
+> Исправлено 2026-09-08: `UpdateDisplayNameAsync` различает отсутствие пользователя и `ConcurrencyFailure`; API возвращает `409 profile_update_conflict` для конфликта.
+
 Источник: [UserAuthenticationService.cs](../src/GaifulinLab.Infrastructure/Authentication/UserAuthenticationService.cs), 101–108; [AuthController.cs](../src/GaifulinLab.Api/Controllers/AuthController.cs), 125–127.
 
 `UpdateAsync(user).Succeeded == false` и отсутствие пользователя превращаются в один bool. При конкурентном обновлении существующего пользователя ConcurrencyFailure превращается в HTTP 404. Коррекция: различать NotFound, Conflict и ошибки Identity; для конфликта возвращать 409 или выполнять ограниченный корректный повтор. Основание по Identity — те же исходники, что в B5.
