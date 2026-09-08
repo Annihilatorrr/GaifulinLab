@@ -185,10 +185,17 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
         var article = new EditorArticle { Status = 1, Slug = "typography" };
         await AuthenticateAsync();
         await RouteEditorAsync(article);
+        await Page.SetViewportSizeAsync(1280, 900);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
         await Page.GetByText("Preview settings", new() { Exact = true }).ClickAsync();
+        var paragraphSpacing = Page.GetByRole(AriaRole.Slider, new() { Name = "Paragraph spacing" });
+
+        // The long label must leave enough track width for precise pointer adjustment.
+        var paragraphSpacingBounds = Assert.IsType<LocatorBoundingBoxResult>(await paragraphSpacing.BoundingBoxAsync());
+        Assert.True(paragraphSpacingBounds.Width >= 96, $"Paragraph spacing slider width was {paragraphSpacingBounds.Width}px.");
+
         await Page.GetByRole(AriaRole.Slider, new() { Name = "Line spacing" }).FillAsync("2.1");
-        await Page.GetByRole(AriaRole.Slider, new() { Name = "Paragraph spacing" }).FillAsync("1.4");
+        await paragraphSpacing.FillAsync("1.4");
         await Expect(Page.Locator(".article-editor")).ToHaveAttributeAsync("style", new Regex("line-height: 2.1.*block-spacing: 1.4rem"));
         await Page.ReloadAsync();
         await Expect(Page.Locator(".article-editor")).ToHaveAttributeAsync("style", new Regex("line-height: 2.1.*block-spacing: 1.4rem"));
