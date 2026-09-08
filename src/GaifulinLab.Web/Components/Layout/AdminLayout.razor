@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
+@inject IJSRuntime JS
 
-<a class="skip-link" href="#admin-main-content">Skip to content</a>
+<a class="skip-link" href="#admin-main-content" @onclick="FocusMainAsync" @onclick:preventDefault>Skip to content</a>
 
 <div class="admin-shell">
     <header class="admin-header">
@@ -19,7 +20,13 @@
         </div>
     </header>
 
-    <main id="admin-main-content" class="admin-main">
+    <main id="admin-main-content" class="admin-main" tabindex="-1" @ref="_mainContent">
         @Body
     </main>
 </div>
+
+@code {
+    private ElementReference _mainContent;
+
+    private async Task FocusMainAsync() => await _mainContent.FocusAsync();
+}

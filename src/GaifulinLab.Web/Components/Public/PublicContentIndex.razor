@@ -104,12 +104,15 @@
     private bool _error;
     private bool _hasMoreArticles;
     private int _articlePage = 1;
+    private long _requestVersion;
     private const int ArticlePageSize = 20;
     private bool HasItems => Kind switch { "articles" or "archive" => _articles.Count > 0, "topics" => _topics.Count > 0, "series" => _series.Count > 0, _ => _tags.Count > 0 };
 
     protected override async Task OnParametersSetAsync()
     {
+        var requestVersion = ++_requestVersion;
         _loading = true;
+        _loadingMoreArticles = false;
         _error = false;
         _hasMoreArticles = false;
         _articlePage = 1;
@@ -117,27 +120,47 @@
         {
             switch (Kind)
             {
-                case "topics": _topics = await ContentClient.GetTopicsAsync(LanguageCode); break;
-                case "series": _series = await ContentClient.GetSeriesAsync(LanguageCode); break;
-                case "tags": _tags = await ContentClient.GetTagsAsync(LanguageCode); break;
+                case "topics":
+                    var topics = await ContentClient.GetTopicsAsync(LanguageCode);
+                    if (requestVersion == _requestVersion) _topics = topics;
+                    break;
+                case "series":
+                    var series = await ContentClient.GetSeriesAsync(LanguageCode);
+                    if (requestVersion == _requestVersion) _series = series;
+                    break;
+                case "tags":
+                    var tags = await ContentClient.GetTagsAsync(LanguageCode);
+                    if (requestVersion == _requestVersion) _tags = tags;
+                    break;
                 default:
-                    _articles = await ContentClient.GetArticlesAsync(
+                    var articles = await ContentClient.GetArticlesAsync(
                         LanguageCode,
                         Topic,
                         SeriesFilter,
                         Tag,
                         _articlePage,
                         ArticlePageSize);
-                    _hasMoreArticles = _articles.Count == ArticlePageSize;
+                    if (requestVersion == _requestVersion)
+                    {
+                        _articles = articles;
+                        _hasMoreArticles = articles.Count == ArticlePageSize;
+                    }
                     break;
             }
         }
-        catch (HttpRequestException) { _error = true; }
-        finally { _loading = false; }
+        catch (HttpRequestException)
+        {
+            if (requestVersion == _requestVersion) _error = true;
+        }
+        finally
+        {
+            if (requestVersion == _requestVersion) _loading = false;
+        }
     }
 
     private async Task LoadMoreArticlesAsync()
     {
+        var requestVersion = _requestVersion;
         _loadingMoreArticles = true;
         try
         {
@@ -148,17 +171,20 @@
                 Tag,
                 _articlePage + 1,
                 ArticlePageSize);
-            _articles = _articles.Concat(nextPage).ToArray();
-            _articlePage++;
-            _hasMoreArticles = nextPage.Count == ArticlePageSize;
+            if (requestVersion == _requestVersion)
+            {
+                _articles = _articles.Concat(nextPage).ToArray();
+                _articlePage++;
+                _hasMoreArticles = nextPage.Count == ArticlePageSize;
+            }
         }
         catch (HttpRequestException)
         {
-            _error = true;
+            if (requestVersion == _requestVersion) _error = true;
         }
         finally
         {
-            _loadingMoreArticles = false;
+            if (requestVersion == _requestVersion) _loadingMoreArticles = false;
         }
     }
 }

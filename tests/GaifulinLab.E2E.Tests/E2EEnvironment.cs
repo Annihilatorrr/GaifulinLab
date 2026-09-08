@@ -48,7 +48,10 @@ public sealed class E2EEnvironment : IAsyncLifetime
         }
 
         BaseUri = baseUri;
-        _usesExternalSite = baseUri != new Uri(DefaultBaseUrl);
+        // An explicitly supplied URL is an external target even when it happens
+        // to use the default host. URI equality normalizes localhost addresses,
+        // which otherwise made isolated browser runs try to start a second API.
+        _usesExternalSite = configuredBaseUrl is not null;
         _repositoryRoot = FindRepositoryRoot();
 
         if (!_usesExternalSite)

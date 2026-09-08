@@ -63,7 +63,16 @@ internal sealed class UpdateArticleTaxonomyCommandHandler(
             series.SetArticle(article, assignment.Position, now);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new RequestConflictException(
+                "The article was changed elsewhere. Reload it before changing taxonomy.",
+                "article_taxonomy_conflict");
+        }
     }
 
     private async Task<IReadOnlyList<Tag>> ResolveTags(

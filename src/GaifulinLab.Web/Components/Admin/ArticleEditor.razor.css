@@ -575,7 +575,7 @@
 }
 
 .editor-tabs {
-    display: none;
+    display: inline-grid;
     align-self: flex-end;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     border: 1px solid var(--color-border);

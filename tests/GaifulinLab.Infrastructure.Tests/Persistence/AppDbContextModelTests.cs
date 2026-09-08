@@ -73,6 +73,7 @@ public sealed class AppDbContextModelTests
             index.Properties.Select(property => property.Name).SequenceEqual(
                 [nameof(Article.OwnerUserId), nameof(Article.DeletedAt), nameof(Article.UpdatedAt)]));
         Assert.NotNull(articleType.FindProperty(nameof(Article.DeletedAt)));
+        Assert.True(articleType.FindProperty(nameof(Article.Version))!.IsConcurrencyToken);
         var userType = context.Model.FindEntityType(typeof(ApplicationUser))!;
         var displayName = userType.FindProperty(nameof(ApplicationUser.DisplayName));
         Assert.NotNull(displayName);

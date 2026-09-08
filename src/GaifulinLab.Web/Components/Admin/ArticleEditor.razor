@@ -291,7 +291,6 @@
     private bool _mathTypesetPending;
     private bool _typographyLoaded;
     private bool _editorSplitLoaded;
-    private bool _shortcutsAttached;
     private bool _markdownEnhancementsAttached;
     private bool _responsiveLayoutAttached;
     private bool _isCompactLayout;
@@ -366,7 +365,6 @@
 
             _typographyLoaded = true;
             StateHasChanged();
-            return;
         }
 
         if (!_editorSplitLoaded)
@@ -382,16 +380,18 @@
 
             _editorSplitLoaded = true;
             StateHasChanged();
-            return;
         }
 
-        if (!_shortcutsAttached)
+        // Refresh the global shortcut target after every render. Blazor can replace an
+        // editor instance during enhanced navigation while the JavaScript module stays
+        // alive, so retaining the previous DotNetObjectReference would save the article
+        // that is no longer on screen.
+        if (!_loading)
         {
             _splitterReference ??= DotNetObjectReference.Create(this);
             try
             {
                 await JS.InvokeVoidAsync("gaifulinLabEditorShortcuts.attach", _splitterReference);
-                _shortcutsAttached = true;
             }
             catch (JSException)
             {
@@ -567,7 +567,10 @@
         {
             _saveFailed = true;
             _autosavePending = false;
-            ShowMessage(exception.Message, true);
+            if (_message is null)
+            {
+                ShowMessage(exception.Message, true);
+            }
         }
         finally
         {

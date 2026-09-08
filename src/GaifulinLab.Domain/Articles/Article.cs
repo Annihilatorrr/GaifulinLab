@@ -24,6 +24,8 @@ public sealed class Article
 
     public Guid Id { get; private set; }
 
+    public long Version { get; private set; }
+
     // This is an internal Identity user id, not a public author profile field.
     public string OwnerUserId { get; private set; } = string.Empty;
 
@@ -191,7 +193,11 @@ public sealed class Article
         }
     }
 
-    private void Touch(DateTimeOffset updatedAt) => UpdatedAt = DomainRules.AsUtc(updatedAt);
+    private void Touch(DateTimeOffset updatedAt)
+    {
+        UpdatedAt = DomainRules.AsUtc(updatedAt);
+        Version++;
+    }
 
     private static string NormalizeOwnerUserId(string ownerUserId)
     {

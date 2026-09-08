@@ -87,9 +87,11 @@ public sealed class ArticleImageWorkflowTests : PageTest
             response.Request.Method == "GET"
             && response.Url.Contains("/api/admin/pdf-exports/", StringComparison.Ordinal)
             && response.Url.Contains("/download", StringComparison.Ordinal));
+        var downloadTask = page.WaitForDownloadAsync();
         await page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" }).ClickAsync();
         var queuedResponse = await queuedResponseTask;
         var response = await responseTask;
+        var download = await downloadTask;
 
         Assert.Equal(202, queuedResponse.Status);
         Assert.StartsWith(
@@ -98,6 +100,12 @@ public sealed class ArticleImageWorkflowTests : PageTest
             StringComparison.OrdinalIgnoreCase);
         var content = await response.BodyAsync();
         Assert.True(content.AsSpan().StartsWith("%PDF-"u8));
+        Assert.Equal($"{slug}.pdf", download.SuggestedFilename);
+        Assert.Null(await download.FailureAsync());
+        await using var downloadedContent = await download.CreateReadStreamAsync();
+        var header = new byte[5];
+        Assert.Equal(header.Length, await downloadedContent.ReadAsync(header));
+        Assert.Equal("%PDF-"u8.ToArray(), header);
     }
 
     private async Task AssertPdfButtonIsHiddenForAnonymousAndRegularUserAsync(string publicPath)

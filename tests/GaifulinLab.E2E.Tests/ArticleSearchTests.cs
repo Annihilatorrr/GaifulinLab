@@ -74,6 +74,11 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         Assert.Equal(3, last.Page); Assert.Equal(4, last.Items.Count);
         Assert.Equal(24, first.Items.Concat(second.Items).Concat(last.Items).Select(x => x.Slug).Distinct().Count());
         Assert.Equal(first.Items.Select(x => x.Slug), (await search.SearchAsync(Request(), default)).Items.Select(x => x.Slug));
+        var newest = Request(); newest.Sort = "newest";
+        var newestFirstRun = await search.SearchAsync(newest, default);
+        var newestSecondRun = await search.SearchAsync(newest, default);
+        Assert.Equal(first.Items.Select(x => x.Slug), newestFirstRun.Items.Select(x => x.Slug));
+        Assert.Equal(newestFirstRun.Items.Select(x => x.Slug), newestSecondRun.Items.Select(x => x.Slug));
         var ranked = await search.SearchAsync(Request("quasar"), default);
         Assert.Equal(2, ranked.TotalCount); Assert.Equal("Quasar in the title", ranked.Items[0].Title);
         Assert.Single((await search.SearchAsync(Request("quasar", "title"), default)).Items);
@@ -98,7 +103,9 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         recent.Tag = [cpp.Name, sharp.Name];
         Assert.Equal(2, (await search.SearchAsync(recent, default)).TotalCount);
         var oldest = Request(); oldest.Sort = "oldest";
-        Assert.Equal(old.Localizations.Single().Slug, (await search.SearchAsync(oldest, default)).Items[0].Slug);
+        var oldestFirstRun = await search.SearchAsync(oldest, default);
+        Assert.Equal(old.Localizations.Single().Slug, oldestFirstRun.Items[0].Slug);
+        Assert.Equal(oldestFirstRun.Items.Select(x => x.Slug), (await search.SearchAsync(oldest, default)).Items.Select(x => x.Slug));
 
         bodyMatch.UpdateLocalization("en", "A distant star", null, "Replacement pulsar content", bodyMatch.Localizations.Single().Slug, now);
         topic.UpdateLocalization("en", "Cosmology " + suffix, topic.Localizations.Single().Slug, null, now);
@@ -174,6 +181,8 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("23 articles found");
         await Page.GetByRole(AriaRole.Link, new() { Name = "Page 2", Exact = true }).ClickAsync();
         await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
+        Assert.Contains($"tag={token}", Page.Url);
+        Assert.Contains("page=2", Page.Url);
         var secondTitles = await Page.Locator(".search-card h2").AllTextContentsAsync();
         await Page.ReloadAsync();
         await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
@@ -182,11 +191,20 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(3);
         await Page.GoBackAsync();
         await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
+        await Page.GoForwardAsync();
+        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(3);
+        await Page.GoBackAsync();
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
         await Page.GetByLabel("Search articles", new() { Exact = true }).FillAsync("interface");
         await Page.GetByLabel("Search articles", new() { Exact = true }).PressAsync("Enter");
         await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 3");
+        Assert.Contains("q=interface", Page.Url);
+        Assert.Contains("page=1", Page.Url);
         await Expect(Page.Locator(".search-card h2 mark").First).ToBeVisibleAsync();
+        await Page.GetByRole(AriaRole.Link, new() { Name = "Page 2", Exact = true }).ClickAsync();
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
         await Page.GetByLabel("Search in", new() { Exact = true }).SelectOptionAsync("title");
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 3");
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10);
         await Page.GetByLabel("Search articles", new() { Exact = true }).FillAsync("less");
         await Page.GetByLabel("Search articles", new() { Exact = true }).PressAsync("Enter");
@@ -240,12 +258,33 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Page.GetByLabel("Search articles", new() { Exact = true }).FillAsync("delayedquery");
         await Page.GetByLabel("Search articles", new() { Exact = true }).PressAsync("Enter");
         await oldStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Searching");
+        await Expect(Page.Locator(".search-skeleton")).ToHaveCountAsync(3);
         await Page.GetByLabel("Search articles", new() { Exact = true }).FillAsync("interface");
         await Page.GetByLabel("Search articles", new() { Exact = true }).PressAsync("Enter");
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10);
         releaseOld.TrySetResult();
         await oldFinished.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10);
+        await Page.UnrouteAsync("**/api/public/search?**");
+
+        var htmlToken = "searchhtml" + Guid.NewGuid().ToString("N");
+        var htmlSlug = "safe-card-" + Guid.NewGuid().ToString("N");
+        var htmlArticle = Article.Create(owner, "en", DateTimeOffset.UtcNow,
+            "Safe card " + htmlToken,
+            "<img src=x onerror=\"window.searchCardScriptExecuted = true\">",
+            "Search card content.", htmlSlug);
+        htmlArticle.PublishLocalization("en", DateTimeOffset.UtcNow);
+        db.Articles.Add(htmlArticle);
+        await db.SaveChangesAsync();
+        await Page.EvaluateAsync("window.searchCardScriptExecuted = false");
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/search?q=" + htmlToken).ToString());
+        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(1);
+        await Expect(Page.Locator(".article-meta")).ToContainTextAsync("1 min read");
+        await Expect(Page.Locator(".search-excerpt img")).ToHaveCountAsync(0);
+        Assert.False(await Page.EvaluateAsync<bool>("window.searchCardScriptExecuted === true"));
+        await Page.Locator(".search-card h2 a").ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex($"/en/articles/{htmlSlug}$"));
     }
 
     private static ServiceProvider CreateServices()

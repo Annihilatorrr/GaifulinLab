@@ -12,6 +12,11 @@ public sealed class MarkdownRendererTests
         const string markdown = """
             # Heading
 
+            [Documentation](https://example.com/docs)
+
+            - first
+            - second
+
             | Name | Value |
             | --- | ---: |
             | FFT | **Fast** |
@@ -20,6 +25,9 @@ public sealed class MarkdownRendererTests
         var html = _renderer.Render(markdown);
 
         Assert.Contains("<h1", html);
+        Assert.Contains("href=\"https://example.com/docs\"", html);
+        Assert.Contains("<ul>", html);
+        Assert.Contains("<li>first</li>", html);
         Assert.Contains("<table>", html);
         Assert.Contains("<strong>Fast</strong>", html);
     }
@@ -33,6 +41,7 @@ public sealed class MarkdownRendererTests
             <script>alert('xss')</script>
             <img src="/media/image.png" onerror="alert('xss')" style="display:none">
             <a href="javascript:alert('xss')">unsafe link</a>
+            <button onclick="alert('xss')">unsafe button</button>
             """;
 
         var html = _renderer.Render(markdown);
@@ -43,6 +52,7 @@ public sealed class MarkdownRendererTests
         Assert.DoesNotContain("onerror", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("style=", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("javascript:", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onclick", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -61,6 +61,10 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
         Assert.Equal("login_taken", error?.Code);
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+        Assert.Equal(1, userManager.Users.Count(user => user.Email == login));
     }
 
     [Fact]

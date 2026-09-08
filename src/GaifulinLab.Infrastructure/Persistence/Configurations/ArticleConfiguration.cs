@@ -14,6 +14,9 @@ internal sealed class ArticleConfiguration : IEntityTypeConfiguration<Article>
 
         builder.Property(article => article.OwnerUserId)
             .IsRequired();
+        builder.Property(article => article.Version)
+            .IsConcurrencyToken()
+            .IsRequired();
         builder.Property(article => article.CreatedAt).IsRequired();
         builder.Property(article => article.UpdatedAt).IsRequired();
         builder.Property(article => article.DeletedAt);

@@ -34,6 +34,10 @@
     }
     else
     {
+        @if (_deleteError is not null)
+        {
+            <p class="state error" role="alert">@_deleteError</p>
+        }
         <div class="article-list surface">
             @foreach (var article in _articles)
             {
@@ -59,6 +63,7 @@
     private IReadOnlyList<AdminArticleListItemDto> _articles = [];
     private bool _loading = true;
     private string? _error;
+    private string? _deleteError;
     private Guid? _deleting;
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -89,7 +94,7 @@
         }
 
         _deleting = articleId;
-        _error = null;
+        _deleteError = null;
         try
         {
             await ArticlesClient.DeleteAsync(articleId);
@@ -97,7 +102,7 @@
         }
         catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
         {
-            _error = exception.Message;
+            _deleteError = exception.Message;
         }
         finally
         {

@@ -25,6 +25,22 @@ public sealed class TokenAuthenticationStateProviderTests
         Assert.True(state.User.IsInRole("Admin"));
     }
 
+    [Theory]
+    [InlineData("not-a-jwt")]
+    [InlineData("header.eyJleHAiOjF9.signature")]
+    public async Task GetAuthenticationStateAsync_ClearsMalformedOrExpiredTokens(string token)
+    {
+        var js = new TokenJsRuntime(token);
+        var provider = new TokenAuthenticationStateProvider(new AccessTokenStore(js));
+
+        var state = await provider.GetAuthenticationStateAsync();
+
+        Assert.False(state.User.Identity?.IsAuthenticated);
+        Assert.False(provider.IsLoggedIn);
+        Assert.Null(js.Token);
+        Assert.Equal(1, js.ClearCount);
+    }
+
     private static string CreateToken(IReadOnlyDictionary<string, object?> payload) =>
         $"header.{Encode(JsonSerializer.Serialize(payload))}.signature";
 
@@ -34,15 +50,31 @@ public sealed class TokenAuthenticationStateProviderTests
             .Replace('+', '-')
             .Replace('/', '_');
 
-    private sealed class TokenJsRuntime(string token) : IJSRuntime
+    private sealed class TokenJsRuntime(string? token) : IJSRuntime
     {
+        public string? Token { get; private set; } = token;
+        public int ClearCount { get; private set; }
+
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) =>
-            new((TValue)(object)token);
+            InvokeAsync<TValue>(identifier, CancellationToken.None, args);
 
         public ValueTask<TValue> InvokeAsync<TValue>(
             string identifier,
             CancellationToken cancellationToken,
-            object?[]? args) =>
-            new((TValue)(object)token);
+            object?[]? args)
+        {
+            if (identifier == "sessionStorage.getItem")
+            {
+                return new((TValue)(object?)Token!);
+            }
+
+            if (identifier == "sessionStorage.removeItem")
+            {
+                Token = null;
+                ClearCount++;
+            }
+
+            return new(default(TValue)!);
+        }
     }
 }

@@ -129,6 +129,69 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
     }
 
     [Fact]
+    public async Task TranslationPublication_IsIndependentForEachLanguageAndKeepsBothVersionsIntact()
+    {
+        using var client = await CreateAuthenticatedClient();
+        var enSlug = $"translation-en-{Guid.NewGuid():N}";
+        var ruSlug = $"translation-ru-{Guid.NewGuid():N}";
+        var created = await (await client.PostAsJsonAsync(
+            "/api/admin/articles", new CreateArticleRequest("en", "English", "EN summary", "EN body", enSlug)))
+            .Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(created);
+
+        var russian = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created!.ArticleId}/localizations/ru",
+            new UpdateArticleLocalizationRequest("Русский", "RU summary", "RU body", ruSlug));
+        Assert.Equal(HttpStatusCode.OK, russian.StatusCode);
+        await client.PostAsync($"/api/admin/articles/{created.ArticleId}/localizations/en/publish", null);
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/public/articles/en/{enSlug}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/public/articles/ru/{ruSlug}")).StatusCode);
+
+        await client.PostAsync($"/api/admin/articles/{created.ArticleId}/localizations/ru/publish", null);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/public/articles/ru/{ruSlug}")).StatusCode);
+        await client.PostAsync($"/api/admin/articles/{created.ArticleId}/localizations/en/unpublish", null);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/public/articles/en/{enSlug}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/public/articles/ru/{ruSlug}")).StatusCode);
+
+        var details = await client.GetFromJsonAsync<AdminArticleDetailsDto>($"/api/admin/articles/{created.ArticleId}");
+        Assert.Equal("EN body", details!.Localizations.Single(item => item.LanguageCode == "en").Markdown);
+        Assert.Equal("RU body", details.Localizations.Single(item => item.LanguageCode == "ru").Markdown);
+    }
+
+    [Fact]
+    public async Task PublishingAfterAnUpdate_ExposesTheLatestLocalizationRatherThanTheOriginalDraft()
+    {
+        using var client = await CreateAuthenticatedClient();
+        var slug = $"latest-before-publish-{Guid.NewGuid():N}";
+        var created = await (await client.PostAsJsonAsync(
+            "/api/admin/articles", new CreateArticleRequest("en", "Initial title", null, "Initial body", slug)))
+            .Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(created);
+        var update = await client.PutAsJsonAsync($"/api/admin/articles/{created!.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest("Latest title", "Latest summary", "Latest body", slug, created.LocalizationVersion));
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en/publish", null)).StatusCode);
+        var publicArticle = await client.GetFromJsonAsync<PublicArticleDetailsDto>($"/api/public/articles/en/{slug}");
+        Assert.Equal("Latest title", publicArticle!.Title);
+        Assert.Contains("Latest body", publicArticle.Html);
+    }
+
+    [Theory]
+    [InlineData("", "valid-slug")]
+    [InlineData("Valid title", "")]
+    public async Task Publish_RejectsDraftMissingRequiredFields(string title, string slug)
+    {
+        using var client = await CreateAuthenticatedClient();
+        var created = await (await client.PostAsJsonAsync("/api/admin/articles", new CreateArticleRequest("en", title, null, "Body", slug)))
+            .Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(created);
+        var response = await client.PostAsync($"/api/admin/articles/{created!.ArticleId}/localizations/en/publish", null);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Unpublish_RejectsDraftAndMakesTheLocalizationPrivateUntilRepublished()
     {
         using var client = await CreateAuthenticatedClient();
@@ -151,6 +214,32 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
             $"/api/public/articles/en/{slug}")).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync(
             $"/api/admin/articles/{created.ArticleId}/localizations/en/publish", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task RetryAfterARejectedLocalizationUpdate_UpdatesTheOriginalArticleWithoutCreatingADuplicate()
+    {
+        using var client = await CreateAuthenticatedClient();
+        var slug = $"retry-{Guid.NewGuid():N}";
+        var created = await (await client.PostAsJsonAsync(
+            "/api/admin/articles", new CreateArticleRequest("en", "Initial", null, "Initial body", slug)))
+            .Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(created);
+
+        var invalid = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created!.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest("Updated", new string('s', ContentLimits.ArticleSummary + 1), "Updated body", slug, created.LocalizationVersion));
+        await AssertInvalidFieldAsync(invalid, "Summary");
+
+        var retry = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest("Updated", "Updated summary", "Updated body", slug, created.LocalizationVersion));
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        var list = await client.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>("/api/admin/articles");
+        Assert.Single(list!, item => item.Id == created.ArticleId);
+        var saved = await client.GetFromJsonAsync<AdminArticleDetailsDto>($"/api/admin/articles/{created.ArticleId}");
+        Assert.Equal("Updated", Assert.Single(saved!.Localizations).Title);
+        Assert.Equal("Updated body", Assert.Single(saved.Localizations).Markdown);
     }
 
     [Fact]
@@ -357,6 +446,7 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         }
 
         using var client = await CreateAuthenticatedClient(isolatedFactory);
+        var articleSlug = $"fft-{Guid.NewGuid():N}";
         var createResponse = await client.PostAsJsonAsync(
             "/api/admin/articles",
             new CreateArticleRequest(
@@ -364,7 +454,7 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
                 "FFT",
                 null,
                 "# FFT",
-                $"fft-{Guid.NewGuid():N}"));
+                articleSlug));
         var article = await createResponse.Content.ReadFromJsonAsync<CreateArticleResponse>();
 
         var assignResponse = await client.PutAsJsonAsync(
@@ -382,6 +472,20 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         Assert.Equal([topicId], details!.TopicIds);
         Assert.Equal(new SeriesAssignmentDto(seriesId, 1), Assert.Single(details.Series));
         Assert.Equal(["Backend", "dotnet"], details.Tags);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync(
+            $"/api/admin/articles/{article.ArticleId}/localizations/en/publish",
+            null)).StatusCode);
+        var publicDetails = await client.GetFromJsonAsync<PublicArticleDetailsDto>(
+            $"/api/public/articles/en/{articleSlug}");
+        Assert.Equal("Engineering", Assert.Single(publicDetails!.Topics).DisplayName);
+        Assert.Equal("Fourier transforms", Assert.Single(publicDetails.Series).DisplayName);
+        Assert.Equal(["Backend", "dotnet"], publicDetails.Tags);
+        Assert.Single((await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en&topic=engineering"))!);
+        Assert.Single((await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en&series=fourier-transforms"))!);
+        Assert.Single((await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en&tag=dotnet"))!);
 
         var clearResponse = await client.PutAsJsonAsync(
             $"/api/admin/articles/{article.ArticleId}/taxonomy",
@@ -393,6 +497,17 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         Assert.Empty(details!.TopicIds);
         Assert.Empty(details.Series);
         Assert.Empty(details.Tags);
+        publicDetails = await client.GetFromJsonAsync<PublicArticleDetailsDto>(
+            $"/api/public/articles/en/{articleSlug}");
+        Assert.Empty(publicDetails!.Topics);
+        Assert.Empty(publicDetails.Series);
+        Assert.Empty(publicDetails.Tags);
+        Assert.Empty((await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en&topic=engineering"))!);
+        Assert.Empty((await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en&series=fourier-transforms"))!);
+        Assert.Empty((await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en&tag=dotnet"))!);
     }
 
     [Fact]
@@ -458,6 +573,103 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         Assert.Equal([first, replacement, third, fourth], orderedArticleIds);
     }
 
+    [Fact]
+    public async Task ArticleCanUseDifferentPositionsInTwoSeries_AndChangingOneKeepsBothPublicOrdersCorrect()
+    {
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        var suffix = Guid.NewGuid().ToString("N");
+        var firstSeriesSlug = $"first-series-{suffix}";
+        var secondSeriesSlug = $"second-series-{suffix}";
+        Guid firstSeriesId;
+        Guid secondSeriesId;
+        using (var scope = isolatedFactory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var now = DateTimeOffset.UtcNow;
+            var firstSeries = Series.Create("en", "First series", firstSeriesSlug, null, now);
+            var secondSeries = Series.Create("en", "Second series", secondSeriesSlug, null, now);
+            db.Series.AddRange(firstSeries, secondSeries);
+            await db.SaveChangesAsync();
+            firstSeriesId = firstSeries.Id;
+            secondSeriesId = secondSeries.Id;
+        }
+
+        using var client = await CreateAuthenticatedClient(isolatedFactory);
+        var firstAnchor = await CreatePublishedArticle(client, "First anchor", $"first-anchor-{suffix}");
+        var target = await CreatePublishedArticle(client, "Target article", $"target-{suffix}");
+        var secondAnchor = await CreatePublishedArticle(client, "Second anchor", $"second-anchor-{suffix}");
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/admin/articles/{firstAnchor}/taxonomy",
+            new UpdateArticleTaxonomyRequest([], [new SeriesAssignmentRequest(firstSeriesId, 1)], []))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/admin/articles/{secondAnchor}/taxonomy",
+            new UpdateArticleTaxonomyRequest([], [new SeriesAssignmentRequest(secondSeriesId, 2)], []))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            $"/api/admin/articles/{target}/taxonomy",
+            new UpdateArticleTaxonomyRequest(
+                [],
+                [new SeriesAssignmentRequest(firstSeriesId, 2), new SeriesAssignmentRequest(secondSeriesId, 1)],
+                []))).StatusCode);
+
+        var changeOnePosition = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{target}/taxonomy",
+            new UpdateArticleTaxonomyRequest(
+                [],
+                [new SeriesAssignmentRequest(firstSeriesId, 3), new SeriesAssignmentRequest(secondSeriesId, 1)],
+                []));
+        Assert.Equal(HttpStatusCode.NoContent, changeOnePosition.StatusCode);
+
+        var details = await client.GetFromJsonAsync<AdminArticleDetailsDto>($"/api/admin/articles/{target}");
+        Assert.Contains(new SeriesAssignmentDto(firstSeriesId, 3), details!.Series);
+        Assert.Contains(new SeriesAssignmentDto(secondSeriesId, 1), details.Series);
+        var firstPublic = await client.GetFromJsonAsync<PublicSeriesDetailsDto>($"/api/public/series/en/{firstSeriesSlug}");
+        var secondPublic = await client.GetFromJsonAsync<PublicSeriesDetailsDto>($"/api/public/series/en/{secondSeriesSlug}");
+        Assert.Equal([("First anchor", 1), ("Target article", 3)], firstPublic!.Articles.Select(item => (item.Title, item.Position)).ToArray());
+        Assert.Equal([("Target article", 1), ("Second anchor", 2)], secondPublic!.Articles.Select(item => (item.Title, item.Position)).ToArray());
+    }
+
+    [Fact]
+    public async Task InvalidOrOccupiedSeriesPosition_IsRejectedWithoutChangingTheExistingOrder()
+    {
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        var suffix = Guid.NewGuid().ToString("N");
+        var seriesSlug = $"position-validation-{suffix}";
+        Guid seriesId;
+        using (var scope = isolatedFactory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var series = Series.Create("en", "Position validation", seriesSlug, null, DateTimeOffset.UtcNow);
+            db.Series.Add(series);
+            await db.SaveChangesAsync();
+            seriesId = series.Id;
+        }
+
+        using var client = await CreateAuthenticatedClient(isolatedFactory);
+        var first = await CreatePublishedArticle(client, "Occupied first", $"occupied-first-{suffix}");
+        var target = await CreatePublishedArticle(client, "Stable second", $"stable-second-{suffix}");
+        await client.PutAsJsonAsync($"/api/admin/articles/{first}/taxonomy",
+            new UpdateArticleTaxonomyRequest([], [new SeriesAssignmentRequest(seriesId, 1)], []));
+        await client.PutAsJsonAsync($"/api/admin/articles/{target}/taxonomy",
+            new UpdateArticleTaxonomyRequest([], [new SeriesAssignmentRequest(seriesId, 2)], []));
+
+        var occupied = await client.PutAsJsonAsync($"/api/admin/articles/{target}/taxonomy",
+            new UpdateArticleTaxonomyRequest([], [new SeriesAssignmentRequest(seriesId, 1)], []));
+        Assert.Equal(HttpStatusCode.BadRequest, occupied.StatusCode);
+        Assert.Contains("already occupied", (await occupied.Content.ReadFromJsonAsync<ApiErrorResponse>())!.Message);
+        foreach (var invalidPosition in new[] { 0, -1 })
+        {
+            var invalid = await client.PutAsJsonAsync($"/api/admin/articles/{target}/taxonomy",
+                new UpdateArticleTaxonomyRequest([], [new SeriesAssignmentRequest(seriesId, invalidPosition)], []));
+            Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+            Assert.Contains("greater than zero", (await invalid.Content.ReadFromJsonAsync<ApiErrorResponse>())!.Message);
+        }
+
+        var details = await client.GetFromJsonAsync<AdminArticleDetailsDto>($"/api/admin/articles/{target}");
+        Assert.Equal(new SeriesAssignmentDto(seriesId, 2), Assert.Single(details!.Series));
+        var publicSeries = await client.GetFromJsonAsync<PublicSeriesDetailsDto>($"/api/public/series/en/{seriesSlug}");
+        Assert.Equal([("Occupied first", 1), ("Stable second", 2)], publicSeries!.Articles.Select(item => (item.Title, item.Position)).ToArray());
+    }
+
     private static async Task<Guid> CreateArticle(HttpClient client, string title)
     {
         var response = await client.PostAsJsonAsync(
@@ -470,6 +682,19 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
                 $"{title.ToLowerInvariant()}-{Guid.NewGuid():N}"));
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<CreateArticleResponse>())!.ArticleId;
+    }
+
+    private static async Task<Guid> CreatePublishedArticle(HttpClient client, string title, string slug)
+    {
+        var response = await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest("en", title, null, $"# {title}", slug));
+        response.EnsureSuccessStatusCode();
+        var articleId = (await response.Content.ReadFromJsonAsync<CreateArticleResponse>())!.ArticleId;
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync(
+            $"/api/admin/articles/{articleId}/localizations/en/publish",
+            null)).StatusCode);
+        return articleId;
     }
 
     private async Task<HttpClient> CreateAuthenticatedClient()

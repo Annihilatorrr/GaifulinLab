@@ -3,7 +3,7 @@
 <button class="theme-toggle"
         type="button"
         aria-label="@ThemeLabel"
-        aria-pressed="@_isDark"
+        aria-pressed="@(_isDark ? "true" : "false")"
         @onclick="ToggleThemeAsync">
     <span class="theme-icon theme-icon-light" aria-hidden="true">
         <svg viewBox="0 0 24 24">

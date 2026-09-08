@@ -2,6 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using GaifulinLab.Api.Tests.Authentication;
 using GaifulinLab.Contracts.Articles;
+using GaifulinLab.Contracts.Taxonomy;
+using GaifulinLab.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GaifulinLab.Api.Tests.PublicContent;
 
@@ -162,5 +166,75 @@ public sealed class PublicArticleEndpointsTests
         Assert.Equal(
             articles.OrderByDescending(article => article.PublishedAt).Select(article => article.Slug),
             articles.Select(article => article.Slug));
+    }
+
+    [Fact]
+    public async Task PublicationLifecycle_ImmediatelyUpdatesPublicListsSeriesAndTaxonomy()
+    {
+        await using var factory = new AuthWebApplicationFactory();
+        await PublicContentTestData.SeedAsync(factory.Services);
+        using var client = factory.CreateClient();
+
+        await SetPublicationStatusAsync(factory.Services, publish: false);
+        await AssertHiddenAsync(client);
+
+        await SetPublicationStatusAsync(factory.Services, publish: true);
+        var restored = await client.GetFromJsonAsync<PublicArticleDetailsDto>(
+            "/api/public/articles/en/understanding-fft");
+        var articles = await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en");
+        var series = await client.GetFromJsonAsync<PublicSeriesDetailsDto>(
+            "/api/public/series/en/fourier-notes");
+        var topics = await client.GetFromJsonAsync<IReadOnlyList<PublicTopicDto>>("/api/public/topics/en");
+        var tags = await client.GetFromJsonAsync<IReadOnlyList<PublicTagDto>>("/api/public/tags/en");
+        Assert.NotNull(restored);
+        Assert.Contains(articles!, item => item.Slug == "understanding-fft");
+        Assert.Contains(series!.Articles, item => item.Slug == "understanding-fft");
+        Assert.Equal(1, Assert.Single(topics!).ArticleCount);
+        Assert.Equal(1, Assert.Single(tags!).ArticleCount);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var article = await db.Articles.SingleAsync(item => item.Localizations.Any(localization => localization.Slug == "understanding-fft"));
+            article.Delete(DateTimeOffset.UtcNow);
+            await db.SaveChangesAsync();
+        }
+        await AssertHiddenAsync(client);
+    }
+
+    private static async Task SetPublicationStatusAsync(IServiceProvider services, bool publish)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var article = await db.Articles
+            .Include(item => item.Localizations)
+            .SingleAsync(item => item.Localizations.Any(localization => localization.Slug == "understanding-fft"));
+        if (publish)
+        {
+            article.PublishLocalization("en", DateTimeOffset.UtcNow);
+        }
+        else
+        {
+            article.UnpublishLocalization("en", DateTimeOffset.UtcNow);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task AssertHiddenAsync(HttpClient client)
+    {
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(
+            "/api/public/articles/en/understanding-fft")).StatusCode);
+        var articles = await client.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>(
+            "/api/public/articles?languageCode=en");
+        var series = await client.GetFromJsonAsync<PublicSeriesDetailsDto>(
+            "/api/public/series/en/fourier-notes");
+        var topics = await client.GetFromJsonAsync<IReadOnlyList<PublicTopicDto>>("/api/public/topics/en");
+        var tags = await client.GetFromJsonAsync<IReadOnlyList<PublicTagDto>>("/api/public/tags/en");
+        Assert.DoesNotContain(articles!, item => item.Slug == "understanding-fft");
+        Assert.DoesNotContain(series!.Articles, item => item.Slug == "understanding-fft");
+        Assert.Empty(topics!);
+        Assert.Empty(tags!);
     }
 }
