@@ -381,6 +381,14 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         var created = await createResponse.Content.ReadFromJsonAsync<CreateArticleResponse>();
         Assert.NotNull(created);
 
+        // The owner's workspace includes the newly saved draft and preserves its status.
+        var ownerList = await ownerClient.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>(
+            "/api/admin/articles");
+        var ownerListArticle = Assert.Single(ownerList!, article => article.Id == created.ArticleId);
+        Assert.Equal(
+            PublicationStatusDto.Draft,
+            Assert.Single(ownerListArticle.Localizations).Status);
+
         // A second account cannot discover or change a draft even when it knows its identifier.
         var otherList = await otherClient.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>(
             "/api/admin/articles");

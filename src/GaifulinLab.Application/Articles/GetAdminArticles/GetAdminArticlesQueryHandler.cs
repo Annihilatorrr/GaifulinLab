@@ -12,17 +12,41 @@ internal sealed class GetAdminArticlesQueryHandler(IAppDbContext dbContext)
         GetAdminArticlesQuery request,
         CancellationToken cancellationToken)
     {
-        var articles = await dbContext.Articles
+        var articleRows = await dbContext.Articles
             .AsNoTracking()
             // Never load another author's drafts into the workspace list.
             .Where(article => article.OwnerUserId == request.UserId && article.DeletedAt == null)
             .OrderByDescending(article => article.UpdatedAt)
+            .Select(article => new
+            {
+                article.Id,
+                article.CreatedAt,
+                article.UpdatedAt,
+                Localizations = article.Localizations
+                    .OrderBy(localization => localization.LanguageCode)
+                    .Select(localization => new
+                    {
+                        localization.Id,
+                        localization.LanguageCode,
+                        localization.Slug,
+                        localization.Title,
+                        localization.Status,
+                        localization.PublishedAt,
+                        localization.UpdatedAt,
+                        localization.LastEditedAt
+                    })
+                    .ToArray()
+            })
+            .ToListAsync(cancellationToken);
+
+        // The status column is string-backed; casting between enum types in the EF projection
+        // makes PostgreSQL try to convert values such as "Draft" to an integer.
+        return articleRows
             .Select(article => new AdminArticleListItemDto(
                 article.Id,
                 article.CreatedAt,
                 article.UpdatedAt,
                 article.Localizations
-                    .OrderBy(localization => localization.LanguageCode)
                     .Select(localization => new AdminArticleLocalizationSummaryDto(
                         localization.Id,
                         localization.LanguageCode,
@@ -33,8 +57,6 @@ internal sealed class GetAdminArticlesQueryHandler(IAppDbContext dbContext)
                         localization.UpdatedAt,
                         localization.LastEditedAt))
                     .ToArray()))
-            .ToListAsync(cancellationToken);
-
-        return articles;
+            .ToArray();
     }
 }
