@@ -3,4 +3,9 @@
 
 <PageTitle>Sign in · Gaifulin Lab</PageTitle>
 
-<LoginForm />
+<LoginForm ReturnUrl="@ReturnUrl" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+}

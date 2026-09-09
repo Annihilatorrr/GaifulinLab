@@ -10,7 +10,7 @@
                 <span class="eyebrow">Account created</span>
                 <h1 id="registration-title">Welcome, @_registeredDisplayName</h1>
                 <p>Your account is ready. Sign in to create and manage your own articles.</p>
-                <a class="button button-primary" href="/admin/login">Sign in</a>
+                <a class="button button-primary" href="@LoginUrl">Sign in</a>
             </div>
         }
         else
@@ -90,10 +90,15 @@
 </section>
 
 @code {
+    [Parameter] public string? ReturnUrl { get; set; }
     private readonly RegistrationModel _registration = new();
     private string? _registeredDisplayName;
     private string? _errorMessage;
     private bool _isSubmitting;
+
+    private string LoginUrl => IsSafeLocalReturnUrl(ReturnUrl)
+        ? $"/admin/login?returnUrl={Uri.EscapeDataString(ReturnUrl!)}"
+        : "/admin/login";
 
     private async Task RegisterAsync()
     {
@@ -136,4 +141,10 @@
         [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
         public string ConfirmPassword { get; set; } = string.Empty;
     }
+
+    private static bool IsSafeLocalReturnUrl(string? returnUrl) =>
+        !string.IsNullOrWhiteSpace(returnUrl)
+        && returnUrl.StartsWith("/", StringComparison.Ordinal)
+        && !returnUrl.StartsWith("//", StringComparison.Ordinal)
+        && !returnUrl.Contains("\\", StringComparison.Ordinal);
 }

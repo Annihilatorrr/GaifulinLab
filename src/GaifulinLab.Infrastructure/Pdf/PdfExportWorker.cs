@@ -83,7 +83,8 @@ internal sealed class PdfExportWorker(
                     job.Markdown,
                     job.PublishedAt),
                 new ArticleTypography(job.LineHeight, job.BlockSpacing),
-                job.AttemptCount);
+                job.AttemptCount,
+                job.GenerationVersion);
         });
     }
 
@@ -100,7 +101,8 @@ internal sealed class PdfExportWorker(
             await using var content = new MemoryStream(pdf, writable: false);
             await storage.SaveAsync(relativePath, content, cancellationToken);
 
-            if (!await CompleteAsync(job, relativePath, pdf.LongLength, cancellationToken))
+            var replacedPath = await CompleteAsync(job, relativePath, pdf.LongLength, cancellationToken);
+            if (replacedPath is null)
             {
                 await DeleteOutputAsync(relativePath);
                 logger.LogInformation(
@@ -110,20 +112,25 @@ internal sealed class PdfExportWorker(
                 return;
             }
 
+            if (!string.IsNullOrWhiteSpace(replacedPath))
+            {
+                await DeleteOutputAsync(replacedPath);
+            }
+
             logger.LogInformation("Generated PDF export {PdfExportId} ({Size} bytes).", job.Id, pdf.LongLength);
         }
         catch (PdfRenderingException exception)
         {
-            await FailAsync(job.Id, job.AttemptCount, exception.Message, cancellationToken);
+            await FailAsync(job.Id, job.AttemptCount, job.GenerationVersion, exception.Message, cancellationToken);
         }
         catch (Exception exception)
         {
             logger.LogError(exception, "PDF export {PdfExportId} failed.", job.Id);
-            await FailAsync(job.Id, job.AttemptCount, "The PDF export failed.", cancellationToken);
+            await FailAsync(job.Id, job.AttemptCount, job.GenerationVersion, "The PDF export failed.", cancellationToken);
         }
     }
 
-    private async Task<bool> CompleteAsync(
+    private async Task<string?> CompleteAsync(
         PdfExportSnapshot job,
         string relativePath,
         long outputSize,
@@ -132,11 +139,20 @@ internal sealed class PdfExportWorker(
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var completedAt = timeProvider.GetUtcNow();
+        var previousPath = await dbContext.PdfExportJobs
+            .AsNoTracking()
+            .Where(candidate => candidate.Id == job.Id
+                && candidate.AttemptCount == job.AttemptCount
+                && candidate.GenerationVersion == job.GenerationVersion
+                && candidate.Status == PdfExportStatus.Processing)
+            .Select(candidate => candidate.RelativePath)
+            .SingleOrDefaultAsync(cancellationToken);
         // A lease may have been reclaimed while rendering, so only this active attempt may complete.
         var changed = await dbContext.PdfExportJobs
             .Where(candidate =>
                 candidate.Id == job.Id
                 && candidate.AttemptCount == job.AttemptCount
+                && candidate.GenerationVersion == job.GenerationVersion
                 && candidate.Status == PdfExportStatus.Processing)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(candidate => candidate.Status, PdfExportStatus.Completed)
@@ -146,12 +162,13 @@ internal sealed class PdfExportWorker(
                 .SetProperty(candidate => candidate.LeaseExpiresAt, (DateTimeOffset?)null)
                 .SetProperty(candidate => candidate.ErrorMessage, (string?)null), cancellationToken);
 
-        return changed == 1;
+        return changed == 1 ? previousPath ?? string.Empty : null;
     }
 
     private async Task FailAsync(
         Guid jobId,
         int attemptCount,
+        int generationVersion,
         string message,
         CancellationToken cancellationToken)
     {
@@ -166,6 +183,7 @@ internal sealed class PdfExportWorker(
             .Where(candidate =>
                 candidate.Id == jobId
                 && candidate.AttemptCount == attemptCount
+                && candidate.GenerationVersion == generationVersion
                 && candidate.Status == PdfExportStatus.Processing)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(candidate => candidate.Status, PdfExportStatus.Failed)
@@ -196,7 +214,8 @@ internal sealed class PdfExportWorker(
         Guid Id,
         ArticlePdfDocument Document,
         ArticleTypography Typography,
-        int AttemptCount);
+        int AttemptCount,
+        int GenerationVersion);
 }
 
 internal sealed record PdfExportWorkerSettings(TimeSpan PollInterval, TimeSpan LeaseDuration);

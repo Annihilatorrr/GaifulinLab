@@ -350,6 +350,11 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
     public const string AdminLogin = "admin";
     public const string AdminPassword = "Correct-horse-battery-staple-1!";
 
+    private readonly bool _publicPdfDownloadEnabled;
+
+    public AuthWebApplicationFactory(bool publicPdfDownloadEnabled = false) =>
+        _publicPdfDownloadEnabled = publicPdfDownloadEnabled;
+
     private readonly string _mediaStoragePath = Path.Combine(
         Path.GetTempPath(),
         $"gaifulinlab-api-media-tests-{Guid.NewGuid():N}");
@@ -371,6 +376,7 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("ForwardedHeaders:TrustedNetworks:0", "127.0.0.1/32");
         builder.UseSetting("MEDIA_STORAGE_PATH", _mediaStoragePath);
         builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5172");
+        builder.UseSetting("Features:PublicPdfDownloadEnabled", _publicPdfDownloadEnabled.ToString());
         builder.ConfigureServices(services =>
         {
             services.AddSingleton<IStartupFilter, TestRemoteIpStartupFilter>();

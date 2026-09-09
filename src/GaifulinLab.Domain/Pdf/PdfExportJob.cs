@@ -48,6 +48,10 @@ public sealed class PdfExportJob
 
     public int AttemptCount { get; private set; }
 
+    // Changes whenever an author requests a fresh document. A worker may only
+    // publish output for the generation it claimed.
+    public int GenerationVersion { get; private set; }
+
     public DateTimeOffset? LeaseExpiresAt { get; private set; }
 
     public DateTimeOffset? StartedAt { get; private set; }
@@ -68,6 +72,24 @@ public sealed class PdfExportJob
         decimal blockSpacing,
         DateTimeOffset createdAt) =>
         new(localization, lineHeight, blockSpacing, createdAt);
+
+    public void Requeue(ArticleLocalization localization, decimal lineHeight, decimal blockSpacing)
+    {
+        LanguageCode = localization.LanguageCode;
+        Slug = localization.Slug ?? throw new InvalidOperationException("A PDF export requires an article slug.");
+        Title = localization.Title;
+        Summary = localization.Summary;
+        Markdown = localization.Markdown;
+        PublishedAt = localization.PublishedAt;
+        LineHeight = lineHeight;
+        BlockSpacing = blockSpacing;
+        GenerationVersion++;
+        Status = PdfExportStatus.Queued;
+        LeaseExpiresAt = null;
+        StartedAt = null;
+        CompletedAt = null;
+        ErrorMessage = null;
+    }
 
     public void Start(DateTimeOffset now, TimeSpan lease)
     {

@@ -41,6 +41,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<PdfExportJob> PdfExportJobs => Set<PdfExportJob>();
 
+    public DbSet<PdfDownloadUsage> PdfDownloadUsages => Set<PdfDownloadUsage>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         PrepareSearchText();

@@ -51,7 +51,7 @@
         @if (ShowRegistrationLink)
         {
             <p class="login-note">
-                Need an account? <a href="/register">Register here</a>.
+                Need an account? <a href="@RegistrationUrl">Register here</a>.
             </p>
         }
         else
@@ -62,6 +62,7 @@
 </section>
 
 @code {
+    [Parameter] public string? ReturnUrl { get; set; }
     private readonly CredentialsModel _credentials = new();
     private string? _errorMessage;
     private bool _isSubmitting;
@@ -69,7 +70,12 @@
     private bool _isLoggedIn;
 
     private bool ShowRegistrationLink =>
-        RegistrationLinkVisibility.ShouldShow(_registrationLinkEnabled, _isLoggedIn);
+        RegistrationLinkVisibility.ShouldShow(_registrationLinkEnabled, _isLoggedIn)
+        || IsSafeLocalReturnUrl(ReturnUrl);
+
+    private string RegistrationUrl => IsSafeLocalReturnUrl(ReturnUrl)
+        ? $"/register?returnUrl={Uri.EscapeDataString(ReturnUrl!)}"
+        : "/register";
 
     protected override async Task OnInitializedAsync()
     {
@@ -90,7 +96,7 @@
 
         if (result.Succeeded)
         {
-            Navigation.NavigateTo("/admin/articles", replace: true);
+            Navigation.NavigateTo(SafeReturnUrlOrDefault(), replace: true);
             return;
         }
 
@@ -119,4 +125,13 @@
 
     public void Dispose() =>
         AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
+
+    private string SafeReturnUrlOrDefault() =>
+        IsSafeLocalReturnUrl(ReturnUrl) ? ReturnUrl! : "/admin/articles";
+
+    private static bool IsSafeLocalReturnUrl(string? returnUrl) =>
+        !string.IsNullOrWhiteSpace(returnUrl)
+        && returnUrl.StartsWith("/", StringComparison.Ordinal)
+        && !returnUrl.StartsWith("//", StringComparison.Ordinal)
+        && !returnUrl.Contains("\\", StringComparison.Ordinal);
 }

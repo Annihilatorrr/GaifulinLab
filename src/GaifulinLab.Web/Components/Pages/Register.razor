@@ -3,5 +3,10 @@
 <PageTitle>Create account · Gaifulin Lab</PageTitle>
 
 <main id="main-content" class="site-main">
-    <RegistrationForm />
+    <RegistrationForm ReturnUrl="@ReturnUrl" />
 </main>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+}

@@ -60,7 +60,9 @@ public sealed class FileSystemMediaStorage : IMediaStorage
                 fullPath,
                 FileMode.Open,
                 FileAccess.Read,
-                FileShare.Read,
+                // A reader may still stream the previous PDF while a worker
+                // atomically promotes its replacement and deletes the old path.
+                FileShare.ReadWrite | FileShare.Delete,
                 bufferSize: 81_920,
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
             return Task.FromResult<Stream?>(stream);

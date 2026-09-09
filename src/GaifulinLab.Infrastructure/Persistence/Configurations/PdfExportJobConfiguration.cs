@@ -33,5 +33,8 @@ internal sealed class PdfExportJobConfiguration : IEntityTypeConfiguration<PdfEx
             .HasDatabaseName("ix_pdf_export_jobs_queue");
         builder.HasIndex(job => job.LeaseExpiresAt)
             .HasDatabaseName("ix_pdf_export_jobs_lease");
+        builder.HasIndex(job => job.ArticleLocalizationId)
+            .IsUnique()
+            .HasDatabaseName("ux_pdf_export_jobs_localization");
     }
 }

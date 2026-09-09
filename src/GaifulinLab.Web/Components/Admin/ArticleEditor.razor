@@ -43,18 +43,14 @@
                           role="@(_hasError ? "alert" : "status")">@_message</span>
                 }
             </div>
-            <AuthorizeView Roles="Admin">
-                <Authorized>
-                    <div class="export-action">
-                        <button class="button button-secondary" type="button" disabled="@(!CanExportPdf)" @onclick="ExportPdfAsync">@PdfExportButtonLabel</button>
-                        @if (_pdfExportInProgress || _pdfExportError is not null)
-                        {
-                            <span class="export-status @(_pdfExportError is not null ? "message-error" : null)"
-                                  role="@(_pdfExportError is not null ? "alert" : "status")">@PdfExportStatusText</span>
-                        }
-                    </div>
-                </Authorized>
-            </AuthorizeView>
+            <div class="export-action">
+                <button class="button button-secondary" type="button" disabled="@(!CanExportPdf)" @onclick="ExportPdfAsync">@PdfExportButtonLabel</button>
+                @if (_pdfExportInProgress || _pdfExportError is not null)
+                {
+                    <span class="export-status @(_pdfExportError is not null ? "message-error" : null)"
+                          role="@(_pdfExportError is not null ? "alert" : "status")">@PdfExportStatusText</span>
+                }
+            </div>
             @if (CanPublishCurrent)
             {
                 <button class="button button-secondary" type="button" disabled="@IsBusy" @onclick="PublishAsync">Publish</button>

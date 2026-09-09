@@ -17,7 +17,8 @@ public sealed class AdminAuthorizationHandler(
             && (path.Equals("/api/admin", StringComparison.Ordinal)
                 || path.StartsWith("/api/admin/", StringComparison.Ordinal)
                 || path.Equals("/api/auth/session", StringComparison.Ordinal)
-                || path.Equals("/api/auth/profile", StringComparison.Ordinal));
+                || path.Equals("/api/auth/profile", StringComparison.Ordinal)
+                || IsReaderPdfDownloadPath(path));
 
         if (isProtectedRequest)
         {
@@ -36,5 +37,15 @@ public sealed class AdminAuthorizationHandler(
         }
 
         return response;
+    }
+
+    private static bool IsReaderPdfDownloadPath(string path)
+    {
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length == 6
+            && string.Equals(segments[0], "api", StringComparison.Ordinal)
+            && string.Equals(segments[1], "public", StringComparison.Ordinal)
+            && string.Equals(segments[2], "articles", StringComparison.Ordinal)
+            && string.Equals(segments[5], "pdf", StringComparison.Ordinal);
     }
 }

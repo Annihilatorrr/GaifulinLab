@@ -1,5 +1,6 @@
 @inject PublicContentClient ContentClient
 @inject IJSRuntime JS
+@inject IConfiguration Configuration
 @using System.Globalization
 
 <main id="main-content"
@@ -21,25 +22,22 @@
                         </span>
                         <time datetime="@_article.LastEditedAt.ToString("O")">Last edited @_article.LastEditedAt.ToLocalTime().ToString("d MMM yyyy")</time>
                     </div>
-                    <AuthorizeView Roles="Admin">
-                        <Authorized>
-                            @if (_typographyReady)
-                            {
-                                <button class="article-download" @onclick="DownloadPdfAsync" disabled="@_pdfExportInProgress">
-                                    @PdfDownloadLabel
-                                </button>
-                            }
-                        </Authorized>
-                    </AuthorizeView>
+                    @if (PublicPdfDownloadEnabled)
+                    {
+                        <AuthorizeView>
+                            <Authorized>
+                                <button class="article-download" @onclick="DownloadReaderPdfAsync" disabled="@_readerPdfDownloadInProgress">Download PDF</button>
+                                @if (_readerPdfDownloadError is not null)
+                                {
+                                    <p class="article-download-error" role="alert">@_readerPdfDownloadError</p>
+                                }
+                            </Authorized>
+                            <NotAuthorized>
+                                <span><a href="@SignInForPdfUrl">Sign in</a> or <a href="@RegisterForPdfUrl">register</a> to download PDF.</span>
+                            </NotAuthorized>
+                        </AuthorizeView>
+                    }
                 </div>
-                <AuthorizeView Roles="Admin">
-                    <Authorized>
-                        @if (_pdfExportError is not null)
-                        {
-                            <p class="article-download-error" role="alert">@_pdfExportError</p>
-                        }
-                    </Authorized>
-                </AuthorizeView>
                 <h1>@_article.Title</h1>
                 @if (!string.IsNullOrWhiteSpace(_article.Summary)) { <p>@_article.Summary</p> }
                 @if (_article.AvailableLocalizations.Count > 1)
@@ -66,15 +64,19 @@
     private bool _mathTypesetPending;
     private bool _articleAssetsPrepared;
     private bool _typographyReady;
-    private bool _pdfExportInProgress;
-    private string? _pdfExportError;
+    private bool _readerPdfDownloadInProgress;
+    private string? _readerPdfDownloadError;
     private ArticleTypography _typography = ArticleTypography.Default;
 
     private string TypographyStyle =>
         $"--article-line-height: {_typography.LineHeight.ToString(CultureInfo.InvariantCulture)}; --article-block-spacing: {_typography.BlockSpacing.ToString(CultureInfo.InvariantCulture)}rem;";
 
+    private bool PublicPdfDownloadEnabled => Configuration.GetValue<bool>("Features:PublicPdfDownloadEnabled");
+    private string SignInForPdfUrl => $"/admin/login?returnUrl={Uri.EscapeDataString($"/articles/{LanguageCode}/{Slug}")}";
+    private string RegisterForPdfUrl => $"/register?returnUrl={Uri.EscapeDataString($"/articles/{LanguageCode}/{Slug}")}";
+
     private string PdfDownloadLabel =>
-        _pdfExportInProgress
+        false
             ? string.Equals(LanguageCode, "ru", StringComparison.OrdinalIgnoreCase)
                 ? "Готовим PDF…"
                 : "Preparing PDF…"
@@ -184,46 +186,6 @@
         }
     }
 
-    private async Task DownloadPdfAsync()
-    {
-        _pdfExportInProgress = true;
-        _pdfExportError = null;
-        try
-        {
-            var export = await ContentClient.CreateArticlePdfExportAsync(LanguageCode, Slug, _typography);
-            for (var attempt = 0; attempt < 60; attempt++)
-            {
-                if (string.Equals(export.Status, "completed", StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(export.DownloadUrl))
-                {
-                    var pdf = await ContentClient.DownloadPdfExportAsync(export.Id);
-                    await JS.InvokeVoidAsync("articleAssets.download", pdf, $"{Slug}.pdf");
-                    return;
-                }
-
-                if (string.Equals(export.Status, "failed", StringComparison.OrdinalIgnoreCase))
-                {
-                    _pdfExportError = export.ErrorMessage ?? "The PDF export failed.";
-                    return;
-                }
-
-                await Task.Delay(TimeSpan.FromSeconds(1));
-                export = await ContentClient.GetPdfExportAsync(export.Id);
-            }
-
-            _pdfExportError = "The PDF export is taking longer than expected. Please try again.";
-        }
-        catch (HttpRequestException)
-        {
-            _pdfExportError = "Unable to start the PDF export.";
-        }
-        finally
-        {
-            _pdfExportInProgress = false;
-            StateHasChanged();
-        }
-    }
-
     private async Task ClearArticleMathAsync()
     {
         if (!_articleElementReady)
@@ -237,6 +199,29 @@
         }
         catch (JSException)
         {
+        }
+    }
+
+    private async Task DownloadReaderPdfAsync()
+    {
+        _readerPdfDownloadInProgress = true;
+        _readerPdfDownloadError = null;
+        try
+        {
+            var pdf = await ContentClient.DownloadArticlePdfAsync(LanguageCode, Slug);
+            await JS.InvokeVoidAsync("articleAssets.download", pdf, $"{Slug}.pdf");
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            _readerPdfDownloadError = "Your monthly PDF download limit has been reached.";
+        }
+        catch (HttpRequestException)
+        {
+            _readerPdfDownloadError = "The PDF is not available right now.";
+        }
+        finally
+        {
+            _readerPdfDownloadInProgress = false;
         }
     }
 }

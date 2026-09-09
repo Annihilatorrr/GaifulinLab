@@ -37,5 +37,7 @@ public interface IAppDbContext
 
     DbSet<PdfExportJob> PdfExportJobs { get; }
 
+    DbSet<PdfDownloadUsage> PdfDownloadUsages { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

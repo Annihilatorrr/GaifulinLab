@@ -62,6 +62,18 @@ public sealed class PublicContentClient(HttpClient httpClient)
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
+    public async Task<byte[]> DownloadArticlePdfAsync(
+        string languageCode,
+        string slug,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            $"/api/public/articles/{Uri.EscapeDataString(languageCode)}/{Uri.EscapeDataString(slug)}/pdf",
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
     public Task<IReadOnlyList<PublicArticleListItemDto>> GetArticlesAsync(
         string languageCode,
         string? topic = null,

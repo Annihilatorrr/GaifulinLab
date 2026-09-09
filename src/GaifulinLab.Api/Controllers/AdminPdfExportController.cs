@@ -11,11 +11,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace GaifulinLab.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = AuthorizationPolicies.Admin)]
+[Authorize]
 [Route("api/admin")]
 public sealed class AdminPdfExportController(
     AppDbContext dbContext,
@@ -36,22 +37,44 @@ public sealed class AdminPdfExportController(
     {
         var normalizedLanguageCode = DomainRules.NormalizeLanguageCode(languageCode);
         var normalizedSlug = DomainRules.NormalizeSlug(slug);
+        var userId = GetCurrentUserId();
         var localization = await dbContext.ArticleLocalizations
             .SingleOrDefaultAsync(candidate =>
                 candidate.LanguageCode == normalizedLanguageCode
                 && candidate.Slug == normalizedSlug
                 && dbContext.Articles.Any(article =>
-                    article.Id == candidate.ArticleId && article.DeletedAt == null),
+                    article.Id == candidate.ArticleId
+                    && article.DeletedAt == null
+                    && article.OwnerUserId == userId),
                 cancellationToken)
             ?? throw new ResourceNotFoundException("Article", $"{normalizedLanguageCode}/{normalizedSlug}");
         var typography = ArticleTypography.FromOptional(lineHeight, blockSpacing);
-        var job = PdfExportJob.Create(
-            localization,
-            typography.LineHeight,
-            typography.BlockSpacing,
-            DateTimeOffset.UtcNow);
-        dbContext.PdfExportJobs.Add(job);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var job = await dbContext.PdfExportJobs
+            .SingleOrDefaultAsync(candidate => candidate.ArticleLocalizationId == localization.Id, cancellationToken);
+        if (job is null)
+        {
+            job = PdfExportJob.Create(localization, typography.LineHeight, typography.BlockSpacing, DateTimeOffset.UtcNow);
+            dbContext.PdfExportJobs.Add(job);
+        }
+        else
+        {
+            job.Requeue(localization, typography.LineHeight, typography.BlockSpacing);
+        }
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // The unique localization index serializes first-export races. The
+            // loser reloads and requeues the single canonical job.
+            dbContext.ChangeTracker.Clear();
+            job = await dbContext.PdfExportJobs
+                .SingleAsync(candidate => candidate.ArticleLocalizationId == localization.Id, cancellationToken);
+            job.Requeue(localization, typography.LineHeight, typography.BlockSpacing);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         return AcceptedAtAction(nameof(GetPdfExport), new { job.Id }, ToStatusDto(job));
     }
@@ -63,7 +86,7 @@ public sealed class AdminPdfExportController(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var job = await GetAvailablePdfExport(id, cancellationToken)
+        var job = await GetAvailablePdfExport(id, GetCurrentUserId(), cancellationToken)
             ?? throw new ResourceNotFoundException("PDF export", id.ToString());
         return Ok(ToStatusDto(job));
     }
@@ -74,9 +97,9 @@ public sealed class AdminPdfExportController(
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DownloadPdfExport(Guid id, CancellationToken cancellationToken)
     {
-        var job = await GetAvailablePdfExport(id, cancellationToken)
+        var job = await GetAvailablePdfExport(id, GetCurrentUserId(), cancellationToken)
             ?? throw new ResourceNotFoundException("PDF export", id.ToString());
-        if (job.Status != PdfExportStatus.Completed || job.RelativePath is null)
+        if (job.RelativePath is null)
         {
             return Conflict(new ApiErrorResponse("pdf_export_not_ready", "The PDF export is not ready yet."));
         }
@@ -99,16 +122,21 @@ public sealed class AdminPdfExportController(
             job.Id,
             job.Status.ToString().ToLowerInvariant(),
             job.ErrorMessage,
-            job.Status == PdfExportStatus.Completed
+            job.RelativePath is not null
                 ? $"/api/admin/pdf-exports/{job.Id}/download"
                 : null);
 
-    private Task<PdfExportJob?> GetAvailablePdfExport(Guid id, CancellationToken cancellationToken) =>
+    private Task<PdfExportJob?> GetAvailablePdfExport(Guid id, string userId, CancellationToken cancellationToken) =>
         dbContext.PdfExportJobs
             .AsNoTracking()
             .Where(job => job.Id == id
                 && dbContext.ArticleLocalizations.Any(localization =>
                     localization.Id == job.ArticleLocalizationId
-                    && localization.Article.DeletedAt == null))
+                    && localization.Article.DeletedAt == null
+                    && localization.Article.OwnerUserId == userId))
             .SingleOrDefaultAsync(cancellationToken);
+
+    private string GetCurrentUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? throw new InvalidOperationException("The authenticated user does not have an identifier.");
 }
