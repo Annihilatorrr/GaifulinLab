@@ -1,17 +1,14 @@
 using System.Text.RegularExpressions;
-using Markdig;
 using AngleSharp.Html.Parser;
 
 namespace GaifulinLab.Infrastructure.Content;
 
 internal static partial class ArticleSearchText
 {
-    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
-
-    public static string Extract(string markdown)
+    public static string Extract(string html)
     {
-        var document = new HtmlParser().ParseDocument(Markdown.ToHtml(markdown, Pipeline));
-        foreach (var hidden in document.QuerySelectorAll("script, style")) hidden.Remove();
+        var document = new HtmlParser().ParseDocument(html);
+        foreach (var hidden in document.QuerySelectorAll("script, style, template")) hidden.Remove();
         foreach (var image in document.QuerySelectorAll("img"))
             image.Replace(document.CreateTextNode(image.GetAttribute("alt") ?? ""));
         return Whitespace().Replace((document.Body?.TextContent ?? "")

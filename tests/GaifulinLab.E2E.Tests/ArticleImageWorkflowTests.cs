@@ -45,8 +45,8 @@ public sealed class ArticleImageWorkflowTests : PageTest
             Buffer = OnePixelPng
         });
 
-        var markdown = Page.Locator("#article-markdown");
-        await Expect(markdown).ToHaveValueAsync(new Regex(
+        var html = Page.Locator("#article-html");
+        await Expect(html).ToHaveValueAsync(new Regex(
             "!\\[e2e-diagram\\]\\(/media/[0-9a-f-]{36}\\)",
             RegexOptions.None));
 

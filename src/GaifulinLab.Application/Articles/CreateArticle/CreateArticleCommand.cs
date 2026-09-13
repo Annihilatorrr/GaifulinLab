@@ -8,6 +8,6 @@ public sealed record CreateArticleCommand(
     string LanguageCode,
     string? Title,
     string? Summary,
-    string? Markdown,
+    string? Html,
     string? Slug,
     Guid? CoverMediaAssetId = null) : IRequest<CreateArticleResponse>;

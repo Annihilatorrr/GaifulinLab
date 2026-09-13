@@ -1,4 +1,5 @@
 using GaifulinLab.Application.Common;
+using GaifulinLab.Application.Content;
 using GaifulinLab.Application.Persistence;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Domain.Articles;
@@ -9,7 +10,8 @@ namespace GaifulinLab.Application.Articles.CreateArticle;
 
 internal sealed class CreateArticleCommandHandler(
     IAppDbContext dbContext,
-    TimeProvider timeProvider) : IRequestHandler<CreateArticleCommand, CreateArticleResponse>
+    TimeProvider timeProvider,
+    IArticleHtmlSanitizer htmlSanitizer) : IRequestHandler<CreateArticleCommand, CreateArticleResponse>
 {
     public async Task<CreateArticleResponse> Handle(
         CreateArticleCommand request,
@@ -21,7 +23,7 @@ internal sealed class CreateArticleCommandHandler(
             timeProvider.GetUtcNow(),
             request.Title,
             request.Summary,
-            request.Markdown,
+            htmlSanitizer.Sanitize(request.Html ?? string.Empty),
             request.Slug);
         var localization = article.Localizations.Single();
 

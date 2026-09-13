@@ -89,12 +89,6 @@ try
 
     var app = builder.Build();
 
-    await using (var searchScope = app.Services.CreateAsyncScope())
-    {
-        var database = searchScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        if (database.Database.IsRelational()) await database.BackfillArticleSearchAsync();
-    }
-
     if (app.Environment.IsDevelopment())
     {
         await app.Services.SeedTaxonomyAsync(app.Configuration);

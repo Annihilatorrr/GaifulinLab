@@ -54,7 +54,7 @@ public sealed class AdminMediaClient(HttpClient httpClient)
             throw new MediaUploadException(error?.Message ?? "The image could not be uploaded.");
         }
 
-        // A successful response contains the media ID and URL that the editor inserts into Markdown.
+                // A successful response contains the media ID and URL that the editor inserts into article HTML.
         return await response.Content.ReadFromJsonAsync<UploadMediaResponse>(cancellationToken)
             ?? throw new MediaUploadException("The server returned an empty upload response.");
     }

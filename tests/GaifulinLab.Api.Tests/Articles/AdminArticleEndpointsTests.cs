@@ -155,8 +155,8 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync($"/api/public/articles/ru/{ruSlug}")).StatusCode);
 
         var details = await client.GetFromJsonAsync<AdminArticleDetailsDto>($"/api/admin/articles/{created.ArticleId}");
-        Assert.Equal("EN body", details!.Localizations.Single(item => item.LanguageCode == "en").Markdown);
-        Assert.Equal("RU body", details.Localizations.Single(item => item.LanguageCode == "ru").Markdown);
+        Assert.Equal("EN body", details!.Localizations.Single(item => item.LanguageCode == "en").Html);
+        Assert.Equal("RU body", details.Localizations.Single(item => item.LanguageCode == "ru").Html);
     }
 
     [Fact]
@@ -239,7 +239,7 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         Assert.Single(list!, item => item.Id == created.ArticleId);
         var saved = await client.GetFromJsonAsync<AdminArticleDetailsDto>($"/api/admin/articles/{created.ArticleId}");
         Assert.Equal("Updated", Assert.Single(saved!.Localizations).Title);
-        Assert.Equal("Updated body", Assert.Single(saved.Localizations).Markdown);
+        Assert.Equal("Updated body", Assert.Single(saved.Localizations).Html);
     }
 
     [Fact]
@@ -292,7 +292,7 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
             $"/api/admin/articles/{created.ArticleId}");
         var localization = Assert.Single(persisted!.Localizations);
         Assert.Equal("First editor", localization.Title);
-        Assert.Equal("# Saved by first editor", localization.Markdown);
+        Assert.Equal("# Saved by first editor", localization.Html);
         Assert.Equal(firstLocalization.Version + 1, localization.Version);
     }
 

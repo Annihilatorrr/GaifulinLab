@@ -12,7 +12,7 @@ param(
 # Usage:
 #   .\deployment\client\backup-site.ps1
 # Downloads one database dump and one media archive. Keep both files with the
-# same timestamped id: an article's Markdown references media rows in the dump.
+# same timestamped id: an article's HTML references media rows in the dump.
 . (Join-Path $PSScriptRoot 'common.ps1')
 
 $target = New-RemoteDeploymentConnection -RemoteUser $RemoteUser -RemoteHost $RemoteHost -RemoteDir $RemoteDir -IdentityFile $IdentityFile

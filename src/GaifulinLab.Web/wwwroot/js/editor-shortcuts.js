@@ -28,12 +28,12 @@ window.gaifulinLabEditorShortcuts = { attach };
 
 (() => {
     const rememberSelection = (editor) => {
-        editor.dataset.markdownSelectionStart = String(editor.selectionStart ?? 0);
-        editor.dataset.markdownSelectionEnd = String(editor.selectionEnd ?? 0);
+        editor.dataset.htmlSelectionStart = String(editor.selectionStart ?? 0);
+        editor.dataset.htmlSelectionEnd = String(editor.selectionEnd ?? 0);
     };
 
     const attach = (editor) => {
-        if (!editor || editor.dataset.markdownEnhancementsAttached) {
+        if (!editor || editor.dataset.htmlEnhancementsAttached) {
             return;
         }
 
@@ -54,22 +54,22 @@ window.gaifulinLabEditorShortcuts = { attach };
         editor.addEventListener("keyup", () => rememberSelection(editor));
         editor.addEventListener("select", () => rememberSelection(editor));
         editor.addEventListener("keydown", onKeyDown);
-        editor.dataset.markdownEnhancementsAttached = "true";
+        editor.dataset.htmlEnhancementsAttached = "true";
         rememberSelection(editor);
     };
 
-    const insertAtSelection = (editor, markdown) => {
+    const insertAtSelection = (editor, html) => {
         if (!editor) {
-            return markdown;
+            return html;
         }
 
-        const start = Number(editor.dataset.markdownSelectionStart ?? editor.selectionStart ?? editor.value.length);
-        const end = Number(editor.dataset.markdownSelectionEnd ?? editor.selectionEnd ?? start);
+        const start = Number(editor.dataset.htmlSelectionStart ?? editor.selectionStart ?? editor.value.length);
+        const end = Number(editor.dataset.htmlSelectionEnd ?? editor.selectionEnd ?? start);
         const before = editor.value.slice(0, start);
         const after = editor.value.slice(end);
         const prefix = before.length && !before.endsWith("\n") ? "\n\n" : "";
         const suffix = after.length && !after.startsWith("\n") ? "\n\n" : "";
-        const insertion = `${prefix}${markdown}${suffix}`;
+        const insertion = `${prefix}${html}${suffix}`;
 
         editor.setRangeText(insertion, start, end, "end");
         rememberSelection(editor);
@@ -77,5 +77,24 @@ window.gaifulinLabEditorShortcuts = { attach };
         return editor.value;
     };
 
-    window.gaifulinLabMarkdownEditor = { attach, insertAtSelection };
+    const escapeHtml = (value) => value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+
+    const insertCodeBlock = (editor, language) => {
+        if (!editor) {
+            return "<pre><code class=\"language-plaintext\">code</code></pre>";
+        }
+
+        const start = Number(editor.dataset.htmlSelectionStart ?? editor.selectionStart ?? editor.value.length);
+        const end = Number(editor.dataset.htmlSelectionEnd ?? editor.selectionEnd ?? start);
+        const selection = editor.value.slice(start, end) || "code";
+        const normalizedLanguage = String(language ?? "plaintext").replace(/[^a-z0-9-]/gi, "") || "plaintext";
+        return insertAtSelection(editor, `<pre><code class="language-${normalizedLanguage}">${escapeHtml(selection)}</code></pre>`);
+    };
+
+    window.gaifulinLabHtmlEditor = { attach, insertAtSelection, insertCodeBlock };
 })();

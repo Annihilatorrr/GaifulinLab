@@ -128,13 +128,13 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
         await RouteEditorAsync(article);
         await Page.SetViewportSizeAsync(1280, 900);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
-        var markdown = Page.GetByLabel("Article Markdown");
-        await markdown.FillAsync("Text kept across editor modes");
+        var html = Page.GetByLabel("Article Html");
+        await html.FillAsync("Text kept across editor modes");
         await Page.Locator(".editor-tabs button", new() { HasText = "Preview" }).ClickAsync();
         await Expect(Page.Locator(".article-editor")).ToHaveAttributeAsync("data-active-pane", "Preview");
         await Expect(Page.Locator("article.article-preview")).ToContainTextAsync("Text kept across editor modes");
         await Page.Locator(".editor-tabs button", new() { HasText = "Edit" }).ClickAsync();
-        await Expect(markdown).ToHaveValueAsync("Text kept across editor modes");
+        await Expect(html).ToHaveValueAsync("Text kept across editor modes");
         await Page.Locator(".editor-tabs button", new() { HasText = "Split" }).ClickAsync();
         await Expect(Page.Locator(".article-editor")).ToHaveAttributeAsync("data-active-pane", "Split");
 
@@ -142,12 +142,12 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
         await Expect(Page.Locator(".editor-tabs .split-mode")).ToHaveCountAsync(0);
         await Expect(Page.Locator(".editor-tabs button", new() { HasText = "Edit" })).ToBeVisibleAsync();
         await Expect(Page.Locator(".editor-tabs button", new() { HasText = "Preview" })).ToBeVisibleAsync();
-        await Expect(markdown).ToHaveValueAsync("Text kept across editor modes");
+        await Expect(html).ToHaveValueAsync("Text kept across editor modes");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true })).ToBeVisibleAsync();
 
         await Page.SetViewportSizeAsync(1280, 900);
         await Expect(Page.Locator(".editor-tabs .split-mode")).ToBeVisibleAsync();
-        await Expect(markdown).ToHaveValueAsync("Text kept across editor modes");
+        await Expect(html).ToHaveValueAsync("Text kept across editor modes");
     }
 
     [Fact]
@@ -218,29 +218,29 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
         await RouteEditorsAsync(first, second);
 
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{first.Id}").ToString());
-        var markdown = Page.GetByLabel("Article Markdown");
-        await markdown.FillAsync("First keyboard save");
+        var html = Page.GetByLabel("Article Html");
+        await html.FillAsync("First keyboard save");
         Assert.True(await DispatchSaveShortcutAsync());
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true })).ToBeDisabledAsync();
         Assert.True(await Page.EvaluateAsync<bool>("window.saveShortcutPrevented"));
 
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{second.Id}").ToString());
-        markdown = Page.GetByLabel("Article Markdown");
-        await markdown.FillAsync("alpha beta gamma");
+        html = Page.GetByLabel("Article Html");
+        await html.FillAsync("alpha beta gamma");
         Assert.True(await DispatchSaveShortcutAsync());
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true })).ToBeDisabledAsync();
-        Assert.Equal("alpha beta gamma", second.Markdown);
+        Assert.Equal("alpha beta gamma", second.Html);
 
-        await markdown.EvaluateAsync("editor => { editor.focus(); editor.setSelectionRange(6, 10); }");
-        await markdown.PressAsync("Tab");
-        await Expect(markdown).ToHaveValueAsync("alpha      gamma");
+        await html.EvaluateAsync("editor => { editor.focus(); editor.setSelectionRange(6, 10); }");
+        await html.PressAsync("Tab");
+        await Expect(html).ToHaveValueAsync("alpha      gamma");
         await Expect(Page.Locator("article.article-preview")).ToContainTextAsync("alpha      gamma");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true })).ToBeDisabledAsync();
         await Page.ReloadAsync();
-        await Expect(markdown).ToHaveValueAsync("alpha      gamma");
-        Assert.Equal("First keyboard save", first.Markdown);
-        Assert.Equal("alpha      gamma", second.Markdown);
+        await Expect(html).ToHaveValueAsync("alpha      gamma");
+        Assert.Equal("First keyboard save", first.Html);
+        Assert.Equal("alpha      gamma", second.Html);
     }
 
     [Fact]
@@ -284,7 +284,7 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
     [Fact]
     public async Task OpenArticle_OpensPublishedLocalizationInNewTabAndDraftHasNoActiveLink()
     {
-        var article = new EditorArticle { Status = 1, Slug = "published-en", Markdown = "Published English body" };
+        var article = new EditorArticle { Status = 1, Slug = "published-en", Html = "Published English body" };
         article.RussianStatus = 0;
         await AuthenticateAsync();
         await RouteEditorOnContextAsync(article);
@@ -370,11 +370,11 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
             await JsonAsync(route, includeTaxonomy ? Taxonomy() : EmptyTaxonomy());
             return;
         }
-        if (path == "/api/admin/markdown/preview")
+        if (path == "/api/admin/html/preview")
         {
             using var request = JsonDocument.Parse(route.Request.PostData!);
-            var markdown = WebUtility.HtmlEncode(request.RootElement.GetProperty("markdown").GetString());
-            await JsonAsync(route, new { html = $"<p>{markdown}</p>" });
+            var html = WebUtility.HtmlEncode(request.RootElement.GetProperty("html").GetString());
+            await JsonAsync(route, new { html = $"<p>{html}</p>" });
             return;
         }
 
@@ -390,7 +390,7 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
             using var request = JsonDocument.Parse(route.Request.PostData!);
             article.Title = request.RootElement.GetProperty("title").GetString() ?? "";
             article.Slug = request.RootElement.GetProperty("slug").GetString() ?? "";
-            article.Markdown = request.RootElement.GetProperty("markdown").GetString() ?? "";
+            article.Html = request.RootElement.GetProperty("html").GetString() ?? "";
             article.Version++;
             await JsonAsync(route, article.Version);
             return;
@@ -429,15 +429,15 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
         id = article.Id, createdAt = DateTimeOffset.UtcNow.AddDays(-1), updatedAt = DateTimeOffset.UtcNow,
         localizations = new[]
         {
-            Localization("en", article.Slug, article.Title, article.Markdown, article.Status, article.Version),
+            Localization("en", article.Slug, article.Title, article.Html, article.Status, article.Version),
             Localization("ru", "chernovik-ru", "Русский черновик", "Русский текст", article.RussianStatus, 1L)
         },
         topicIds = Array.Empty<Guid>(), series = Array.Empty<object>(), tags = Array.Empty<string>()
     };
 
-    private static object Localization(string language, string slug, string title, string markdown, int status, long version) => new
+    private static object Localization(string language, string slug, string title, string html, int status, long version) => new
     {
-        id = Guid.NewGuid(), version, languageCode = language, slug, title, summary = "Summary", markdown, status,
+        id = Guid.NewGuid(), version, languageCode = language, slug, title, summary = "Summary", html, status,
         publishedAt = status == 1 ? (DateTimeOffset?)DateTimeOffset.UtcNow.AddDays(-1) : null,
         updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow
     };
@@ -445,7 +445,7 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
     private static object PublicDetails(EditorArticle article) => new
     {
         languageCode = "en", slug = article.Slug, title = "Published article", summary = "Summary",
-        html = $"<p>{WebUtility.HtmlEncode(article.Markdown)}</p>", publishedAt = DateTimeOffset.UtcNow.AddDays(-1),
+        html = $"<p>{WebUtility.HtmlEncode(article.Html)}</p>", publishedAt = DateTimeOffset.UtcNow.AddDays(-1),
         updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow, authorDisplayName = "Part Four",
         availableLocalizations = new[] { new { languageCode = "en", url = $"/en/articles/{article.Slug}" } },
         topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L
@@ -471,7 +471,7 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : PageTe
         public long Version { get; set; } = 1;
         public string Title { get; set; } = "Editor article";
         public string Slug { get; set; } = "editor-article";
-        public string Markdown { get; set; } = "Original body";
+        public string Html { get; set; } = "Original body";
         public int Status { get; set; }
         public int RussianStatus { get; set; }
     }

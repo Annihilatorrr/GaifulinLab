@@ -32,7 +32,7 @@ public sealed class ArticleEditConflictTests(E2EEnvironment environment) : PageT
         var conflict = Page.Locator(".editor-conflict");
         await Expect(conflict.GetByRole(AriaRole.Heading, new()
         {
-            Name = "This localization was changed elsewhere"
+            Name = "English localization was changed elsewhere"
         })).ToBeVisibleAsync();
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("My unsaved draft");
         await Expect(conflict.Locator("input")).ToHaveValueAsync("Saved in another editor");

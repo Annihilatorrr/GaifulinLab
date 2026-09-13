@@ -14,7 +14,7 @@ public sealed class ArticleEditorScrollTests : PageTest
     }
 
     [Fact]
-    public async Task MarkdownAndPreviewScrollIndependently()
+    public async Task HtmlAndPreviewScrollIndependently()
     {
         var (login, password) = _environment.GetAdminCredentials();
 
@@ -25,11 +25,11 @@ public sealed class ArticleEditorScrollTests : PageTest
         await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
 
-        var markdown = Page.Locator("#article-markdown");
+        var html = Page.Locator("#article-html");
         var preview = Page.Locator(".preview-pane");
         var previewHeading = preview.Locator(".pane-heading");
         var articlePreview = Page.Locator("article.article-preview");
-        await markdown.FillAsync($"Before thematic break\n\n---\n\n{CreateLongMarkdown()}");
+        await html.FillAsync($"<p>Before thematic break</p><hr>{CreateLongHtml()}");
         await Expect(articlePreview).ToContainTextAsync("Paragraph 140");
 
         // The preview gutter and article must form one continuous surface.
@@ -37,10 +37,10 @@ public sealed class ArticleEditorScrollTests : PageTest
             await BackgroundColorAsync(articlePreview),
             await BackgroundColorAsync(preview));
 
-        // Markdown thematic breaks must not introduce a visual divider in the editor preview.
-        await Expect(articlePreview.Locator("hr")).ToBeHiddenAsync();
+        // Native HTML thematic breaks remain visible in the editor preview.
+        await Expect(articlePreview.Locator("hr")).ToBeVisibleAsync();
 
-        await AssertScrollableAsync(markdown);
+        await AssertScrollableAsync(html);
         await AssertScrollableAsync(preview);
 
         var pageScrollBeforePreview = await Page.EvaluateAsync<double>("() => window.scrollY");
@@ -53,13 +53,13 @@ public sealed class ArticleEditorScrollTests : PageTest
         await AssertHeadingStaysStickyAsync(preview, previewHeading);
         await AssertPreviewDoesNotScrollThePageAtItsBoundaryAsync(preview);
 
-        var previewScrollBeforeMarkdown = await ScrollTopAsync(preview);
-        await ScrollWithMouseAsync(markdown);
-        var markdownScrollTop = await ScrollTopAsync(markdown);
-        var previewScrollAfterMarkdown = await ScrollTopAsync(preview);
+        var previewScrollBeforeHtml = await ScrollTopAsync(preview);
+        await ScrollWithMouseAsync(html);
+        var htmlScrollTop = await ScrollTopAsync(html);
+        var previewScrollAfterHtml = await ScrollTopAsync(preview);
 
-        Assert.True(markdownScrollTop > 0, "The Markdown editor did not scroll after a mouse-wheel event.");
-        Assert.Equal(previewScrollBeforeMarkdown, previewScrollAfterMarkdown);
+        Assert.True(htmlScrollTop > 0, "The Html editor did not scroll after a mouse-wheel event.");
+        Assert.Equal(previewScrollBeforeHtml, previewScrollAfterHtml);
 
         var settings = Page.Locator(".preview-settings");
         await settings.Locator("summary").ClickAsync();
@@ -73,9 +73,9 @@ public sealed class ArticleEditorScrollTests : PageTest
         await Expect(splitter).ToHaveAttributeAsync("aria-valuenow", "35");
     }
 
-    private static string CreateLongMarkdown() => string.Join(
+    private static string CreateLongHtml() => string.Join(
         "\n\n",
-        Enumerable.Range(1, 140).Select(number => $"Paragraph {number}"));
+        Enumerable.Range(1, 140).Select(number => $"<p>Paragraph {number}</p>"));
 
     private static async Task AssertScrollableAsync(ILocator locator)
     {

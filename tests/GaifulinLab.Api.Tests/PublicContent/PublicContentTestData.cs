@@ -29,7 +29,7 @@ internal static class PublicContentTestData
             now,
             "Understanding FFT",
             "A practical introduction",
-            "**safe** <script>alert('xss')</script>",
+            "<p><strong>safe</strong> <script>alert('xss')</script></p>",
             "understanding-fft");
         article.PublishLocalization("en", now);
         article.AddLocalization(
@@ -37,7 +37,7 @@ internal static class PublicContentTestData
             now,
             "Как работает FFT",
             "Практическое введение",
-            "**безопасно**",
+            "<p><strong>безопасно</strong></p>",
             "kak-rabotaet-fft");
         article.PublishLocalization("ru", now);
 

@@ -15,5 +15,5 @@ public sealed record ArticlePdfDocument(
     string Slug,
     string Title,
     string? Summary,
-    string Markdown,
+    string Html,
     DateTimeOffset? PublishedAt);

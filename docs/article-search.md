@@ -40,7 +40,7 @@ stores optional `CoverMediaAssetId`, derived `SearchText` and `ReadingMinutes`.
 The current media upload endpoint and localization save/version workflow handle
 cover selection and removal. Each translation may have its own cover.
 
-`AppDbContext.SaveChanges` prepares visible text from Markdown (including code and
+`AppDbContext.SaveChanges` prepares visible text from article HTML (including code and
 image alt text, excluding HTML markup, script/style blocks and link destinations)
 and estimates reading time at 200 words per minute. These derived fields do not
 increment the author's edit version separately. Direct SQL writers must update
@@ -71,7 +71,7 @@ Apply migrations through `20260908130000_UseEntityFrameworkArticleSearch` before
 starting the updated API, using the existing EF migration/deployment workflow.
 The new migration populates generated vectors and replaces the earlier expression
 indexes and `gl_search_*` functions; its rollback restores them. API startup fills existing
-NULL search-text values in batches with the same Markdown extraction used for
+NULL search-text values in batches with the same HTML extraction used for
 new saves. The backfill is repeatable and checks edit versions before updating.
 It does not republish content or modify its edit version.
 

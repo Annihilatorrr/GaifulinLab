@@ -13,7 +13,7 @@ public sealed class ArticleLocalization
         string languageCode,
         string? title,
         string? summary,
-        string? markdown,
+        string? html,
         string? slug,
         DateTimeOffset createdAt)
     {
@@ -21,7 +21,7 @@ public sealed class ArticleLocalization
         ArticleId = articleId;
         LanguageCode = DomainRules.NormalizeLanguageCode(languageCode);
         Status = PublicationStatus.Draft;
-        UpdateContent(title, summary, markdown, slug, createdAt);
+        UpdateContent(title, summary, html, slug, createdAt);
     }
 
     public Guid Id { get; private set; }
@@ -40,7 +40,7 @@ public sealed class ArticleLocalization
 
     public string? Summary { get; private set; }
 
-    public string Markdown { get; private set; } = string.Empty;
+    public string Html { get; private set; } = string.Empty;
 
     public Guid? CoverMediaAssetId { get; private set; }
 
@@ -67,27 +67,28 @@ public sealed class ArticleLocalization
     internal void UpdateContent(
         string? title,
         string? summary,
-        string? markdown,
+        string? html,
         string? slug,
         DateTimeOffset updatedAt)
     {
         var normalizedTitle = title?.Trim() ?? string.Empty;
         var normalizedSummary = string.IsNullOrWhiteSpace(summary) ? null : summary.Trim();
-        var normalizedMarkdown = markdown ?? string.Empty;
+        var normalizedHtml = html ?? string.Empty;
         var normalizedSlug = DomainRules.NormalizeOptionalSlug(slug);
 
         DomainRules.EnsureMaximumLength(normalizedTitle, ContentLimits.ArticleTitle, nameof(title));
         DomainRules.EnsureMaximumLength(normalizedSummary, ContentLimits.ArticleSummary, nameof(summary));
         DomainRules.EnsureMaximumLength(normalizedSlug, ContentLimits.ArticleSlug, nameof(slug));
+        DomainRules.EnsureMaximumLength(normalizedHtml, ContentLimits.ArticleHtml, nameof(html));
 
         if (Status == PublicationStatus.Published)
         {
-            EnsurePublishable(normalizedTitle, normalizedSlug, normalizedMarkdown);
+            EnsurePublishable(normalizedTitle, normalizedSlug, normalizedHtml);
         }
 
         Title = normalizedTitle;
         Summary = normalizedSummary;
-        Markdown = normalizedMarkdown;
+        Html = normalizedHtml;
         Slug = normalizedSlug;
         var timestamp = DomainRules.AsUtc(updatedAt);
         UpdatedAt = timestamp;
@@ -102,7 +103,7 @@ public sealed class ArticleLocalization
             throw new InvalidOperationException("Only a draft or unpublished localization can be published.");
         }
 
-        EnsurePublishable(Title, Slug, Markdown);
+        EnsurePublishable(Title, Slug, Html);
 
         var timestamp = DomainRules.AsUtc(publishedAt);
         Status = PublicationStatus.Published;
@@ -121,7 +122,7 @@ public sealed class ArticleLocalization
         UpdatedAt = DomainRules.AsUtc(updatedAt);
     }
 
-    private static void EnsurePublishable(string title, string? slug, string markdown)
+    private static void EnsurePublishable(string title, string? slug, string html)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -133,9 +134,9 @@ public sealed class ArticleLocalization
             throw new InvalidOperationException("A slug is required before publication.");
         }
 
-        if (string.IsNullOrWhiteSpace(markdown))
+        if (string.IsNullOrWhiteSpace(html))
         {
-            throw new InvalidOperationException("Markdown content is required before publication.");
+            throw new InvalidOperationException("HTML content is required before publication.");
         }
     }
 }

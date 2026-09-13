@@ -59,9 +59,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     {
         foreach (var entry in ChangeTracker.Entries<ArticleLocalization>())
         {
-            if (entry.State == EntityState.Added || entry.Property(x => x.Markdown).IsModified)
+            if (entry.State == EntityState.Added || entry.Property(x => x.Html).IsModified)
             {
-                var text = Content.ArticleSearchText.Extract(entry.Entity.Markdown);
+                var text = Content.ArticleSearchText.Extract(entry.Entity.Html);
                 entry.Entity.UpdateSearchText(text, Content.ArticleSearchText.ReadingMinutes(text));
             }
         }

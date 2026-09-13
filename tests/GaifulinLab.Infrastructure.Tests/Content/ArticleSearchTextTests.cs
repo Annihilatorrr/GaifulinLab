@@ -8,15 +8,15 @@ namespace GaifulinLab.Infrastructure.Tests.Content;
 public sealed class ArticleSearchTextTests
 {
     [Fact]
-    public void Extract_KeepsVisibleWordsAndCodeWithoutMarkdownOrLinkDestinations()
+    public void Extract_KeepsVisibleWordsAndCodeWithoutHtmlOrLinkDestinations()
     {
-        var text = ArticleSearchText.Extract("# Title\n\nRead **carefully** [guide](https://secret-destination.test)\n\n```csharp\nvar example = 1;\n```\n\n<script>alert('bad')</script>");
+        var text = ArticleSearchText.Extract("<h1>Title</h1><p>Read <strong>carefully</strong> <a href=\"https://secret-destination.test\">guide</a></p><pre><code class=\"language-csharp\">var example = 1;</code></pre><script>alert('bad')</script>");
         Assert.Contains("Title", text);
         Assert.Contains("carefully", text);
         Assert.Contains("guide", text);
         Assert.Contains("example", text);
         Assert.DoesNotContain("secret-destination", text);
-        Assert.DoesNotContain("**", text);
+        Assert.DoesNotContain("language-csharp", text);
         Assert.DoesNotContain("<script>", text);
     }
 

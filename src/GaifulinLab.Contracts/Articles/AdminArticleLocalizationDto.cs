@@ -7,7 +7,7 @@ public sealed record AdminArticleLocalizationDto(
     string? Slug,
     string Title,
     string? Summary,
-    string Markdown,
+    string Html,
     PublicationStatusDto Status,
     DateTimeOffset? PublishedAt,
     DateTimeOffset UpdatedAt,

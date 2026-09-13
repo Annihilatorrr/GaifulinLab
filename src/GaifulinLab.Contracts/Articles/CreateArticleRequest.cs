@@ -4,6 +4,6 @@ public sealed record CreateArticleRequest(
     string LanguageCode,
     string? Title,
     string? Summary,
-    string? Markdown,
+    string? Html,
     string? Slug,
     Guid? CoverMediaAssetId = null);

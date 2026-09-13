@@ -15,7 +15,7 @@ using Microsoft.Playwright;
 namespace GaifulinLab.Infrastructure.Pdf;
 
 internal sealed class PlaywrightArticlePdfRenderer(
-    IMarkdownRenderer markdownRenderer,
+    IArticleHtmlSanitizer htmlSanitizer,
     IMediaStorage mediaStorage,
     IServiceScopeFactory scopeFactory,
     ArticlePdfRendererSettings settings,
@@ -154,6 +154,29 @@ internal sealed class PlaywrightArticlePdfRenderer(
         await page.EmulateMediaAsync(new PageEmulateMediaOptions { Media = Microsoft.Playwright.Media.Print });
         await page.SetContentAsync(html, new PageSetContentOptions { WaitUntil = WaitUntilState.Load });
 
+        var highlightJsPath = Path.GetFullPath(settings.HighlightJsPath);
+        if (!File.Exists(highlightJsPath))
+        {
+            throw new PdfRenderingException(
+                $"The local code highlighting asset was not found at '{settings.HighlightJsPath}'.");
+        }
+
+        await page.AddScriptTagAsync(new PageAddScriptTagOptions
+        {
+            Content = await File.ReadAllTextAsync(highlightJsPath)
+        });
+        await page.EvaluateAsync("""
+            () => {
+                document.querySelectorAll("pre code[class*='language-']").forEach(code => {
+                    try {
+                        window.hljs?.highlightElement(code);
+                    } catch {
+                        // Unknown language labels deliberately fall back to plain source text.
+                    }
+                });
+            }
+            """);
+
         await page.AddScriptTagAsync(new PageAddScriptTagOptions
         {
             Url = mathJaxScriptUrl
@@ -217,9 +240,17 @@ internal sealed class PlaywrightArticlePdfRenderer(
         ArticleTypography typography,
         CancellationToken cancellationToken)
     {
-        var articleHtml = markdownRenderer.Render(document.Markdown);
+        var articleHtml = htmlSanitizer.Sanitize(document.Html);
         articleHtml = ForceDisplayIntegralLimits(articleHtml);
         articleHtml = await EmbedInternalMediaAsync(articleHtml, cancellationToken);
+        var articleStylesPath = Path.GetFullPath(settings.ArticleStylesPath);
+        if (!File.Exists(articleStylesPath))
+        {
+            throw new PdfRenderingException(
+                $"The shared article stylesheet was not found at '{settings.ArticleStylesPath}'.");
+        }
+
+        var articleStyles = await File.ReadAllTextAsync(articleStylesPath, cancellationToken);
         var title = WebUtility.HtmlEncode(document.Title);
         var summary = string.IsNullOrWhiteSpace(document.Summary)
             ? string.Empty
@@ -235,33 +266,42 @@ internal sealed class PlaywrightArticlePdfRenderer(
                 <meta charset="utf-8">
                 <style>
                     @page { size: A4; margin: 18mm 16mm; }
-                    :root { color-scheme: light; }
+                    :root {
+                        color-scheme: light;
+                        --color-surface: #fff;
+                        --color-surface-subtle: #f5f7fb;
+                        --color-surface-accent: #f2f5fb;
+                        --color-text: #071735;
+                        --color-text-muted: #5d6e92;
+                        --color-border: #d6dfef;
+                        --color-accent: #2647dd;
+                        --color-danger: #c83232;
+                        --color-code-keyword: #6d28d9;
+                        --color-code-string: #a23a00;
+                        --color-code-number: #08745b;
+                        --color-code-comment: #65748b;
+                        --font-mono: "Courier New", monospace;
+                        --text-sm: 9pt;
+                        --text-xl: 15pt;
+                        --text-3xl: 26pt;
+                        --line-heading: 1.2;
+                        --radius-sm: 4px;
+                        --radius-md: 5px;
+                        --space-2: .45rem;
+                        --space-3: .55rem;
+                        --space-4: .75rem;
+                        --space-5: .9rem;
+                        --article-line-height: __LINE_HEIGHT__;
+                        --article-block-spacing: __BLOCK_SPACING__rem;
+                    }
                     * { box-sizing: border-box; }
                     body { margin: 0; color: #071735; background: #fff; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: __LINE_HEIGHT__; }
                     .article-header { margin-bottom: 1.5rem; }
                     .article-header time { color: #5d6e92; font-size: 9pt; }
-                    h1 { margin: .4rem 0 .7rem; font-size: 26pt; line-height: 1.1; }
-                    h2 { margin-top: 1.8rem; font-size: 19pt; line-height: 1.2; break-after: avoid-page; }
-                    h3 { margin-top: 1.5rem; font-size: 15pt; line-height: 1.25; break-after: avoid-page; }
-                    h4, h5, h6 { margin-top: 1.25rem; break-after: avoid-page; }
-                    hr { display: none; }
+                    .article-header h1 { margin: .4rem 0 .7rem; font-size: 26pt; line-height: 1.1; }
                     .summary { color: #40547c; font-size: 13pt; }
-                    p, ul, ol, blockquote, pre, table { margin: 0 0 __BLOCK_SPACING__rem; }
-                    .math { margin: 0; break-inside: avoid-page; }
-                    ul, ol { padding-left: 1.45rem; }
-                    img { display: block; max-width: 100%; max-height: 235mm; height: auto; margin-bottom: __BLOCK_SPACING__rem; border-radius: 4px; break-inside: avoid-page; }
-                    pre { overflow: visible; padding: .9rem; border: 1px solid #d6dfef; border-radius: 5px; background: #f5f7fb; white-space: pre-wrap; break-inside: avoid-page; }
-                    code { font-family: "Courier New", monospace; font-size: .9em; }
-                    .editor-colors .keyword, .editor-colors .type, .editor-colors .preprocessor { color: #6d28d9; }
-                    .editor-colors .string, .editor-colors .character, .editor-colors .regex { color: #a23a00; }
-                    .editor-colors .number { color: #08745b; }
-                    .editor-colors .comment { color: #65748b; font-style: italic; }
-                    blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid #5875ff; color: #40547c; break-inside: avoid-page; }
-                    table { width: 100%; border-collapse: collapse; font-size: .94em; break-inside: avoid-page; }
-                    th, td { padding: .45rem .55rem; border: 1px solid #d6dfef; text-align: left; vertical-align: top; }
-                    th { background: #f2f5fb; }
-                    a { color: #2647dd; text-decoration: underline; }
-                    mjx-container[display="true"] { margin: 0 0 __BLOCK_SPACING__rem !important; break-inside: avoid-page; }
+                    .article-content img { max-height: 235mm; }
+                    __ARTICLE_STYLES__
                 </style>
                 <script>
                     window.MathJax = {
@@ -276,7 +316,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
             <body>
                 <main>
                     <header class="article-header">__PUBLISHED_AT__<h1>__TITLE__</h1>__SUMMARY__</header>
-                    <article class="article-body">__ARTICLE_HTML__</article>
+                    <article class="article-content article-body">__ARTICLE_HTML__</article>
                 </main>
             </body>
             </html>
@@ -285,6 +325,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
             .Replace("__LANGUAGE__", WebUtility.HtmlEncode(document.LanguageCode), StringComparison.Ordinal)
             .Replace("__LINE_HEIGHT__", typography.LineHeight.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
             .Replace("__BLOCK_SPACING__", typography.BlockSpacing.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
+            .Replace("__ARTICLE_STYLES__", articleStyles, StringComparison.Ordinal)
             .Replace("__PUBLISHED_AT__", publishedAt, StringComparison.Ordinal)
             .Replace("__TITLE__", title, StringComparison.Ordinal)
             .Replace("__SUMMARY__", summary, StringComparison.Ordinal)
@@ -403,4 +444,6 @@ internal sealed record ArticlePdfRendererSettings(
     TimeSpan Timeout,
     int MaximumConcurrentRenders,
     string MathJaxPath,
-    string MathJaxAssetsPath);
+    string MathJaxAssetsPath,
+    string ArticleStylesPath,
+    string HighlightJsPath);

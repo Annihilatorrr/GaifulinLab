@@ -7,7 +7,7 @@ using Microsoft.Playwright.Xunit;
 namespace GaifulinLab.E2E.Tests;
 
 [Collection(E2ECollection.Name)]
-public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : PageTest
+public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : PageTest
 {
     private static readonly byte[] OnePixelPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
@@ -25,7 +25,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
                 return;
             }
 
-            await JsonAsync(route, path == "/api/admin/markdown/preview"
+            await JsonAsync(route, path == "/api/admin/html/preview"
                 ? new { html = "" }
                 : new { });
         });
@@ -72,7 +72,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
                 return;
             }
 
-            if (path == "/api/admin/markdown/preview")
+            if (path == "/api/admin/html/preview")
             {
                 await JsonAsync(route, new { html = "<p>Body</p>" });
                 return;
@@ -98,7 +98,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
     }
 
     [Fact]
-    public async Task Preview_IgnoresLateResponseAndClearingMarkdownShowsEmptyState()
+    public async Task Preview_IgnoresLateResponseAndClearingHtmlShowsEmptyState()
     {
         var firstRequestArrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -107,17 +107,17 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview")
+            if (path == "/api/admin/html/preview")
             {
                 using var request = JsonDocument.Parse(route.Request.PostData!);
-                var markdown = request.RootElement.GetProperty("markdown").GetString()!;
-                if (markdown == "First response")
+                var html = request.RootElement.GetProperty("html").GetString()!;
+                if (html == "First response")
                 {
                     firstRequestArrived.TrySetResult();
                     await releaseFirst.Task;
                 }
 
-                await JsonAsync(route, new { html = $"<p>{markdown}</p>" });
+                await JsonAsync(route, new { html = $"<p>{html}</p>" });
                 return;
             }
 
@@ -125,16 +125,16 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         });
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
-        var markdown = Page.GetByLabel("Article Markdown");
-        await markdown.FillAsync("First response");
+        var html = Page.GetByLabel("Article Html");
+        await html.FillAsync("First response");
         await firstRequestArrived.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await markdown.FillAsync("Current response");
+        await html.FillAsync("Current response");
         await Expect(Page.Locator("article.article-preview")).ToHaveTextAsync("Current response");
         releaseFirst.TrySetResult();
         await Page.WaitForTimeoutAsync(250);
         await Expect(Page.Locator("article.article-preview")).ToHaveTextAsync("Current response");
 
-        await markdown.FillAsync("");
+        await html.FillAsync("");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Nothing to preview yet" })).ToBeVisibleAsync();
         await Expect(Page.Locator("article.article-preview")).ToHaveCountAsync(0);
     }
@@ -148,7 +148,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview")
+            if (path == "/api/admin/html/preview")
             {
                 if (failPreview)
                 {
@@ -157,7 +157,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
                 }
 
                 using var request = JsonDocument.Parse(route.Request.PostData!);
-                var value = request.RootElement.GetProperty("markdown").GetString();
+                var value = request.RootElement.GetProperty("html").GetString();
                 await JsonAsync(route, new { html = $"<p>{value}</p>" });
                 return;
             }
@@ -166,19 +166,19 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         });
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
-        var markdown = Page.GetByLabel("Article Markdown");
-        await markdown.FillAsync("Text that must survive");
+        var html = Page.GetByLabel("Article Html");
+        await html.FillAsync("Text that must survive");
         await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveTextAsync("Preview is temporarily unavailable.");
-        await Expect(markdown).ToHaveValueAsync("Text that must survive");
+        await Expect(html).ToHaveValueAsync("Text that must survive");
 
         failPreview = false;
-        await markdown.FillAsync("Recovered preview");
+        await html.FillAsync("Recovered preview");
         await Expect(Page.Locator("article.article-preview")).ToHaveTextAsync("Recovered preview");
         await Expect(Page.Locator(".preview-error")).ToHaveCountAsync(0);
     }
 
     [Fact]
-    public async Task ExtendedMarkdown_IsRenderedAndTypesetInPreviewAndPublishedArticle()
+    public async Task ExtendedHtml_IsRenderedAndTypesetInPreviewAndPublishedArticle()
     {
         const string rendered = """
             <h1>Advanced document</h1><p><a href="https://example.com">link</a></p>
@@ -197,15 +197,15 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
             };
             """);
         await AuthenticateAsync();
-        await RouteMarkdownEditorAndPublicAsync(rendered);
+        await RouteHtmlEditorAndPublicAsync(rendered);
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
-        await Page.GetByLabel("Article Markdown").FillAsync("# Advanced document\n\n$E=mc^2$");
+        await Page.GetByLabel("Article Html").FillAsync(rendered);
         var preview = Page.Locator("article.article-preview");
         await Expect(preview.Locator("h1")).ToHaveTextAsync("Advanced document");
         await Expect(preview.Locator("ul li")).ToHaveCountAsync(2);
         await Expect(preview.Locator("table td")).ToHaveTextAsync("cell");
-        await Expect(preview.Locator("code .keyword")).ToHaveTextAsync("return");
+        await Expect(preview.Locator("code .hljs-keyword")).ToHaveTextAsync("return");
         await Expect(preview.Locator("mjx-container")).ToContainTextAsync("E=mc^2");
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/en/articles/advanced-document").ToString());
@@ -247,21 +247,21 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         await AuthenticateAsync(role: "Author");
         await RouteImageEditorAsync(articleId, () => state, value => state = value, () => ++uploadIndex);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{articleId}").ToString());
-        var markdown = Page.GetByLabel("Article Markdown");
-        await markdown.EvaluateAsync("""editor => { editor.focus(); editor.setSelectionRange(7, 13); editor.dispatchEvent(new Event('select', { bubbles: true })); }""");
+        var html = Page.GetByLabel("Article Html");
+        await html.EvaluateAsync("""editor => { editor.focus(); editor.setSelectionRange(7, 13); editor.dispatchEvent(new Event('select', { bubbles: true })); }""");
         await UploadAsync("diagram[one].png", "image/png", OnePixelPng);
-        await Expect(markdown).ToHaveValueAsync(new Regex("^Before\\s+!\\[diagramone\\]\\(/media/image-1\\)\\s+after$"));
+        await Expect(html).ToHaveValueAsync(new Regex("^Before\\s+<figure class=\"article-figure\"><img src=\"/media/image-1\" alt=\"diagramone\" loading=\"lazy\"></figure>\\s+after$"));
 
-        await markdown.EvaluateAsync("""editor => { editor.focus(); editor.setSelectionRange(6, 6); editor.dispatchEvent(new Event('select', { bubbles: true })); }""");
+        await html.EvaluateAsync("""editor => { editor.focus(); editor.setSelectionRange(6, 6); editor.dispatchEvent(new Event('select', { bubbles: true })); }""");
         await UploadAsync("photo.jpeg", "image/jpeg", [0xff, 0xd8, 0xff, 0xe0]);
-        await Expect(markdown).ToHaveValueAsync(new Regex("!\\[photo\\]\\(/media/image-2\\)"));
+        await Expect(html).ToHaveValueAsync(new Regex("<img src=\"/media/image-2\" alt=\"photo\" loading=\"lazy\">"));
         await UploadAsync("animation.gif", "image/gif", "GIF89a"u8.ToArray());
-        await Expect(markdown).ToHaveValueAsync(new Regex("!\\[animation\\]\\(/media/image-3\\)"));
+        await Expect(html).ToHaveValueAsync(new Regex("<img src=\"/media/image-3\" alt=\"animation\" loading=\"lazy\">"));
         await UploadAsync("drawing.webp", "image/webp", "RIFF0000WEBP"u8.ToArray());
-        await Expect(markdown).ToHaveValueAsync(new Regex("!\\[drawing\\]\\(/media/image-4\\)"));
+        await Expect(html).ToHaveValueAsync(new Regex("<img src=\"/media/image-4\" alt=\"drawing\" loading=\"lazy\">"));
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
         await Page.ReloadAsync();
-        await Expect(markdown).ToHaveValueAsync(state);
+        await Expect(html).ToHaveValueAsync(state);
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/en/articles/image-workflow").ToString());
         await Expect(Page.Locator("article.article-body img")).ToHaveCountAsync(4);
@@ -272,7 +272,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
     }
 
     [Fact]
-    public async Task ImageUploadErrors_KeepMarkdownAndNextValidUploadSucceeds()
+    public async Task ImageUploadErrors_KeepHtmlAndNextValidUploadSucceeds()
     {
         var uploadAttempt = 0;
         await AuthenticateAsync(role: "Author");
@@ -280,7 +280,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview") { await JsonAsync(route, new { html = "<p>Original</p>" }); return; }
+            if (path == "/api/admin/html/preview") { await JsonAsync(route, new { html = "<p>Original</p>" }); return; }
             if (path == "/api/admin/media")
             {
                 uploadAttempt++;
@@ -302,34 +302,34 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         });
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
-        var markdown = Page.GetByLabel("Article Markdown");
-        await markdown.FillAsync("Original text");
+        var html = Page.GetByLabel("Article Html");
+        await html.FillAsync("Original text");
 
         await UploadAsync("too-large.png", "image/png", new byte[10 * 1024 * 1024 + 1]);
         await Expect(Page.Locator(".upload-error")).ToContainTextAsync("larger than 10 MB");
-        await Expect(markdown).ToHaveValueAsync("Original text");
+        await Expect(html).ToHaveValueAsync("Original text");
 
         await UploadAsync("notes.txt", "text/plain", "plain text"u8.ToArray());
         await Expect(Page.Locator(".upload-error")).ToContainTextAsync("Only PNG, JPEG, GIF and WebP");
-        await Expect(markdown).ToHaveValueAsync("Original text");
+        await Expect(html).ToHaveValueAsync("Original text");
 
         await UploadAsync("fake.jpg", "image/jpeg", OnePixelPng);
         await Expect(Page.Locator(".upload-error")).ToContainTextAsync("do not match");
-        await Expect(markdown).ToHaveValueAsync("Original text");
+        await Expect(html).ToHaveValueAsync("Original text");
 
         await UploadAsync("network.png", "image/png", OnePixelPng);
         await Expect(Page.Locator(".upload-error")).ToBeVisibleAsync();
-        await Expect(markdown).ToHaveValueAsync("Original text");
+        await Expect(html).ToHaveValueAsync("Original text");
 
         await UploadAsync("recovered.png", "image/png", OnePixelPng);
         await Expect(Page.Locator(".upload-error")).ToHaveCountAsync(0);
-        await Expect(markdown).ToHaveValueAsync(new Regex("Original text\\s+!\\[recovered\\]\\(/media/recovered\\)"));
+        await Expect(html).ToHaveValueAsync(new Regex("Original text\\s+<figure class=\"article-figure\"><img src=\"/media/recovered\" alt=\"recovered\" loading=\"lazy\"></figure>"));
     }
 
     private async Task AuthenticateAsync(string role = "Admin")
     {
         var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(
-                $"{{\"sub\":\"markdown-author\",\"role\":\"{role}\",\"exp\":{DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()}}}"))
+                $"{{\"sub\":\"html-author\",\"role\":\"{role}\",\"exp\":{DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()}}}"))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
         await Page.AddInitScriptAsync($"sessionStorage.setItem('gaifulinlab.admin.access_token','header.{payload}.signature');");
     }
@@ -342,13 +342,13 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
             Buffer = bytes
         });
 
-    private async Task RouteMarkdownEditorAndPublicAsync(string html)
+    private async Task RouteHtmlEditorAndPublicAsync(string html)
     {
         await Page.RouteAsync("**/api/admin/**", async route =>
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview") { await JsonAsync(route, new { html }); return; }
+            if (path == "/api/admin/html/preview") { await JsonAsync(route, new { html }); return; }
             await JsonAsync(route, new { });
         });
         await Page.RouteAsync("**/api/public/articles/**", async route =>
@@ -361,15 +361,15 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
 
     private async Task RouteImageEditorAsync(
         Guid articleId,
-        Func<string> getMarkdown,
-        Action<string> setMarkdown,
+        Func<string> getHtml,
+        Action<string> setHtml,
         Func<int> nextUpload)
     {
         await Page.RouteAsync("**/api/admin/**", async route =>
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview") { await JsonAsync(route, new { html = MarkdownImagesToHtml(getMarkdown()) }); return; }
+            if (path == "/api/admin/html/preview") { await JsonAsync(route, new { html = HtmlImagesToHtml(getHtml()) }); return; }
             if (path == "/api/admin/media")
             {
                 var index = nextUpload();
@@ -385,13 +385,13 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
             }
             if (path == $"/api/admin/articles/{articleId}" && route.Request.Method == "GET")
             {
-                await JsonAsync(route, ArticleDetails(articleId, getMarkdown()));
+                await JsonAsync(route, ArticleDetails(articleId, getHtml()));
                 return;
             }
             if (path == $"/api/admin/articles/{articleId}/localizations/en" && route.Request.Method == "PUT")
             {
                 using var request = JsonDocument.Parse(route.Request.PostData!);
-                setMarkdown(request.RootElement.GetProperty("markdown").GetString() ?? "");
+                setHtml(request.RootElement.GetProperty("html").GetString() ?? "");
                 await JsonAsync(route, 2L);
                 return;
             }
@@ -401,16 +401,16 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path.EndsWith("/views", StringComparison.Ordinal)) { await JsonAsync(route, new { viewCount = 1L }); return; }
-            await JsonAsync(route, PublicArticle("image-workflow", "Image workflow", MarkdownImagesToHtml(getMarkdown())));
+            await JsonAsync(route, PublicArticle("image-workflow", "Image workflow", HtmlImagesToHtml(getHtml())));
         });
     }
 
-    private static object ArticleDetails(Guid articleId, string markdown) => new
+    private static object ArticleDetails(Guid articleId, string html) => new
     {
         id = articleId,
         createdAt = DateTimeOffset.UtcNow.AddDays(-1),
         updatedAt = DateTimeOffset.UtcNow,
-        localizations = new[] { Localization("en", "image-workflow", "Image workflow", markdown) },
+        localizations = new[] { Localization("en", "image-workflow", "Image workflow", html) },
         topicIds = Array.Empty<Guid>(),
         series = Array.Empty<object>(),
         tags = Array.Empty<string>()
@@ -431,7 +431,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         tags = Array.Empty<string>()
     };
 
-    private static object Localization(string language, string slug, string title, string markdown) => new
+    private static object Localization(string language, string slug, string title, string html) => new
     {
         id = Guid.NewGuid(),
         version = 1L,
@@ -439,7 +439,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         slug,
         title,
         summary = "Summary",
-        markdown,
+        html,
         status = 0,
         publishedAt = (DateTimeOffset?)null,
         updatedAt = DateTimeOffset.UtcNow,
@@ -488,12 +488,7 @@ public sealed class ArticleMarkdownAndMediaTests(E2EEnvironment environment) : P
         topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L
     };
 
-    private static string MarkdownImagesToHtml(string markdown)
-    {
-        var matches = Regex.Matches(markdown, @"!\[(?<alt>[^]]*)\]\((?<url>[^)]+)\)");
-        return string.Concat(matches.Select(match =>
-            $"<img alt=\"{match.Groups["alt"].Value}\" src=\"{match.Groups["url"].Value}\">"));
-    }
+    private static string HtmlImagesToHtml(string html) => html;
 
     private static object EmptyTaxonomy() => new
     {

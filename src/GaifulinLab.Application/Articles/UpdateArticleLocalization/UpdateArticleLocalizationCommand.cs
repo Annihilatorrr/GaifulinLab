@@ -8,7 +8,7 @@ public sealed record UpdateArticleLocalizationCommand(
     string LanguageCode,
     string? Title,
     string? Summary,
-    string? Markdown,
+    string? Html,
     string? Slug,
     long? ExpectedVersion,
     Guid? CoverMediaAssetId = null) : IRequest<long>;

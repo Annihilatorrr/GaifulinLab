@@ -2,7 +2,7 @@
 
 This project verifies registration and access boundaries, article creation and
 publication, and the complete article-image flow: upload in the editor,
-Markdown insertion and preview, public rendering, and PDF download.
+HTML insertion and preview, public rendering, and PDF download.
 
 It is included in `GaifulinLab.slnx` for discovery in Visual Studio Test
 Explorer. With the default URL, the fixture starts Web and API automatically.

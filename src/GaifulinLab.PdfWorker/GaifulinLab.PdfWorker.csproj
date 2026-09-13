@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\GaifulinLab.Web\wwwroot\css\articles.css" Link="pdf-assets\articles.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\GaifulinLab.Web\wwwroot\vendor\highlightjs\highlight.min.js" Link="pdf-assets\highlightjs\highlight.min.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

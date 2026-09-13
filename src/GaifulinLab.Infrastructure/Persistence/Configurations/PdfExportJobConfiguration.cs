@@ -23,7 +23,7 @@ internal sealed class PdfExportJobConfiguration : IEntityTypeConfiguration<PdfEx
         builder.Property(job => job.Slug).HasMaxLength(200).IsRequired();
         builder.Property(job => job.Title).HasMaxLength(300).IsRequired();
         builder.Property(job => job.Summary).HasMaxLength(1_000);
-        builder.Property(job => job.Markdown).HasColumnType("text").IsRequired();
+        builder.Property(job => job.Html).HasColumnType("text").IsRequired();
         builder.Property(job => job.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
         builder.Property(job => job.RelativePath).HasMaxLength(500);
         builder.Property(job => job.ErrorMessage).HasMaxLength(1_000);

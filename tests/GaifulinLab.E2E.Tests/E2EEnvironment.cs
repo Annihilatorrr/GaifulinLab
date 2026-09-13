@@ -132,7 +132,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
     public async Task<SeededArticle> SeedPublishedArticleAsync(
         string title,
         string slug,
-        string markdown,
+        string html,
         CancellationToken cancellationToken = default)
     {
         var article = new SeededArticle(Guid.NewGuid(), title, slug);
@@ -160,8 +160,8 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
         await using (var localizationCommand = new NpgsqlCommand(
             """
-            INSERT INTO article_localizations ("Id", "ArticleId", "LanguageCode", "Slug", "Title", "Summary", "Markdown", "Status", "PublishedAt", "UpdatedAt", "LastEditedAt")
-            VALUES (@localizationId, @articleId, 'en', @slug, @title, NULL, @markdown, 'Published', @publishedAt, @updatedAt, @lastEditedAt)
+            INSERT INTO article_localizations ("Id", "ArticleId", "LanguageCode", "Slug", "Title", "Summary", "Html", "Status", "PublishedAt", "UpdatedAt", "LastEditedAt")
+            VALUES (@localizationId, @articleId, 'en', @slug, @title, NULL, @html, 'Published', @publishedAt, @updatedAt, @lastEditedAt)
             """,
             connection,
             transaction))
@@ -170,7 +170,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
             localizationCommand.Parameters.AddWithValue("articleId", article.Id);
             localizationCommand.Parameters.AddWithValue("slug", article.Slug);
             localizationCommand.Parameters.AddWithValue("title", article.Title);
-            localizationCommand.Parameters.AddWithValue("markdown", markdown);
+            localizationCommand.Parameters.AddWithValue("html", html);
             localizationCommand.Parameters.AddWithValue("publishedAt", now);
             localizationCommand.Parameters.AddWithValue("updatedAt", now);
             localizationCommand.Parameters.AddWithValue("lastEditedAt", now);
@@ -212,7 +212,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
         Guid articleId,
         string languageCode,
         string title,
-        string markdown,
+        string html,
         CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
@@ -222,7 +222,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
             """
             UPDATE article_localizations
             SET "Title" = @title,
-                "Markdown" = @markdown,
+                "Html" = @html,
                 "UpdatedAt" = @updatedAt,
                 "LastEditedAt" = @lastEditedAt,
                 "Version" = "Version" + 1
@@ -231,7 +231,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
             """,
             connection);
         command.Parameters.AddWithValue("title", title);
-        command.Parameters.AddWithValue("markdown", markdown);
+        command.Parameters.AddWithValue("html", html);
         command.Parameters.AddWithValue("updatedAt", now);
         command.Parameters.AddWithValue("lastEditedAt", now);
         command.Parameters.AddWithValue("articleId", articleId);
@@ -362,7 +362,6 @@ public sealed class E2EEnvironment : IAsyncLifetime
             .Options;
         await using var dbContext = new AppDbContext(options);
         await dbContext.Database.MigrateAsync();
-        await dbContext.BackfillArticleSearchAsync();
     }
 
     private async Task SeedAdminAsync()

@@ -114,7 +114,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await OpenActionsAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Delete article" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToBeVisibleAsync();
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync(article.Markdown);
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync(article.Html);
 
         allowDelete = true;
         await OpenActionsAsync();
@@ -130,21 +130,21 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await AuthenticateAsync();
         await RouteEditorAsync(article);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync(article.Markdown);
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync(article.Html);
         await Page.GetByLabel("Article title").FillAsync("Updated title");
         await Page.Locator("textarea.summary-field").FillAsync("Updated summary");
-        await Page.GetByLabel("Article Markdown").FillAsync("Updated body");
+        await Page.GetByLabel("Article Html").FillAsync("Updated body");
         await Page.GetByPlaceholder("article-slug").FillAsync("updated-slug");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
         await Page.ReloadAsync();
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("Updated title");
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("Updated body");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Updated body");
         await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("updated-slug");
 
-        await Page.GetByLabel("Article Markdown").FillAsync("Autosaved final body");
+        await Page.GetByLabel("Article Html").FillAsync("Autosaved final body");
         await Page.WaitForTimeoutAsync(2200);
         await Page.ReloadAsync();
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("Autosaved final body");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Autosaved final body");
 
         var creates = 0;
         await Page.UnrouteAsync("**/api/admin/**");
@@ -153,12 +153,12 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             var path = new Uri(route.Request.Url).AbsolutePath.TrimEnd('/');
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
             if (path == "/api/admin/articles" && route.Request.Method == "POST") creates++;
-            if (path == "/api/admin/markdown/preview") { await JsonAsync(route, new { html = "" }); return; }
+            if (path == "/api/admin/html/preview") { await JsonAsync(route, new { html = "" }); return; }
             await JsonAsync(route, new { });
         });
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
         await Page.GetByLabel("Article title").FillAsync("Unsaved new article");
-        await Page.GetByLabel("Article Markdown").FillAsync("No automatic create");
+        await Page.GetByLabel("Article Html").FillAsync("No automatic create");
         await Page.WaitForTimeoutAsync(1600);
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles").ToString());
         Assert.Equal(0, creates);
@@ -174,15 +174,15 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             new Uri(route.Request.Url).AbsolutePath.Contains($"/api/admin/articles/{article.Id}/localizations/en", StringComparison.Ordinal)
             && route.Request.Method == "PUT" && failSave ? 500 : null);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
-        await Page.GetByLabel("Article Markdown").FillAsync("Draft retained after failure");
+        await Page.GetByLabel("Article Html").FillAsync("Draft retained after failure");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
         await Expect(Page.GetByText("Save failed", new() { Exact = true })).ToBeVisibleAsync();
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("Draft retained after failure");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Draft retained after failure");
 
         failSave = false;
         await Page.GetByRole(AriaRole.Button, new() { Name = "Retry" }).ClickAsync();
         await Page.ReloadAsync();
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("Draft retained after failure");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Draft retained after failure");
     }
 
     [Fact]
@@ -199,28 +199,320 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             if (route.Request.Method != "PUT") { await route.ContinueAsync(); return; }
             saves++;
             using var request = JsonDocument.Parse(route.Request.PostData!);
-            var markdown = request.RootElement.GetProperty("markdown").GetString()!;
+            var html = request.RootElement.GetProperty("html").GetString()!;
             if (saves == 1)
             {
                 firstSaveStarted.TrySetResult();
                 await releaseFirstSave.Task;
             }
-            article.Markdown = markdown;
+            article.Html = html;
             article.Version++;
             await JsonAsync(route, article.Version);
         });
 
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync(article.Markdown);
-        await Page.GetByLabel("Article Markdown").FillAsync("First revision");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync(article.Html);
+        await Page.GetByLabel("Article Html").FillAsync("First revision");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
         await firstSaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await Page.GetByLabel("Article Markdown").FillAsync("Latest revision");
+        await Page.GetByLabel("Article Html").FillAsync("Latest revision");
         releaseFirstSave.TrySetResult();
         await Page.WaitForTimeoutAsync(2200);
         await Page.ReloadAsync();
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("Latest revision");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Latest revision");
         Assert.True(saves >= 2);
+    }
+
+    [Fact]
+    public async Task AutosaveDuringAFailedCoverUpload_PreservesTheTextDraft()
+    {
+        Page.SetDefaultTimeout(5_000);
+        var article = MultiArticle.WithEnglishDraft();
+        var coverUploadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failCoverUpload = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await AuthenticateAsync();
+        await RouteMultiEditorAsync(Page, article);
+        await Page.RouteAsync("**/api/admin/media", async route =>
+        {
+            coverUploadStarted.TrySetResult();
+            await failCoverUpload.Task;
+            await ErrorAsync(route, 500, "upload_failed", "The cover could not be uploaded.");
+        });
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+        await Page.GetByText("+ Add cover", new() { Exact = true }).ClickAsync();
+        await Page.GetByLabel("Upload cover", new() { Exact = true }).SetInputFilesAsync(new FilePayload
+        {
+            Name = "cover.png",
+            MimeType = "image/png",
+            Buffer = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+        });
+        await coverUploadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Keep the upload busy past the autosave delay; a failed upload will not mark the draft dirty again.
+        var saveResponse = Page.WaitForResponseAsync(response =>
+            response.Request.Method == "PUT"
+            && new Uri(response.Url).AbsolutePath == $"/api/admin/articles/{article.Id}/localizations/en");
+        await Page.GetByLabel("Article Html").FillAsync("Text saved while cover upload is pending");
+        Assert.Equal(200, (await saveResponse).Status);
+        Assert.Equal("Text saved while cover upload is pending", article.Localizations["en"].Html);
+        failCoverUpload.TrySetResult();
+        await Expect(Page.Locator(".cover-setting [role=alert]")).ToHaveTextAsync("The cover could not be uploaded.");
+
+        // The text must survive reload without a manual save or a successful upload scheduling another save.
+        await Page.ReloadAsync();
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Text saved while cover upload is pending");
+    }
+
+    [Fact]
+    public async Task SwitchingLanguagesDuringAutosave_DoesNotApplyAStaleReloadOrShowAConflict()
+    {
+        Page.SetDefaultTimeout(5_000);
+        var article = MultiArticle.WithEnglishAndRussian();
+        var russianSaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRussianSave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reloadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseReload = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var articleGets = 0;
+        var saveRequests = new List<(string Language, long? ExpectedVersion)>();
+        var activeLocalizationSaves = 0;
+        var maximumActiveLocalizationSaves = 0;
+        var englishSaveCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await AuthenticateAsync();
+        await RouteMultiEditorAsync(Page, article);
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}", async route =>
+        {
+            if (route.Request.Method != "GET")
+            {
+                await route.ContinueAsync();
+                return;
+            }
+
+            articleGets++;
+            if (articleGets > 1)
+            {
+                reloadStarted.TrySetResult();
+                await releaseReload.Task;
+            }
+
+            await JsonAsync(route, MultiDetails(article));
+        });
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/*", async route =>
+        {
+            if (route.Request.Method != "PUT")
+            {
+                await route.ContinueAsync();
+                return;
+            }
+
+            activeLocalizationSaves++;
+            maximumActiveLocalizationSaves = Math.Max(maximumActiveLocalizationSaves, activeLocalizationSaves);
+            try
+            {
+                var language = new Uri(route.Request.Url).Segments[^1].TrimEnd('/');
+                using var request = JsonDocument.Parse(route.Request.PostData!);
+                var expectedVersion = request.RootElement.GetProperty("expectedVersion").GetInt64();
+                saveRequests.Add((language, expectedVersion));
+                var current = article.Localizations[language];
+                article.Localizations[language] = new MultiLocalization(
+                    current.Id,
+                    current.Version + 1,
+                    current.Language,
+                    request.RootElement.GetProperty("slug").GetString() ?? "",
+                    request.RootElement.GetProperty("title").GetString() ?? "",
+                    request.RootElement.GetProperty("summary").GetString() ?? "",
+                    request.RootElement.GetProperty("html").GetString() ?? "",
+                    current.Status);
+                if (language == "ru")
+                {
+                    russianSaveStarted.TrySetResult();
+                    await releaseRussianSave.Task;
+                }
+
+                await JsonAsync(route, article.Localizations[language].Version);
+                if (language == "en")
+                {
+                    englishSaveCompleted.TrySetResult();
+                }
+            }
+            finally
+            {
+                activeLocalizationSaves--;
+            }
+        });
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+        await Page.GetByLabel("Article language").SelectOptionAsync("ru");
+        await Page.GetByLabel("Article Html").FillAsync("Russian autosave snapshot");
+        await Page.GetByLabel("Article language").SelectOptionAsync("en");
+
+        await russianSaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        releaseRussianSave.TrySetResult();
+        await reloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // The GET started with the old English value; this edit must survive its late response.
+        await Page.GetByLabel("Article Html").FillAsync("English edit after reload began");
+        releaseReload.TrySetResult();
+
+        await englishSaveCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("English edit after reload began");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true })).ToBeEnabledAsync();
+
+        // Switching languages must neither overlap saves nor manufacture a version conflict.
+        await Expect(Page.Locator(".editor-conflict")).ToHaveCountAsync(0);
+        Assert.Equal(1, maximumActiveLocalizationSaves);
+        Assert.Equal([("ru", (long?)5), ("en", (long?)1)], saveRequests);
+
+        // Both language snapshots must reach persistence despite the late reload.
+        Assert.Equal(6, article.Localizations["ru"].Version);
+        Assert.Equal("Russian autosave snapshot", article.Localizations["ru"].Html);
+        Assert.Equal(2, article.Localizations["en"].Version);
+        Assert.Equal("English edit after reload began", article.Localizations["en"].Html);
+    }
+
+    [Fact]
+    public async Task SwitchingLanguagesDuringDelayedPreview_DoesNotCrashOrPublishAStalePreview()
+    {
+        Page.SetDefaultTimeout(5_000);
+        var article = MultiArticle.WithEnglishAndRussian();
+        var russianPreviewStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var currentEnglishPreviewStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCurrentEnglishPreview = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pageErrors = new List<string>();
+        Page.PageError += (_, error) => pageErrors.Add(error);
+        await AuthenticateAsync();
+        await RouteMultiEditorAsync(Page, article);
+        await Page.RouteAsync("**/api/admin/html/preview", async route =>
+        {
+            using var request = JsonDocument.Parse(route.Request.PostData!);
+            var html = request.RootElement.GetProperty("html").GetString();
+            if (html == "Russian preview")
+            {
+                russianPreviewStarted.TrySetResult();
+            }
+            else if (html == "Current English preview")
+            {
+                currentEnglishPreviewStarted.TrySetResult();
+                await releaseCurrentEnglishPreview.Task;
+            }
+
+            await JsonAsync(route, new { html = $"<p>{html}</p>" });
+        });
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+        var preview = Page.Locator("article.article-preview");
+        await Expect(preview).ToContainTextAsync("English Html");
+        await Page.EvaluateAsync("""
+            () => {
+              const originalClearMath = window.articleAssets.clearMath;
+              window.previewClearGate = { started: false, release: null };
+              window.articleAssets.clearMath = async root => {
+                if (!window.previewClearGate.started) {
+                  window.previewClearGate.started = true;
+                  await new Promise(resolve => window.previewClearGate.release = resolve);
+                }
+
+                return originalClearMath(root);
+              };
+            }
+            """);
+
+        await Page.GetByLabel("Article Html").FillAsync("Current English preview");
+        await Page.WaitForFunctionAsync("() => window.previewClearGate.started");
+
+        // The first English refresh is waiting in clearMath when the RU refresh cancels it.
+        // A final EN refresh must win after the stale continuation is released.
+        await Page.GetByLabel("Article language").SelectOptionAsync("ru");
+        await Page.GetByLabel("Article Html").FillAsync("Russian preview");
+        await russianPreviewStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Page.GetByLabel("Article language").SelectOptionAsync("en");
+        await currentEnglishPreviewStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await Page.EvaluateAsync("() => window.previewClearGate.release()");
+        releaseCurrentEnglishPreview.TrySetResult();
+
+        // The cancelled English continuation must not overwrite the latest preview.
+        await Expect(preview).ToHaveTextAsync("Current English preview");
+
+        // Cancellation during JavaScript interop must leave the renderer usable.
+        await Expect(Page.Locator(".preview-error")).ToHaveCountAsync(0);
+        await Expect(Page.Locator("#blazor-error-ui")).ToBeHiddenAsync();
+        Assert.Empty(pageErrors);
+    }
+
+    [Fact]
+    public async Task SwitchingToAMissingLanguageDuringDelayedSave_QueuesTheNewLocalization()
+    {
+        Page.SetDefaultTimeout(5_000);
+        var article = MultiArticle.WithEnglishDraft();
+        var englishSaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseEnglishSave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await AuthenticateAsync();
+        await RouteMultiEditorAsync(Page, article);
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/en", async route =>
+        {
+            if (route.Request.Method != "PUT")
+            {
+                await route.ContinueAsync();
+                return;
+            }
+
+            englishSaveStarted.TrySetResult();
+            await releaseEnglishSave.Task;
+            await route.FallbackAsync();
+        });
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+        await Page.GetByLabel("Article Html").FillAsync("English snapshot");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
+        await englishSaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Programmatic change exercises the component path even though the busy UI disables the selector.
+        await Page.GetByLabel("Article language").EvaluateAsync("select => { select.value = 'ru'; select.dispatchEvent(new Event('change', { bubbles: true })); }");
+        await Page.GetByLabel("Article Html").FillAsync("New Russian draft");
+        var russianSaveResponse = Page.WaitForResponseAsync(response =>
+            response.Request.Method == "PUT"
+            && new Uri(response.Url).AbsolutePath == $"/api/admin/articles/{article.Id}/localizations/ru");
+        releaseEnglishSave.TrySetResult();
+
+        // Background autosave does not itself render the status; use its response as the persistence signal.
+        Assert.Equal(200, (await russianSaveResponse).Status);
+        // The pending autosave must preserve both drafts after a language event adds a localization.
+        await Expect(Page.Locator(".editor-conflict")).ToHaveCountAsync(0);
+        Assert.Equal(2, article.Localizations["en"].Version);
+        Assert.Equal(1, article.Localizations["ru"].Version);
+        Assert.Equal("English snapshot", article.Localizations["en"].Html);
+        Assert.Equal("New Russian draft", article.Localizations["ru"].Html);
+
+        // Reload without another manual save to prove both snapshots were already persisted.
+        await Page.ReloadAsync();
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("English snapshot");
+        await Page.GetByLabel("Article language").SelectOptionAsync("ru");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("New Russian draft");
+    }
+
+    [Fact]
+    public async Task SwitchingToAnEmptyTranslationAndBack_DoesNotReuseADisposedPreviewCancellation()
+    {
+        var article = MultiArticle.WithEnglishDraft();
+        var pageErrors = new List<string>();
+        Page.PageError += (_, error) => pageErrors.Add(error);
+        await AuthenticateAsync();
+        await RouteMultiEditorAsync(Page, article);
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+        var preview = Page.Locator("article.article-preview");
+        await Expect(preview).ToContainTextAsync("English body");
+
+        // The empty translation takes the early-return path that used to leave a disposed source behind.
+        await Page.GetByLabel("Article language").SelectOptionAsync("ru");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("");
+        await Expect(preview).ToHaveCountAsync(0);
+        await Page.GetByLabel("Article language").SelectOptionAsync("en");
+
+        // Returning to a populated localization must restore preview without crashing Blazor.
+        await Expect(preview).ToContainTextAsync("English body");
+        await Expect(Page.Locator("#blazor-error-ui")).ToBeHiddenAsync();
+        Assert.Empty(pageErrors);
     }
 
     [Fact]
@@ -235,7 +527,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview") { await JsonAsync(route, new { html = "<p>Preview</p>" }); return; }
+            if (path == "/api/admin/html/preview") { await JsonAsync(route, new { html = "<p>Preview</p>" }); return; }
             if (path == "/api/admin/articles" && route.Request.Method == "POST")
             {
                 createRequests++;
@@ -267,7 +559,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
         await Page.GetByLabel("Article title").FillAsync("One article, two save attempts");
-        await Page.GetByLabel("Article Markdown").FillAsync("Body retained across the retry");
+        await Page.GetByLabel("Article Html").FillAsync("Body retained across the retry");
         await Page.GetByPlaceholder("Separate tags with commas").FillAsync("part-one");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
 
@@ -279,7 +571,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         Assert.Equal(1, createRequests);
         Assert.Equal(2, taxonomyRequests);
         Assert.True(taxonomySaved);
-        Assert.Equal("Body retained across the retry", article.Markdown);
+        Assert.Equal("Body retained across the retry", article.Html);
         await Expect(Page.GetByPlaceholder("Separate tags with commas")).ToHaveValueAsync("part-one");
     }
 
@@ -294,10 +586,10 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview")
+            if (path == "/api/admin/html/preview")
             {
                 using var preview = JsonDocument.Parse(route.Request.PostData!);
-                await JsonAsync(route, new { html = $"<p>{preview.RootElement.GetProperty("markdown").GetString()}</p>" });
+                await JsonAsync(route, new { html = $"<p>{preview.RootElement.GetProperty("html").GetString()}</p>" });
                 return;
             }
             if (path == "/api/admin/articles" && route.Request.Method == "POST")
@@ -332,7 +624,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
         await Page.GetByLabel("Article title").FillAsync("Publish without save");
         await Page.Locator("textarea.summary-field").FillAsync("The newest summary");
-        await Page.GetByLabel("Article Markdown").FillAsync("The newest body");
+        await Page.GetByLabel("Article Html").FillAsync("The newest body");
         await Page.GetByPlaceholder("article-slug").FillAsync("publish-without-save");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Publish", Exact = true }).ClickAsync();
 
@@ -340,7 +632,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex($"/admin/articles/{article.Id}$"));
         Assert.Equal(1, createRequests);
         Assert.Equal(1, publishRequests);
-        Assert.Equal("The newest body", article.Markdown);
+        Assert.Equal("The newest body", article.Html);
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/en/articles/publish-without-save").ToString());
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Publish without save" })).ToBeVisibleAsync();
@@ -358,7 +650,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview") { await JsonAsync(route, new { html = "<p>Preview</p>" }); return; }
+            if (path == "/api/admin/html/preview") { await JsonAsync(route, new { html = "<p>Preview</p>" }); return; }
             if (path == $"/api/admin/articles/{article.Id}" && route.Request.Method == "GET") { await JsonAsync(route, Details(article)); return; }
             if (path == $"/api/admin/articles/{article.Id}/localizations/en/publish" && route.Request.Method == "POST")
             {
@@ -408,8 +700,8 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await RouteNewEditorAsync();
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
 
-        await Page.GetByLabel("Article title").FillAsync("Test Markdown → PDF");
-        await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("test-markdown-pdf");
+        await Page.GetByLabel("Article title").FillAsync("Test Html → PDF");
+        await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("test-html-pdf");
         await Page.GetByLabel("Article title").FillAsync("Café déjà vu");
         await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("cafe-deja-vu");
 
@@ -458,13 +750,13 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
 
         await Page.GetByLabel("Article title").FillAsync("Saved in the first tab");
         await Page.Locator("textarea.summary-field").FillAsync("Server summary");
-        await Page.GetByLabel("Article Markdown").FillAsync("Server body");
+        await Page.GetByLabel("Article Html").FillAsync("Server body");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
         await firstSaveCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         await otherPage.GetByLabel("Article title").FillAsync("Stale local title");
         await otherPage.Locator("textarea.summary-field").FillAsync("Stale local summary");
-        await otherPage.GetByLabel("Article Markdown").FillAsync("Stale local body");
+        await otherPage.GetByLabel("Article Html").FillAsync("Stale local body");
         await otherPage.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
         var conflict = otherPage.Locator(".editor-conflict");
         await Expect(conflict).ToBeVisibleAsync();
@@ -474,7 +766,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Expect(conflict).ToBeHiddenAsync();
         await Expect(otherPage.GetByLabel("Article title")).ToHaveValueAsync("Saved in the first tab");
         await Expect(otherPage.Locator("textarea.summary-field")).ToHaveValueAsync("Server summary");
-        await Expect(otherPage.GetByLabel("Article Markdown")).ToHaveValueAsync("Server body");
+        await Expect(otherPage.GetByLabel("Article Html")).ToHaveValueAsync("Server body");
         await Expect(otherPage.Locator(".article-preview")).ToContainTextAsync("Server body");
 
         await otherPage.CloseAsync();
@@ -494,17 +786,17 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             Version = 2,
             Title = "Server title",
             Summary = "Server summary",
-            Markdown = "Server Markdown"
+            Html = "Server Html"
         };
         article.Localizations["ru"] = article.Localizations["ru"] with
         {
             Version = 6,
             Title = "Русский серверный апдейт",
-            Markdown = "Обновлено независимо"
+            Html = "Обновлено независимо"
         };
         await Page.GetByLabel("Article title").FillAsync("My complete draft");
         await Page.Locator("textarea.summary-field").FillAsync("My draft summary");
-        await Page.GetByLabel("Article Markdown").FillAsync("My draft Markdown");
+        await Page.GetByLabel("Article Html").FillAsync("My draft Html");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
 
         var conflict = Page.Locator(".editor-conflict");
@@ -514,11 +806,11 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Page.ReloadAsync();
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("My complete draft");
         await Expect(Page.Locator("textarea.summary-field")).ToHaveValueAsync("My draft summary");
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("My draft Markdown");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("My draft Html");
 
         await Page.GetByLabel("Article language").SelectOptionAsync("ru");
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("Русский серверный апдейт");
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("Обновлено независимо");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Обновлено независимо");
     }
 
     [Fact]
@@ -528,7 +820,8 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await AuthenticateAsync();
         await RouteMultiEditorAsync(Page, article);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true })).ToBeDisabledAsync();
+        // A disabled Save also appears during loading; wait until this editor has captured version one.
+        await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("English original");
 
         article.Localizations["en"] = article.Localizations["en"] with { Version = 2, Title = "Server version two" };
         await Page.GetByLabel("Article title").FillAsync("My stale draft");
@@ -552,17 +845,17 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await AuthenticateAsync();
         await RouteMultiEditorAsync(Page, article);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("English Markdown");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("English Html");
 
         article.Localizations["en"] = article.Localizations["en"] with { Version = 2, Title = "Latest server title" };
         article.FailConflictLoad = true;
         await Page.GetByLabel("Article title").FillAsync("Local text must survive");
-        await Page.GetByLabel("Article Markdown").FillAsync("Local Markdown must survive");
+        await Page.GetByLabel("Article Html").FillAsync("Local Html must survive");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
 
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("latest version could not be loaded");
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("Local text must survive");
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("Local Markdown must survive");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Local Html must survive");
         await Expect(Page.Locator(".editor-conflict")).ToHaveCountAsync(0);
 
         article.FailConflictLoad = false;
@@ -584,7 +877,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Page.GetByLabel("Article language").SelectOptionAsync("ru");
         await Page.GetByLabel("Article title").FillAsync("Русская статья");
         await Page.Locator("textarea.summary-field").FillAsync("Русское описание");
-        await Page.GetByLabel("Article Markdown").FillAsync("Последний русский текст");
+        await Page.GetByLabel("Article Html").FillAsync("Последний русский текст");
         await Page.GetByPlaceholder("article-slug").FillAsync("russkaya-statya");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Publish", Exact = true }).ClickAsync();
 
@@ -592,7 +885,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Expect(Page.Locator(".publication-status")).ToHaveTextAsync("Published");
         var russian = Assert.Single(article.Localizations);
         Assert.Equal("ru", russian.Key);
-        Assert.Equal("Последний русский текст", russian.Value.Markdown);
+        Assert.Equal("Последний русский текст", russian.Value.Html);
         Assert.Equal(1, russian.Value.Status);
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/ru/articles/russkaya-statya").ToString());
@@ -611,16 +904,16 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
 
         await Page.GetByLabel("Article title").FillAsync("English edited");
         await Page.Locator("textarea.summary-field").FillAsync("English edited summary");
-        await Page.GetByLabel("Article Markdown").FillAsync("English edited body");
+        await Page.GetByLabel("Article Html").FillAsync("English edited body");
         await Page.GetByLabel("Article language").SelectOptionAsync("ru");
         await Page.GetByLabel("Article title").FillAsync("Русский перевод");
         await Page.Locator("textarea.summary-field").FillAsync("Русское описание");
-        await Page.GetByLabel("Article Markdown").FillAsync("Русский текст");
+        await Page.GetByLabel("Article Html").FillAsync("Русский текст");
         await Page.GetByPlaceholder("article-slug").FillAsync("russkiy-perevod");
         await Page.GetByLabel("Article language").SelectOptionAsync("en");
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("English edited");
         await Page.GetByLabel("Article language").SelectOptionAsync("ru");
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("Русский текст");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Русский текст");
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true })).ToBeDisabledAsync();
@@ -628,7 +921,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("English edited");
         await Page.GetByLabel("Article language").SelectOptionAsync("ru");
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("Русский перевод");
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("Русский текст");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Русский текст");
 
         await Page.GetByLabel("Article language").SelectOptionAsync("en");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Publish", Exact = true }).ClickAsync();
@@ -664,7 +957,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await AuthenticateAsync();
         await RouteMultiEditorAsync(Page, article);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync("English body");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("English body");
 
         await Page.GetByText("+ Add topic", new() { Exact = true }).ClickAsync();
         await Page.GetByLabel("Engineering", new() { Exact = true }).CheckAsync();
@@ -766,7 +1059,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Page.Locator(".preview-settings input[type=range]").Nth(1).EvaluateAsync("input => { input.value = '1.1'; input.dispatchEvent(new Event('input', { bubbles: true })); }");
 
         // A changed editor must be explicitly saved before its current snapshot can be exported.
-        await Page.GetByLabel("Article Markdown").FillAsync("Saved before export");
+        await Page.GetByLabel("Article Html").FillAsync("Saved before export");
         await Expect(exportButton).ToBeDisabledAsync();
         await exportButton.EvaluateAsync("button => button.click()");
         Assert.Equal(0, exportRequests);
@@ -863,7 +1156,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await exportButton.ClickAsync();
         await exportStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        await Page.GetByLabel("Article Markdown").FillAsync("Autosaved after export");
+        await Page.GetByLabel("Article Html").FillAsync("Autosaved after export");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Preparing PDF…", Exact = true })).ToBeDisabledAsync();
 
         var downloadTask = Page.WaitForDownloadAsync();
@@ -890,7 +1183,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
         await Page.GetByLabel("Article title").FillAsync("Save before exporting");
-        await Page.GetByLabel("Article Markdown").FillAsync("A draft needs its initial save.");
+        await Page.GetByLabel("Article Html").FillAsync("A draft needs its initial save.");
         var exportButton = Page.GetByRole(AriaRole.Button, new() { Name = "Export PDF", Exact = true });
 
         await Expect(exportButton).ToBeDisabledAsync();
@@ -932,7 +1225,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview") { await JsonAsync(route, new { html = "<p>Preview</p>" }); return; }
+            if (path == "/api/admin/html/preview") { await JsonAsync(route, new { html = "<p>Preview</p>" }); return; }
             await JsonAsync(route, new { });
         });
     }
@@ -946,11 +1239,11 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview")
+            if (path == "/api/admin/html/preview")
             {
                 using var request = JsonDocument.Parse(route.Request.PostData!);
-                var markdown = request.RootElement.GetProperty("markdown").GetString();
-                await JsonAsync(route, new { html = $"<p>{markdown}</p>" });
+                var html = request.RootElement.GetProperty("html").GetString();
+                await JsonAsync(route, new { html = $"<p>{html}</p>" });
                 return;
             }
             if (path == $"/api/admin/articles/{article.Id}" && route.Request.Method == "GET") { await JsonAsync(route, Details(article)); return; }
@@ -980,10 +1273,10 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         {
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, MultiTaxonomy(article)); return; }
-            if (path == "/api/admin/markdown/preview")
+            if (path == "/api/admin/html/preview")
             {
                 using var preview = JsonDocument.Parse(route.Request.PostData!);
-                await JsonAsync(route, new { html = $"<p>{preview.RootElement.GetProperty("markdown").GetString()}</p>" });
+                await JsonAsync(route, new { html = $"<p>{preview.RootElement.GetProperty("html").GetString()}</p>" });
                 return;
             }
             if (path == "/api/admin/articles" && route.Request.Method == "POST")
@@ -997,7 +1290,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
                     request.RootElement.GetProperty("slug").GetString() ?? "",
                     request.RootElement.GetProperty("title").GetString() ?? "",
                     request.RootElement.GetProperty("summary").GetString() ?? "",
-                    request.RootElement.GetProperty("markdown").GetString() ?? "",
+                    request.RootElement.GetProperty("html").GetString() ?? "",
                     0);
                 article.Localizations[language] = localization;
                 await JsonAsync(route, new { articleId = article.Id, localizationId = localization.Id, localizationVersion = localization.Version }, 201);
@@ -1067,7 +1360,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
                     request.RootElement.GetProperty("slug").GetString() ?? "",
                     request.RootElement.GetProperty("title").GetString() ?? "",
                     request.RootElement.GetProperty("summary").GetString() ?? "",
-                    request.RootElement.GetProperty("markdown").GetString() ?? "",
+                    request.RootElement.GetProperty("html").GetString() ?? "",
                     hasCurrent ? current!.Status : 0);
                 article.ConflictReturned = false;
                 await JsonAsync(route, nextVersion);
@@ -1108,7 +1401,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
                 slug = localization.Slug,
                 title = localization.Title,
                 summary = localization.Summary,
-                html = $"<p>{localization.Markdown}</p>",
+                html = $"<p>{localization.Html}</p>",
                 publishedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
                 updatedAt = DateTimeOffset.UtcNow,
                 lastEditedAt = DateTimeOffset.UtcNow,
@@ -1130,7 +1423,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             if (status is not null) { await route.FulfillAsync(new() { Status = status.Value }); return; }
             var path = new Uri(route.Request.Url).AbsolutePath;
             if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/markdown/preview") { await JsonAsync(route, new { html = "<p>Preview</p>" }); return; }
+            if (path == "/api/admin/html/preview") { await JsonAsync(route, new { html = "<p>Preview</p>" }); return; }
             if (path == $"/api/admin/articles/{article.Id}" && route.Request.Method == "GET") { await JsonAsync(route, Details(article)); return; }
             if (path.Contains($"/api/admin/articles/{article.Id}/localizations/en", StringComparison.Ordinal) && route.Request.Method == "PUT")
             {
@@ -1155,8 +1448,8 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     }
     private static object EmptyTaxonomy() => new { topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>() };
     private static object ListItem(Guid id, string title, int status) => new { id, createdAt = DateTimeOffset.UtcNow.AddDays(-1), updatedAt = DateTimeOffset.UtcNow, localizations = new[] { new { id = Guid.NewGuid(), languageCode = "en", slug = title.ToLowerInvariant().Replace(' ', '-'), title, status, publishedAt = (DateTimeOffset?)null, updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow } } };
-    private static object Details(MockArticle article) => new { id = article.Id, createdAt = DateTimeOffset.UtcNow.AddDays(-1), updatedAt = DateTimeOffset.UtcNow, localizations = new[] { new { id = article.LocalizationId, version = article.Version, languageCode = "en", slug = article.Slug, title = article.Title, summary = article.Summary, markdown = article.Markdown, status = article.Status, publishedAt = article.Status == 1 ? (DateTimeOffset?)DateTimeOffset.UtcNow.AddDays(-1) : null, updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow } }, topicIds = Array.Empty<Guid>(), series = Array.Empty<object>(), tags = article.Tags };
-    private static object PublicDetails(MockArticle article) => new { languageCode = "en", slug = article.Slug, title = article.Title, summary = article.Summary, html = $"<p>{article.Markdown}</p>", publishedAt = DateTimeOffset.UtcNow.AddMinutes(-1), updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow, authorDisplayName = "Test Author", availableLocalizations = new[] { new { languageCode = "en", url = $"/en/articles/{article.Slug}" } }, topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L };
+    private static object Details(MockArticle article) => new { id = article.Id, createdAt = DateTimeOffset.UtcNow.AddDays(-1), updatedAt = DateTimeOffset.UtcNow, localizations = new[] { new { id = article.LocalizationId, version = article.Version, languageCode = "en", slug = article.Slug, title = article.Title, summary = article.Summary, html = article.Html, status = article.Status, publishedAt = article.Status == 1 ? (DateTimeOffset?)DateTimeOffset.UtcNow.AddDays(-1) : null, updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow } }, topicIds = Array.Empty<Guid>(), series = Array.Empty<object>(), tags = article.Tags };
+    private static object PublicDetails(MockArticle article) => new { languageCode = "en", slug = article.Slug, title = article.Title, summary = article.Summary, html = $"<p>{article.Html}</p>", publishedAt = DateTimeOffset.UtcNow.AddMinutes(-1), updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow, authorDisplayName = "Test Author", availableLocalizations = new[] { new { languageCode = "en", url = $"/en/articles/{article.Slug}" } }, topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L };
     private static object MultiDetails(MultiArticle article) => new
     {
         id = article.Id,
@@ -1170,7 +1463,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             slug = localization.Slug,
             title = localization.Title,
             summary = localization.Summary,
-            markdown = localization.Markdown,
+            html = localization.Html,
             status = localization.Status,
             publishedAt = localization.Status == 1 ? (DateTimeOffset?)DateTimeOffset.UtcNow.AddMinutes(-1) : null,
             updatedAt = DateTimeOffset.UtcNow,
@@ -1212,10 +1505,10 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     {
         article.Title = request.GetProperty("title").GetString() ?? "";
         article.Summary = request.GetProperty("summary").GetString() ?? "";
-        article.Markdown = request.GetProperty("markdown").GetString() ?? "";
+        article.Html = request.GetProperty("html").GetString() ?? "";
         article.Slug = request.GetProperty("slug").GetString() ?? "";
     }
-    private sealed class MockArticle { public Guid Id { get; } = Guid.NewGuid(); public Guid LocalizationId { get; } = Guid.NewGuid(); public long Version { get; set; } = 1; public string Title { get; set; } = "Original title"; public string Summary { get; set; } = "Original summary"; public string Markdown { get; set; } = "Original body"; public string Slug { get; set; } = "original-slug"; public string[] Tags { get; set; } = []; public int Status { get; set; } }
+    private sealed class MockArticle { public Guid Id { get; } = Guid.NewGuid(); public Guid LocalizationId { get; } = Guid.NewGuid(); public long Version { get; set; } = 1; public string Title { get; set; } = "Original title"; public string Summary { get; set; } = "Original summary"; public string Html { get; set; } = "Original body"; public string Slug { get; set; } = "original-slug"; public string[] Tags { get; set; } = []; public int Status { get; set; } }
     private sealed class MultiArticle
     {
         public Guid Id { get; } = Guid.NewGuid();
@@ -1231,7 +1524,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         public static MultiArticle WithEnglishAndRussian()
         {
             var article = new MultiArticle();
-            article.Localizations["en"] = new(Guid.NewGuid(), 1, "en", "english-original", "English original", "English summary", "English Markdown", 0);
+            article.Localizations["en"] = new(Guid.NewGuid(), 1, "en", "english-original", "English original", "English summary", "English Html", 0);
             article.Localizations["ru"] = new(Guid.NewGuid(), 5, "ru", "russkiy-original", "Русский без изменений", "Русское описание", "Русский текст без изменений", 0);
             return article;
         }
@@ -1243,7 +1536,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             return article;
         }
     }
-    private sealed record MultiLocalization(Guid Id, long Version, string Language, string Slug, string Title, string Summary, string Markdown, int Status);
+    private sealed record MultiLocalization(Guid Id, long Version, string Language, string Slug, string Title, string Summary, string Html, int Status);
     private sealed record TaxonomyItem(Guid Id, string Name);
     private sealed record TestTaxonomy(TaxonomyItem[] Topics, TaxonomyItem[] Series)
     {

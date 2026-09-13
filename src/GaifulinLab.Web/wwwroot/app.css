@@ -1,5 +1,6 @@
 @import url("css/tokens.css");
 @import url("css/base.css");
+@import url("css/articles.css");
 
 @page {
     size: A4;

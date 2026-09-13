@@ -49,11 +49,11 @@ public sealed class Article
         DateTimeOffset createdAt,
         string? title = null,
         string? summary = null,
-        string? markdown = null,
+        string? html = null,
         string? slug = null)
     {
         var article = new Article(ownerUserId, createdAt);
-        article.AddLocalization(languageCode, createdAt, title, summary, markdown, slug);
+        article.AddLocalization(languageCode, createdAt, title, summary, html, slug);
         return article;
     }
 
@@ -62,7 +62,7 @@ public sealed class Article
         DateTimeOffset createdAt,
         string? title = null,
         string? summary = null,
-        string? markdown = null,
+        string? html = null,
         string? slug = null)
     {
         EnsureNotDeleted();
@@ -77,7 +77,7 @@ public sealed class Article
             normalizedLanguageCode,
             title,
             summary,
-            markdown,
+            html,
             slug,
             createdAt);
 
@@ -96,13 +96,13 @@ public sealed class Article
         string languageCode,
         string? title,
         string? summary,
-        string? markdown,
+        string? html,
         string? slug,
         DateTimeOffset updatedAt)
     {
         EnsureNotDeleted();
         var localization = GetRequiredLocalization(languageCode);
-        localization.UpdateContent(title, summary, markdown, slug, updatedAt);
+        localization.UpdateContent(title, summary, html, slug, updatedAt);
         Touch(updatedAt);
     }
 

@@ -122,14 +122,6 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await db.SaveChangesAsync();
         Assert.Empty((await search.SearchAsync(Request("quasar"), default)).Items);
 
-        // Backfill uses the same Markdown extraction, preserves edit versions and is repeatable.
-        var id = bodyMatch.Localizations.Single().Id;
-        var version = bodyMatch.Localizations.Single().Version;
-        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE article_localizations SET \"SearchText\" = NULL WHERE \"Id\" = {id}");
-        await db.BackfillArticleSearchAsync(); await db.BackfillArticleSearchAsync();
-        var filled = await db.ArticleLocalizations.AsNoTracking().SingleAsync(x => x.Id == id);
-        Assert.Contains("pulsar", filled.SearchText); Assert.Equal(version, filled.Version);
-
         // Representative local timing, not a machine-independent latency assertion.
         for (var i = 0; i < 1000; i++) Make("Load sample " + i, string.Join(' ', Enumerable.Repeat("signal processing experiment", 100)));
         await db.SaveChangesAsync();
@@ -311,7 +303,7 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/admin/articles$"));
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
         await Page.GetByLabel("Article title").FillAsync(token);
-        await Page.GetByLabel("Article Markdown").FillAsync(string.Join(' ', Enumerable.Repeat("A useful paragraph about search.", 50)));
+        await Page.GetByLabel("Article Html").FillAsync(string.Join(' ', Enumerable.Repeat("A useful paragraph about search.", 50)));
         await Page.GetByText("+ Add cover", new() { Exact = true }).ClickAsync();
         await Page.GetByLabel("Upload cover", new() { Exact = true }).SetInputFilesAsync(new FilePayload
         {

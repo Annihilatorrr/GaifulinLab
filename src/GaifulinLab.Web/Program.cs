@@ -41,7 +41,7 @@ builder.Services.AddScoped<AdminAuthClient>();
 builder.Services.AddScoped<RegistrationClient>();
 builder.Services.AddScoped<ProfileClient>();
 builder.Services.AddScoped<AdminArticlesClient>();
-builder.Services.AddScoped<AdminMarkdownClient>();
+builder.Services.AddScoped<AdminHtmlClient>();
 builder.Services.AddScoped<AdminMediaClient>();
 builder.Services.AddScoped(serviceProvider => new PublicContentClient(
     serviceProvider.GetRequiredService<HttpClient>()));

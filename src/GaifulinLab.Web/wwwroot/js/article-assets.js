@@ -6,6 +6,14 @@
         root.querySelectorAll('img[src^="/media/"]').forEach((image) => {
             image.src = new URL(image.getAttribute("src"), apiBaseUrl).toString();
         });
+
+        root.querySelectorAll("pre code[class*='language-']").forEach((code) => {
+            try {
+                window.hljs?.highlightElement(code);
+            } catch {
+                // A typo in a language class must leave the original code readable.
+            }
+        });
     };
 
     const download = (content, fileName) => {

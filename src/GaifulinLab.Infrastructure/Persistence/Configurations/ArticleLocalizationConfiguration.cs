@@ -22,7 +22,7 @@ internal sealed class ArticleLocalizationConfiguration : IEntityTypeConfiguratio
                 "\"Status\" IN ('Draft', 'Published', 'Unpublished', 'Deleted')");
             tableBuilder.HasCheckConstraint(
                 "ck_article_localizations_published_content",
-                "\"Status\" <> 'Published' OR (\"PublishedAt\" IS NOT NULL AND \"Slug\" IS NOT NULL AND length(btrim(\"Title\")) > 0 AND length(btrim(\"Markdown\")) > 0)");
+                "\"Status\" <> 'Published' OR (\"PublishedAt\" IS NOT NULL AND \"Slug\" IS NOT NULL AND length(btrim(\"Title\")) > 0 AND length(btrim(\"Html\")) > 0)");
         });
 
         builder.HasKey(localization => localization.Id);
@@ -45,7 +45,7 @@ internal sealed class ArticleLocalizationConfiguration : IEntityTypeConfiguratio
             .IsRequired();
         builder.Property(localization => localization.Summary)
             .HasMaxLength(ContentLimits.ArticleSummary);
-        builder.Property(localization => localization.Markdown)
+        builder.Property(localization => localization.Html)
             .HasColumnType("text")
             .IsRequired();
         builder.Property(localization => localization.Status)

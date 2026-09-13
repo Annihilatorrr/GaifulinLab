@@ -12,7 +12,7 @@ namespace GaifulinLab.Application.Articles.Public.GetPublicArticle;
 
 internal sealed class GetPublicArticleQueryHandler(
     IAppDbContext dbContext,
-    IMarkdownRenderer markdownRenderer,
+    IArticleHtmlSanitizer htmlSanitizer,
     IAuthorDisplayNameLookup authorDisplayNameLookup) : IRequestHandler<GetPublicArticleQuery, PublicArticleDetailsDto>
 {
     public async Task<PublicArticleDetailsDto> Handle(
@@ -49,7 +49,7 @@ internal sealed class GetPublicArticleQueryHandler(
             localization.Slug!,
             localization.Title,
             localization.Summary,
-            markdownRenderer.Render(localization.Markdown),
+            htmlSanitizer.Sanitize(localization.Html),
             localization.PublishedAt!.Value,
             localization.UpdatedAt,
             localization.LastEditedAt,

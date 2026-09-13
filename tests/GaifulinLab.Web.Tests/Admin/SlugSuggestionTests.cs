@@ -8,7 +8,7 @@ public sealed class SlugSuggestionTests
     [InlineData(null, "")]
     [InlineData("", "")]
     [InlineData("   ", "")]
-    [InlineData("Test Markdown → PDF", "test-markdown-pdf")]
+    [InlineData("Test Html → PDF", "test-html-pdf")]
     [InlineData("Почему дисперсию делят на n-1", "pochemu-dispersiyu-delyat-na-n-1")]
     [InlineData("Ёжик, чай и щука", "yozhik-chay-i-shchuka")]
     [InlineData("Мягкий знак и подъезд", "myagkiy-znak-i-podezd")]

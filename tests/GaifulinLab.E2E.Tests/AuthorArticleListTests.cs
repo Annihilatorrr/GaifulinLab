@@ -15,7 +15,7 @@ public sealed class AuthorArticleListTests(E2EEnvironment environment) : PageTes
         var localizationId = Guid.NewGuid();
         var stored = false;
         const string title = "First saved draft";
-        const string markdown = "The draft body is saved.";
+        const string html = "The draft body is saved.";
         await AuthenticateAsAuthorAsync();
         await Page.RouteAsync("**/api/admin/**", async route =>
         {
@@ -23,12 +23,12 @@ public sealed class AuthorArticleListTests(E2EEnvironment environment) : PageTes
             object body = path switch
             {
                 "/api/admin/taxonomy" => new { topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>() },
-                "/api/admin/markdown/preview" => new { html = "<p>Preview</p>" },
+                "/api/admin/html/preview" => new { html = "<p>Preview</p>" },
                 "/api/admin/articles" when route.Request.Method == "GET" => stored
                     ? new[] { ListItem(articleId, title, "en", 0, DateTimeOffset.UtcNow) }
                     : Array.Empty<object>(),
                 "/api/admin/articles" when route.Request.Method == "POST" => new { articleId, localizationId, localizationVersion = 0L },
-                _ when path == $"/api/admin/articles/{articleId}" => ArticleDetails(articleId, localizationId, title, markdown),
+                _ when path == $"/api/admin/articles/{articleId}" => ArticleDetails(articleId, localizationId, title, html),
                 _ => new { }
             };
             if (path == "/api/admin/articles" && route.Request.Method == "POST") stored = true;
@@ -39,16 +39,16 @@ public sealed class AuthorArticleListTests(E2EEnvironment environment) : PageTes
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "No articles yet" })).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Link, new() { Name = "Create first article" }).ClickAsync();
         await Page.GetByLabel("Article title").FillAsync(title);
-        await Page.GetByLabel("Article Markdown").FillAsync(markdown);
+        await Page.GetByLabel("Article Html").FillAsync(html);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex($"/admin/articles/{articleId}$"));
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync(title);
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync(markdown);
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync(html);
 
         await Page.GetByRole(AriaRole.Link, new() { Name = "Back to articles" }).ClickAsync();
         await Expect(Page.GetByText(title, new() { Exact = true })).ToBeVisibleAsync();
         await Page.GetByText(title, new() { Exact = true }).ClickAsync();
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync(markdown);
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync(html);
     }
 
     [Fact]
@@ -114,12 +114,12 @@ public sealed class AuthorArticleListTests(E2EEnvironment environment) : PageTes
         }
     };
 
-    private static object ArticleDetails(Guid articleId, Guid localizationId, string title, string markdown) => new
+    private static object ArticleDetails(Guid articleId, Guid localizationId, string title, string html) => new
     {
         id = articleId, createdAt = DateTimeOffset.UtcNow.AddHours(-1), updatedAt = DateTimeOffset.UtcNow,
         localizations = new[]
         {
-            new { id = localizationId, version = 0L, languageCode = "en", slug = "first-saved-draft", title, summary = (string?)null, markdown, status = 0, publishedAt = (DateTimeOffset?)null, updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow, coverMediaAssetId = (Guid?)null }
+            new { id = localizationId, version = 0L, languageCode = "en", slug = "first-saved-draft", title, summary = (string?)null, html, status = 0, publishedAt = (DateTimeOffset?)null, updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow, coverMediaAssetId = (Guid?)null }
         },
         topicIds = Array.Empty<Guid>(), series = Array.Empty<object>(), tags = Array.Empty<string>()
     };

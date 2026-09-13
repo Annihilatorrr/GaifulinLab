@@ -41,7 +41,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
                 request.LanguageCode,
                 request.Title,
                 request.Summary,
-                request.Markdown,
+                request.Html,
                 request.Slug,
                 request.CoverMediaAssetId),
             cancellationToken);
@@ -75,7 +75,7 @@ public sealed class AdminArticlesController(ISender sender) : ControllerBase
                 languageCode,
                 request.Title,
                 request.Summary,
-                request.Markdown,
+                request.Html,
                 request.Slug,
                 request.ExpectedVersion,
                 request.CoverMediaAssetId),

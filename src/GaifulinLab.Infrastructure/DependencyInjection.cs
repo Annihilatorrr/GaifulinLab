@@ -31,7 +31,7 @@ public static class DependencyInjection
 
         services.AddScoped<IAppDbContext>(serviceProvider =>
             serviceProvider.GetRequiredService<AppDbContext>());
-        services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
+        services.AddSingleton<IArticleHtmlSanitizer, ArticleHtmlSanitizer>();
         services.AddScoped<GaifulinLab.Application.Articles.Public.IArticleSearch, Content.ArticleSearch>();
         services.AddSingleton<IMediaStorage>(_ => new FileSystemMediaStorage(
             configuration["MEDIA_STORAGE_PATH"]
@@ -69,7 +69,11 @@ public static class DependencyInjection
             maximumConcurrentPdfRenders,
             configuration["PDF_MATHJAX_PATH"]
             ?? Path.Combine(mathJaxAssetsPath, "mathjax", "tex-chtml.js"),
-            mathJaxAssetsPath));
+            mathJaxAssetsPath,
+            configuration["PDF_ARTICLE_STYLES_PATH"]
+            ?? Path.Combine(mathJaxAssetsPath, "articles.css"),
+            configuration["PDF_HIGHLIGHT_JS_PATH"]
+            ?? Path.Combine(mathJaxAssetsPath, "highlightjs", "highlight.min.js")));
         services.AddSingleton<IArticlePdfRenderer, PlaywrightArticlePdfRenderer>();
         services.AddSingleton(new PdfExportWorkerSettings(
             TimeSpan.FromMilliseconds(pollIntervalMilliseconds),

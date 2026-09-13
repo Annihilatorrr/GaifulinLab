@@ -7,7 +7,7 @@ using GaifulinLab.Api.Tests.Authentication;
 
 namespace GaifulinLab.Api.Tests.Content;
 
-public sealed class AdminMarkdownEndpointsTests(AuthWebApplicationFactory factory)
+public sealed class AdminHtmlEndpointsTests(AuthWebApplicationFactory factory)
     : IClassFixture<AuthWebApplicationFactory>
 {
     [Fact]
@@ -16,12 +16,10 @@ public sealed class AdminMarkdownEndpointsTests(AuthWebApplicationFactory factor
         using var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            "/api/admin/markdown/preview",
-            new MarkdownPreviewRequest("# Preview"));
+            "/api/admin/html/preview",
+            new HtmlPreviewRequest("<p>Preview</p>"));
 
-        Assert.True(
-            response.StatusCode == HttpStatusCode.Unauthorized,
-            $"Expected 401, received {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -30,15 +28,15 @@ public sealed class AdminMarkdownEndpointsTests(AuthWebApplicationFactory factor
         using var client = await CreateAuthenticatedClient();
 
         var response = await client.PostAsJsonAsync(
-            "/api/admin/markdown/preview",
-            new MarkdownPreviewRequest(
-                "# Preview\n\n**Safe** <img src=\"/image.png\" onerror=\"alert(1)\">"));
+            "/api/admin/html/preview",
+            new HtmlPreviewRequest("<p>Safe</p><img src=\"/image.png\" onerror=\"alert(1)\"><script>alert(1)</script>"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var preview = await response.Content.ReadFromJsonAsync<MarkdownPreviewResponse>();
+        var preview = await response.Content.ReadFromJsonAsync<HtmlPreviewResponse>();
         Assert.NotNull(preview);
-        Assert.Contains("<strong>Safe</strong>", preview.Html);
+        Assert.Contains("<p>Safe</p>", preview.Html);
         Assert.DoesNotContain("onerror", preview.Html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<script", preview.Html, StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<HttpClient> CreateAuthenticatedClient()

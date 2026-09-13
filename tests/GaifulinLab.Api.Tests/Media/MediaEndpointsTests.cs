@@ -156,7 +156,7 @@ public sealed class MediaEndpointsTests(AuthWebApplicationFactory factory)
                 "en",
                 "Author image article",
                 "Image uploaded by a regular author",
-                $"![author image]({upload!.Url})",
+                $"<img src=\"{upload!.Url}\" alt=\"author image\">",
                 slug));
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var created = await createResponse.Content.ReadFromJsonAsync<CreateArticleResponse>();

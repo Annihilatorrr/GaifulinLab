@@ -48,7 +48,7 @@ public sealed class ArticleSeriesOrderTests(E2EEnvironment environment) : PageTe
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
         await Page.GetByLabel("Article title").FillAsync(title);
         await Page.GetByPlaceholder("article-slug").FillAsync(slug);
-        await Page.GetByLabel("Article Markdown").FillAsync($"# {title}");
+        await Page.GetByLabel("Article Html").FillAsync($"# {title}");
 
         await Page.GetByText("+ Add series", new() { Exact = true }).ClickAsync();
         await Page.GetByLabel(seriesTitle, new() { Exact = true }).CheckAsync();

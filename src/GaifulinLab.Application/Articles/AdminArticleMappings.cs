@@ -12,7 +12,7 @@ internal static class AdminArticleMappings
         localization.Slug,
         localization.Title,
         localization.Summary,
-        localization.Markdown,
+        localization.Html,
         (PublicationStatusDto)localization.Status,
         localization.PublishedAt,
         localization.UpdatedAt,

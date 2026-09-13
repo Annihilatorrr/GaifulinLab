@@ -1,6 +1,6 @@
 @implements IDisposable
 @inject AdminArticlesClient ArticlesClient
-@inject AdminMarkdownClient MarkdownClient
+@inject AdminHtmlClient HtmlClient
 @inject AdminMediaClient MediaClient
 @inject PublicContentClient ContentClient
 @inject NavigationManager Navigation
@@ -77,14 +77,14 @@
     {
         <section class="editor-conflict" role="alert" aria-labelledby="edit-conflict-title">
             <div>
-                <h2 id="edit-conflict-title">This localization was changed elsewhere</h2>
+                <h2 id="edit-conflict-title">@LanguageName(_conflictLanguage) localization was changed elsewhere</h2>
                 <p>Your draft is still in the editor and has not overwritten the saved version.</p>
             </div>
             <details>
-                <summary>Compare with the saved version</summary>
+                <summary>Compare with the saved @LanguageName(_conflictLanguage) version</summary>
                 <label>Saved title <input readonly value="@_conflictServer.Title" /></label>
                 <label>Saved summary <textarea readonly>@_conflictServer.Summary</textarea></label>
-                <label>Saved Markdown <textarea readonly>@_conflictServer.Markdown</textarea></label>
+                <label>Saved HTML <textarea readonly>@_conflictServer.Html</textarea></label>
             </details>
             <div class="editor-conflict-actions">
                 <button class="button button-secondary" type="button" @onclick="UseServerConflictAsync">Use saved version</button>
@@ -217,10 +217,32 @@
             <button type="button" aria-selected="@(_activePane == EditorPane.Preview)" @onclick="() => _activePane = EditorPane.Preview">Preview</button>
         </nav>
         <div class="editor-workspace" @ref="_workspaceElement" aria-busy="@(_previewLoading || _imageUploading ? "true" : "false")">
-            <section id="markdown-pane" class="editor-pane markdown-pane" aria-labelledby="markdown-heading">
-                <header class="pane-heading" id="markdown-heading">
-                    <span>Markdown</span>
+            <section id="html-pane" class="editor-pane html-pane" aria-labelledby="html-heading">
+                <header class="pane-heading" id="html-heading">
+                    <span>HTML</span>
                     <div class="pane-tools">
+                        <details class="html-snippets">
+                            <summary>Insert block</summary>
+                            <div class="html-snippets__content">
+                                <button type="button" @onclick="InsertParagraphAsync">Paragraph</button>
+                                <button type="button" @onclick="InsertHeadingAsync">Heading</button>
+                                <button type="button" @onclick="InsertWarningAsync">Warning</button>
+                                <button type="button" @onclick="InsertFormulaAsync">Formula</button>
+                                <label>
+                                    <span class="visually-hidden">Code language</span>
+                                    <select @bind="_codeLanguage" aria-label="Code language">
+                                        <option value="csharp">C#</option>
+                                        <option value="javascript">JavaScript</option>
+                                        <option value="python">Python</option>
+                                        <option value="sql">SQL</option>
+                                        <option value="bash">Bash</option>
+                                        <option value="json">JSON</option>
+                                        <option value="xml">HTML/XML</option>
+                                    </select>
+                                </label>
+                                <button type="button" @onclick="InsertCodeBlockAsync">Code block</button>
+                            </div>
+                        </details>
                         <label class="image-upload" aria-disabled="@_imageUploading">
                             @(_imageUploading ? "Uploading…" : "+ Add image")
                             <InputFile OnChange="HandleImageSelected" accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp" disabled="@_imageUploading" />
@@ -228,11 +250,11 @@
                     </div>
                 </header>
                 @if (_imageUploadError is not null) { <div class="upload-error" role="alert">@_imageUploadError</div> }
-                <label class="visually-hidden" for="article-markdown">Article Markdown</label>
-                <span id="markdown-editor-help" class="visually-hidden">Use Tab to indent. Press Control or Command S to save.</span>
-                <textarea id="article-markdown" @ref="_markdownElement" aria-describedby="markdown-editor-help" placeholder="Start writing in Markdown…" spellcheck="true" value="@Current.Markdown" @oninput="HandleMarkdownInput"></textarea>
+                <label class="visually-hidden" for="article-html">Article HTML</label>
+                <span id="html-editor-help" class="visually-hidden">Use Tab to indent. Press Control or Command S to save.</span>
+                <textarea id="article-html" @ref="_htmlElement" aria-describedby="html-editor-help" placeholder="Start writing article HTML…" spellcheck="true" value="@Current.Html" @oninput="HandleHtmlInput"></textarea>
             </section>
-            <div class="editor-splitter" role="separator" aria-orientation="vertical" aria-controls="markdown-pane preview-pane"
+            <div class="editor-splitter" role="separator" aria-orientation="vertical" aria-controls="html-pane preview-pane"
                  aria-valuemin="30" aria-valuemax="70" aria-valuenow="@FormatTypographyValue(_editorSplit)" aria-valuetext="@EditorSplitValueText"
                  tabindex="0" @onpointerdown="StartSplitterAsync" @onkeydown="HandleSplitterKeyDownAsync"
                  @ondblclick="ResetSplitterAsync">
@@ -252,13 +274,13 @@
                         </details>
                     </div>
                 </header>
-                @if (string.IsNullOrWhiteSpace(Current.Markdown))
+                @if (string.IsNullOrWhiteSpace(Current.Html))
                 {
                     <div class="preview-empty"><h2>Nothing to preview yet</h2><p>Start writing to see the rendered article.</p></div>
                 }
                 else if (_previewLoading) { <div class="preview-status" role="status">Rendering preview…</div> }
                 else if (_previewError is not null) { <div class="preview-status preview-error" role="alert">@_previewError</div> }
-                else { <article class="article-preview" @ref="_previewElement">@((MarkupString)_renderedHtml)</article> }
+                else { <article class="article-content article-preview" @ref="_previewElement">@((MarkupString)_renderedHtml)</article> }
             </section>
         </div>
     }
@@ -277,6 +299,7 @@
     private string? _previewError;
     private string? _pdfExportError;
     private string? _imageUploadError;
+    private string _codeLanguage = "csharp";
     private string? _message;
     private bool _hasError;
     private bool _loading = true;
@@ -296,14 +319,14 @@
     private decimal _editorSplit = 50m;
     private CancellationTokenSource? _previewCancellation;
     private ElementReference _workspaceElement;
-    private ElementReference _markdownElement;
+    private ElementReference _htmlElement;
     private ElementReference _previewElement;
     private bool _previewElementReady;
     private bool _mathTypesetPending;
     private bool _typographyLoaded;
     private bool _editorSplitLoaded;
     private bool _disposed;
-    private bool _markdownEnhancementsAttached;
+    private bool _htmlEnhancementsAttached;
     private bool _responsiveLayoutAttached;
     private bool _isCompactLayout;
     private CancellationTokenSource? _messageCancellation;
@@ -327,7 +350,7 @@
         && _conflictLanguage is null
         && !string.IsNullOrWhiteSpace(Current.Title)
         && !string.IsNullOrWhiteSpace(Current.Slug)
-        && !string.IsNullOrWhiteSpace(Current.Markdown);
+        && !string.IsNullOrWhiteSpace(Current.Html);
     private string StatusClass => Current.Status switch
     {
         PublicationStatusDto.Published => "is-published",
@@ -351,7 +374,7 @@
     private string PdfExportStatusText => _pdfExportError ?? "Preparing PDF…";
     private string TypographyStyle =>
         $"--article-line-height: {FormatTypographyValue(_typography.LineHeight)}; --article-block-spacing: {FormatTypographyValue(_typography.BlockSpacing)}rem; --editor-split: {FormatTypographyValue(_editorSplit)}%; --editor-preview-split: {FormatTypographyValue(100m - _editorSplit)}%;";
-    private string EditorSplitValueText => $"{FormatTypographyValue(_editorSplit)}% Markdown, {FormatTypographyValue(100m - _editorSplit)}% Preview";
+    private string EditorSplitValueText => $"{FormatTypographyValue(_editorSplit)}% HTML, {FormatTypographyValue(100m - _editorSplit)}% Preview";
 
     protected override async Task OnInitializedAsync()
     {
@@ -440,12 +463,12 @@
             }
         }
 
-        if (!_loading && !_markdownEnhancementsAttached)
+        if (!_loading && !_htmlEnhancementsAttached)
         {
             try
             {
-                await JS.InvokeVoidAsync("gaifulinLabMarkdownEditor.attach", _markdownElement);
-                _markdownEnhancementsAttached = true;
+                await JS.InvokeVoidAsync("gaifulinLabHtmlEditor.attach", _htmlElement);
+                _htmlEnhancementsAttached = true;
             }
             catch (JSException)
             {
@@ -462,6 +485,15 @@
         }
 
         _previewElementReady = true;
+        try
+        {
+            await JS.InvokeVoidAsync("articleAssets.prepare", _previewElement, ContentClient.AssetBaseUrl);
+        }
+        catch (JSException)
+        {
+            // The static HTML preview remains usable when optional client enhancements fail.
+        }
+
         if (!_mathTypesetPending)
         {
             return;
@@ -501,9 +533,6 @@
 
         _activeLanguage = languageCode;
         ClearMessage();
-        await ClearPreviewMathAsync();
-        _previewElementReady = false;
-        _renderedHtml = "";
         await RefreshPreview();
     }
 
@@ -602,6 +631,12 @@
 
     private async Task SaveCoreAsync(bool navigateAfterCreate, bool isAutomaticSave = false)
     {
+        // Serialize saves, but allow pending text edits to autosave while a cover upload is in progress.
+        if (_saving)
+        {
+            return;
+        }
+
         var saveVersion = _changeVersion;
         if (!isAutomaticSave)
         {
@@ -623,7 +658,9 @@
                 ArticleId = created.ArticleId;
                 Current.MarkSaved(createRequest, created.LocalizationVersion);
             }
-            foreach (var localization in _localizations.Values)
+            // A language event already queued before the busy render can add a draft during the request.
+            // Keep iteration stable; MarkDirty schedules another autosave for any later edits.
+            foreach (var localization in _localizations.Values.ToArray())
             {
                 if (!localization.HasChanges)
                 {
@@ -655,7 +692,7 @@
             if (_changeVersion == saveVersion)
             {
                 _taxonomyDirty = false;
-                await ReloadLocalizationsAsync();
+                await ReloadLocalizationsAsync(saveVersion);
             }
             RecalculateDirty();
             _savedAt = DateTimeOffset.Now;
@@ -686,6 +723,12 @@
 
     private async Task PublishAsync()
     {
+        // A queued click must not publish while another save still owns the editor.
+        if (IsBusy)
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(Current.Title))
         {
             ShowMessage("Add a title before publishing.", true);
@@ -747,9 +790,49 @@
         }
     }
 
-    private async Task HandleMarkdownInput(ChangeEventArgs eventArgs)
+    private async Task HandleHtmlInput(ChangeEventArgs eventArgs)
     {
-        Current.Markdown = eventArgs.Value?.ToString() ?? "";
+        Current.Html = eventArgs.Value?.ToString() ?? "";
+        MarkDirty();
+        await RefreshPreview();
+    }
+
+    private Task InsertParagraphAsync() => InsertHtmlAsync("<p></p>");
+
+    private Task InsertHeadingAsync() => InsertHtmlAsync("<h2></h2>");
+
+    private Task InsertWarningAsync() => InsertHtmlAsync("<aside class=\"article-callout article-callout--warning\"><strong>Warning</strong><p></p></aside>");
+
+    private Task InsertFormulaAsync() => InsertHtmlAsync("<div class=\"article-formula\">\\[  \\]</div>");
+
+    private async Task InsertCodeBlockAsync()
+    {
+        try
+        {
+            Current.Html = await JS.InvokeAsync<string>("gaifulinLabHtmlEditor.insertCodeBlock", _htmlElement, _codeLanguage);
+        }
+        catch (JSException)
+        {
+            await InsertHtmlAsync($"<pre><code class=\"language-{_codeLanguage}\">code</code></pre>");
+            return;
+        }
+
+        MarkDirty();
+        await RefreshPreview();
+    }
+
+    private async Task InsertHtmlAsync(string html)
+    {
+        try
+        {
+            Current.Html = await JS.InvokeAsync<string>("gaifulinLabHtmlEditor.insertAtSelection", _htmlElement, html);
+        }
+        catch (JSException)
+        {
+            var separator = string.IsNullOrEmpty(Current.Html) ? "" : Current.Html.EndsWith('\n') ? "\n" : "\n\n";
+            Current.Html += $"{separator}{html}";
+        }
+
         MarkDirty();
         await RefreshPreview();
     }
@@ -869,16 +952,17 @@
         {
             await using var content = file.OpenReadStream(MediaUploadLimits.MaximumFileSize);
             var uploaded = await MediaClient.UploadAsync(content, file.Name, file.ContentType);
-            var alt = Path.GetFileNameWithoutExtension(file.Name).Replace("[", "", StringComparison.Ordinal).Replace("]", "", StringComparison.Ordinal);
-            var markdown = $"![{alt}]({uploaded.Url})";
+            var alt = System.Net.WebUtility.HtmlEncode(Path.GetFileNameWithoutExtension(file.Name).Replace("[", "", StringComparison.Ordinal).Replace("]", "", StringComparison.Ordinal));
+            var url = System.Net.WebUtility.HtmlEncode(uploaded.Url);
+            var html = $"<figure class=\"article-figure\"><img src=\"{url}\" alt=\"{alt}\" loading=\"lazy\"></figure>";
             try
             {
-                Current.Markdown = await JS.InvokeAsync<string>("gaifulinLabMarkdownEditor.insertAtSelection", _markdownElement, markdown);
+                Current.Html = await JS.InvokeAsync<string>("gaifulinLabHtmlEditor.insertAtSelection", _htmlElement, html);
             }
             catch (JSException)
             {
-                var separator = string.IsNullOrEmpty(Current.Markdown) ? "" : Current.Markdown.EndsWith('\n') ? "\n" : "\n\n";
-                Current.Markdown += $"{separator}{markdown}";
+                var separator = string.IsNullOrEmpty(Current.Html) ? "" : Current.Html.EndsWith('\n') ? "\n" : "\n\n";
+                Current.Html += $"{separator}{html}";
             }
             MarkDirty();
             await RefreshPreview();
@@ -911,37 +995,70 @@
 
     private async Task RefreshPreview()
     {
-        _previewCancellation?.Cancel();
-        _previewCancellation?.Dispose();
-        if (string.IsNullOrWhiteSpace(Current.Markdown))
-        {
-            await ClearPreviewMathAsync();
-            _previewElementReady = false;
-            _renderedHtml = "";
-            _previewError = null;
-            _previewLoading = false;
-            return;
-        }
         var cancellation = new CancellationTokenSource();
+        var cancellationToken = cancellation.Token;
+        var previousCancellation = _previewCancellation;
+        // Store this CTS as the current preview generation before cancelling the old one.
         _previewCancellation = cancellation;
-        await ClearPreviewMathAsync();
-        _previewElementReady = false;
-        _previewLoading = true;
-        _previewError = null;
+        // A later refresh reads it as previousCancellation and cancels it.
+        // Its continuation then fails IsCurrentPreview and cannot overwrite the newer preview.
+        previousCancellation?.Cancel();
+
+        // The editor can switch language while JavaScript clears the old preview.
+        // Keep this invocation's snapshot and cancellation source alive until it resumes.
+        var html = Current.Html;
+        var isEmpty = string.IsNullOrWhiteSpace(html);
         try
         {
-            await Task.Delay(300, cancellation.Token);
-            var html = await MarkdownClient.PreviewAsync(Current.Markdown, cancellation.Token);
-            if (_previewCancellation == cancellation)
+            await ClearPreviewMathAsync();
+            if (!IsCurrentPreview(cancellation))
             {
-                _renderedHtml = html;
-                _mathTypesetPending = true;
+                return;
+            }
+
+            _previewElementReady = false;
+            _previewError = null;
+            _previewLoading = !isEmpty;
+            if (isEmpty)
+            {
+                _renderedHtml = "";
+                return;
+            }
+
+            await Task.Delay(300, cancellationToken);
+            var renderedHtml = await HtmlClient.PreviewAsync(html, cancellationToken);
+            if (!IsCurrentPreview(cancellation))
+            {
+                return;
+            }
+
+            _renderedHtml = renderedHtml;
+            _mathTypesetPending = true;
+            _previewLoading = false;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (HttpRequestException)
+        {
+            if (IsCurrentPreview(cancellation))
+            {
+                _previewError = "Preview is temporarily unavailable.";
                 _previewLoading = false;
             }
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (HttpRequestException) { if (_previewCancellation == cancellation) { _previewError = "Preview is temporarily unavailable."; _previewLoading = false; } }
+        finally
+        {
+            if (ReferenceEquals(_previewCancellation, cancellation))
+            {
+                _previewCancellation = null;
+            }
+
+            // Only this invocation disposes its source; a newer preview may cancel it while it awaits JS.
+            cancellation.Dispose();
+        }
     }
+
+    private bool IsCurrentPreview(CancellationTokenSource cancellation) =>
+        !_disposed && ReferenceEquals(_previewCancellation, cancellation);
 
     private async Task ClearPreviewMathAsync()
     {
@@ -959,10 +1076,16 @@
         }
     }
 
-    private async Task ReloadLocalizationsAsync()
+    private async Task ReloadLocalizationsAsync(long expectedChangeVersion)
     {
         var activeLanguage = _activeLanguage;
         var article = await ArticlesClient.GetArticleAsync(ArticleId!.Value);
+        // Inputs remain editable during the GET; its response must not replace a newer draft.
+        if (_changeVersion != expectedChangeVersion)
+        {
+            return;
+        }
+
         _localizations.Clear();
         foreach (var localization in article.Localizations)
         {
@@ -1016,7 +1139,8 @@
 
     private async Task SaveMyConflictDraftAsync()
     {
-        if (_conflictLanguage is null
+        if (IsBusy
+            || _conflictLanguage is null
             || _conflictServer is null
             || !_localizations.TryGetValue(_conflictLanguage, out var draft))
         {
@@ -1104,6 +1228,7 @@
         }
 
         _autosavePending = true;
+        // The active operation schedules pending edits when it completes; do not start a second save.
         if (_saving || _pdfExportInProgress)
         {
             return;
@@ -1201,7 +1326,6 @@
     {
         _disposed = true;
         _previewCancellation?.Cancel();
-        _previewCancellation?.Dispose();
         _messageCancellation?.Cancel();
         _messageCancellation?.Dispose();
         CancelAutosaveDelay();
@@ -1214,7 +1338,7 @@
     {
         private string _savedTitle = "";
         private string _savedSummary = "";
-        private string _savedMarkdown = "";
+        private string _savedHtml = "";
         private string _savedSlug = "";
         private Guid? _savedCover;
 
@@ -1231,7 +1355,7 @@
             Title = source.Title;
             Summary = source.Summary;
             CoverMediaAssetId = source.CoverMediaAssetId;
-            Markdown = source.Markdown;
+            Html = source.Html;
             Slug = SlugSuggestion.FromTitle(Title);
             SlugIsAutomatic = true;
             CaptureSavedValues();
@@ -1244,7 +1368,7 @@
             Title = dto.Title;
             Summary = dto.Summary ?? "";
             CoverMediaAssetId = dto.CoverMediaAssetId;
-            Markdown = dto.Markdown;
+            Html = dto.Html;
             Slug = dto.Slug ?? "";
             Status = dto.Status;
             SlugIsAutomatic = Status == PublicationStatusDto.Draft
@@ -1260,30 +1384,30 @@
         public string Title { get; set; } = "";
         public string Summary { get; set; } = "";
         public Guid? CoverMediaAssetId { get; set; }
-        public string Markdown { get; set; } = "";
+        public string Html { get; set; } = "";
         public string Slug { get; set; } = "";
         public bool SlugIsAutomatic { get; set; }
         public PublicationStatusDto Status { get; set; } = PublicationStatusDto.Draft;
         public bool HasChanges =>
             !string.Equals(Title, _savedTitle, StringComparison.Ordinal)
             || !string.Equals(Summary, _savedSummary, StringComparison.Ordinal)
-            || !string.Equals(Markdown, _savedMarkdown, StringComparison.Ordinal)
+            || !string.Equals(Html, _savedHtml, StringComparison.Ordinal)
             || !string.Equals(Slug, _savedSlug, StringComparison.Ordinal)
             || CoverMediaAssetId != _savedCover;
-        public CreateArticleRequest ToCreateRequest() => new(LanguageCode, Title, Summary, Markdown, Slug, CoverMediaAssetId);
-        public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Markdown, Slug, Version, CoverMediaAssetId);
+        public CreateArticleRequest ToCreateRequest() => new(LanguageCode, Title, Summary, Html, Slug, CoverMediaAssetId);
+        public UpdateArticleLocalizationRequest ToUpdateRequest() => new(Title, Summary, Html, Slug, Version, CoverMediaAssetId);
         public void MarkSaved(CreateArticleRequest request, long version) =>
             MarkSaved(new UpdateArticleLocalizationRequest(
                 request.Title,
                 request.Summary,
-                request.Markdown,
+                request.Html,
                 request.Slug, CoverMediaAssetId: request.CoverMediaAssetId), version);
         public void MarkSaved(UpdateArticleLocalizationRequest request, long version)
         {
             Version = version;
             _savedTitle = request.Title ?? "";
             _savedSummary = request.Summary ?? "";
-            _savedMarkdown = request.Markdown ?? "";
+            _savedHtml = request.Html ?? "";
             _savedSlug = request.Slug ?? "";
             _savedCover = request.CoverMediaAssetId;
         }
@@ -1292,7 +1416,7 @@
         {
             _savedTitle = Title;
             _savedSummary = Summary;
-            _savedMarkdown = Markdown;
+            _savedHtml = Html;
             _savedSlug = Slug;
             _savedCover = CoverMediaAssetId;
         }

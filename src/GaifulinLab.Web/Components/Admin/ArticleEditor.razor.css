@@ -642,7 +642,7 @@
 }
 
 .article-editor[data-active-pane="Edit"] .preview-pane,
-.article-editor[data-active-pane="Preview"] .markdown-pane,
+.article-editor[data-active-pane="Preview"] .html-pane,
 .article-editor[data-active-pane="Edit"] .editor-splitter,
 .article-editor[data-active-pane="Preview"] .editor-splitter {
     display: none;
@@ -720,6 +720,56 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
+}
+
+.html-snippets {
+    position: relative;
+}
+
+.html-snippets summary,
+.html-snippets__content button,
+.html-snippets__content select {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.6rem;
+    background: var(--color-surface-subtle);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--text-xs);
+    font-weight: 700;
+}
+
+.html-snippets summary {
+    list-style: none;
+}
+
+.html-snippets summary::-webkit-details-marker {
+    display: none;
+}
+
+.html-snippets summary:hover,
+.html-snippets[open] summary,
+.html-snippets__content button:hover,
+.html-snippets__content select:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.html-snippets__content {
+    position: absolute;
+    z-index: 3;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    width: max-content;
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
 }
 
 .preview-live {
@@ -851,7 +901,7 @@
     font-size: var(--text-xs);
 }
 
-#article-markdown {
+#article-html {
     width: 100%;
     min-height: 0;
     flex: 1;
@@ -868,7 +918,7 @@
     outline-offset: -3px;
 }
 
-#article-markdown::placeholder {
+#article-html::placeholder {
     color: var(--color-text-subtle);
 }
 
@@ -935,108 +985,6 @@
     background: var(--color-surface);
     color: var(--color-text);
     line-height: var(--article-line-height, 1.75);
-}
-
-.article-preview ::deep h1,
-.article-preview ::deep h2,
-.article-preview ::deep h3 {
-    margin-block: 1.75em 0.65em;
-}
-
-.article-preview ::deep h1:first-child,
-.article-preview ::deep h2:first-child,
-.article-preview ::deep h3:first-child {
-    margin-top: 0;
-}
-
-.article-preview ::deep h1 {
-    font-size: var(--text-3xl);
-}
-
-.article-preview ::deep h2 {
-    font-size: clamp(1.5rem, 2vw, 2rem);
-}
-
-.article-preview ::deep h3 {
-    font-size: var(--text-xl);
-}
-
-.article-preview ::deep p,
-.article-preview ::deep ul,
-.article-preview ::deep ol,
-.article-preview ::deep blockquote,
-.article-preview ::deep pre,
-.article-preview ::deep table {
-    margin-block: 0 var(--article-block-spacing, .75rem);
-}
-
-.article-preview ::deep p,
-.article-preview ::deep li {
-    color: var(--color-text);
-}
-
-.article-preview ::deep blockquote {
-    margin-inline: 0;
-    border-left: 3px solid var(--color-accent);
-    padding-left: var(--space-5);
-    color: var(--color-text-muted);
-}
-
-.article-preview ::deep hr {
-    display: none;
-}
-
-.article-preview ::deep code {
-    border-radius: var(--radius-sm);
-    padding: 0.12em 0.35em;
-    background: var(--color-surface-subtle);
-    font-size: 0.9em;
-}
-
-.article-preview ::deep pre {
-    overflow-x: auto;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--space-5);
-    background: var(--color-surface-subtle);
-}
-
-.article-preview ::deep pre code {
-    padding: 0;
-    background: transparent;
-}
-
-.article-preview ::deep table {
-    display: block;
-    width: 100%;
-    max-width: 100%;
-    border-collapse: collapse;
-    overflow-x: auto;
-}
-
-.article-preview ::deep th,
-.article-preview ::deep td {
-    border: 1px solid var(--color-border);
-    padding: var(--space-2) var(--space-3);
-    text-align: left;
-}
-
-.article-preview ::deep img {
-    max-width: 100%;
-    height: auto;
-    border-radius: var(--radius-md);
-}
-
-.article-preview ::deep .math,
-.article-preview ::deep mjx-container[display="true"] {
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-}
-
-.article-preview ::deep mjx-container[display="true"] {
-    margin-block: var(--article-block-spacing, .75rem) !important;
-    padding-block: 0;
 }
 
 @media (max-width: 52rem) {
@@ -1209,7 +1157,7 @@
         padding-inline: var(--space-4);
     }
 
-    #article-markdown,
+    #article-html,
     .preview-empty,
     .article-preview {
         padding: var(--space-4);

@@ -1,0 +1,147 @@
+/*
+ * Article HTML is supplied by authors. Every selector stays under this root so
+ * article-specific classes cannot change the surrounding application chrome.
+ */
+.article-content {
+    color: var(--color-text);
+    line-height: var(--article-line-height, 1.75);
+}
+
+.article-content h1,
+.article-content h2,
+.article-content h3,
+.article-content h4,
+.article-content h5,
+.article-content h6 {
+    margin-block: 1.75em .65em;
+    line-height: var(--line-heading);
+}
+
+.article-content > :first-child { margin-top: 0; }
+.article-content h1 { font-size: var(--text-3xl); }
+.article-content h2 { font-size: clamp(1.5rem, 2vw, 2rem); }
+.article-content h3 { font-size: var(--text-xl); }
+
+.article-content p,
+.article-content ul,
+.article-content ol,
+.article-content blockquote,
+.article-content pre,
+.article-content table,
+.article-content figure,
+.article-content .article-callout,
+.article-content .article-formula {
+    margin-block: 0 var(--article-block-spacing, .75rem);
+}
+
+.article-content blockquote {
+    margin-inline: 0;
+    border-left: 3px solid var(--color-accent);
+    padding-left: var(--space-5);
+    color: var(--color-text-muted);
+}
+
+.article-content code,
+.article-content pre,
+.article-content kbd {
+    font-family: var(--font-mono);
+}
+
+.article-content :not(pre) > code,
+.article-content kbd {
+    border-radius: var(--radius-sm);
+    padding: .12em .35em;
+    background: var(--color-surface-subtle);
+    font-size: .9em;
+}
+
+.article-content pre {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    background: var(--color-surface-subtle);
+}
+
+.article-content pre code {
+    display: block;
+    padding: 0;
+    background: transparent;
+    font-size: .9em;
+}
+
+.article-content table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+}
+
+.article-content th,
+.article-content td {
+    border: 1px solid var(--color-border);
+    padding: var(--space-2) var(--space-3);
+    text-align: left;
+    vertical-align: top;
+}
+
+.article-content img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+}
+
+.article-content .article-figure { margin-inline: 0; }
+.article-content .article-figure figcaption { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
+
+.article-content .article-callout {
+    border-left: 4px solid var(--color-accent);
+    border-radius: var(--radius-md);
+    padding: var(--space-4) var(--space-5);
+    background: var(--color-surface-accent);
+}
+
+.article-content .article-callout > :last-child { margin-bottom: 0; }
+.article-content .article-callout--warning { border-color: #d69e2e; background: color-mix(in srgb, #d69e2e 12%, var(--color-surface)); }
+.article-content .article-callout--info { border-color: var(--color-accent); }
+.article-content .article-callout--danger { border-color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface)); }
+
+.article-content .article-formula,
+.article-content .math,
+.article-content mjx-container[display="true"] {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.article-content mjx-container[display="true"] {
+    margin-block: var(--article-block-spacing, .75rem) !important;
+    padding-block: 0;
+}
+
+/* highlight.js token colors. Plain code remains readable if the highlighter is unavailable. */
+.article-content .hljs-keyword,
+.article-content .hljs-selector-tag,
+.article-content .hljs-title.function_ { color: var(--color-code-keyword); }
+.article-content .hljs-string,
+.article-content .hljs-attr,
+.article-content .hljs-template-variable { color: var(--color-code-string); }
+.article-content .hljs-number,
+.article-content .hljs-literal { color: var(--color-code-number); }
+.article-content .hljs-comment { color: var(--color-code-comment); font-style: italic; }
+
+@media print {
+    .article-content h1,
+    .article-content h2,
+    .article-content h3,
+    .article-content h4 { break-after: avoid-page; }
+    .article-content img,
+    .article-content pre,
+    .article-content table,
+    .article-content blockquote,
+    .article-content .article-callout,
+    .article-content mjx-container { break-inside: avoid-page; }
+    .article-content pre { overflow: visible; white-space: pre-wrap; }
+}

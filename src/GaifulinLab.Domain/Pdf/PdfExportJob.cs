@@ -16,7 +16,7 @@ public sealed class PdfExportJob
         Slug = localization.Slug ?? throw new InvalidOperationException("A PDF export requires an article slug.");
         Title = localization.Title;
         Summary = localization.Summary;
-        Markdown = localization.Markdown;
+        Html = localization.Html;
         PublishedAt = localization.PublishedAt;
         LineHeight = lineHeight;
         BlockSpacing = blockSpacing;
@@ -36,7 +36,7 @@ public sealed class PdfExportJob
 
     public string? Summary { get; private set; }
 
-    public string Markdown { get; private set; } = string.Empty;
+    public string Html { get; private set; } = string.Empty;
 
     public DateTimeOffset? PublishedAt { get; private set; }
 
@@ -79,7 +79,7 @@ public sealed class PdfExportJob
         Slug = localization.Slug ?? throw new InvalidOperationException("A PDF export requires an article slug.");
         Title = localization.Title;
         Summary = localization.Summary;
-        Markdown = localization.Markdown;
+        Html = localization.Html;
         PublishedAt = localization.PublishedAt;
         LineHeight = lineHeight;
         BlockSpacing = blockSpacing;

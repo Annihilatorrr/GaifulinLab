@@ -80,7 +80,7 @@ internal sealed class PdfExportWorker(
                     job.Slug,
                     job.Title,
                     job.Summary,
-                    job.Markdown,
+                    job.Html,
                     job.PublishedAt),
                 new ArticleTypography(job.LineHeight, job.BlockSpacing),
                 job.AttemptCount,

@@ -20,6 +20,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+
 namespace GaifulinLab.Api.Tests.Authentication;
 
 public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
@@ -352,7 +354,11 @@ public sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
 
     private readonly bool _publicPdfDownloadEnabled;
 
-    public AuthWebApplicationFactory(bool publicPdfDownloadEnabled = false) =>
+    public AuthWebApplicationFactory() : this(false)
+    {
+    }
+
+    internal AuthWebApplicationFactory(bool publicPdfDownloadEnabled) =>
         _publicPdfDownloadEnabled = publicPdfDownloadEnabled;
 
     private readonly string _mediaStoragePath = Path.Combine(

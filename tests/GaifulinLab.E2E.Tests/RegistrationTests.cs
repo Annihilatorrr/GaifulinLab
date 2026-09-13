@@ -140,7 +140,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await SignInAsync(ownerEmail, password);
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
         await Page.GetByLabel("Article title").FillAsync(ownerTitle);
-        await Page.GetByLabel("Article Markdown").FillAsync("A private draft.");
+        await Page.GetByLabel("Article Html").FillAsync("A private draft.");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
         await Page.GetByRole(AriaRole.Button, new() { Name = "Sign out" }).ClickAsync();
@@ -150,7 +150,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "My articles" })).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
         await Page.GetByLabel("Article title").FillAsync(otherTitle);
-        await Page.GetByLabel("Article Markdown").FillAsync("Another private draft.");
+        await Page.GetByLabel("Article Html").FillAsync("Another private draft.");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles").ToString());
@@ -165,12 +165,12 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         var ownerEmail = $"editor-owner-{Guid.NewGuid():N}@example.com";
         var otherEmail = $"editor-other-{Guid.NewGuid():N}@example.com";
         var title = "Owner editor title " + Guid.NewGuid().ToString("N");
-        var markdown = "Original private article body.";
+        var html = "Original private article body.";
         await RegisterAsync(ownerEmail, "Editor Owner", password);
         await SignInAsync(ownerEmail, password);
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
         await Page.GetByLabel("Article title").FillAsync(title);
-        await Page.GetByLabel("Article Markdown").FillAsync(markdown);
+        await Page.GetByLabel("Article Html").FillAsync(html);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
         var editorUrl = Page.Url;
@@ -196,7 +196,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await SignInAsync(ownerEmail, password);
         await Page.GotoAsync(editorUrl);
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync(title);
-        await Expect(Page.GetByLabel("Article Markdown")).ToHaveValueAsync(markdown);
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync(html);
     }
 
     [Fact]
@@ -212,7 +212,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
 
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
         await Page.GetByLabel("Article title").FillAsync("Unauthorized save");
-        await Page.GetByLabel("Article Markdown").FillAsync("This change must not be saved.");
+        await Page.GetByLabel("Article Html").FillAsync("This change must not be saved.");
         await Page.RouteAsync("**/api/admin/articles", route => route.FulfillAsync(new() { Status = 401 }));
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/login$"));
@@ -244,7 +244,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Page.GetByRole(AriaRole.Link, new() { Name = "New article" }).ClickAsync();
         await Page.GetByLabel("Article title").FillAsync(articleTitle);
         await Page.GetByPlaceholder("article-slug").FillAsync(slug);
-        await Page.GetByLabel("Article Markdown").FillAsync("A published article keeps the current author name live.");
+        await Page.GetByLabel("Article Html").FillAsync("A published article keeps the current author name live.");
         await Page.GetByText("+ Add series", new() { Exact = true }).ClickAsync();
         await Page.GetByLabel(series.Title, new() { Exact = true }).CheckAsync();
         await Page.GetByLabel("Position in series", new() { Exact = true }).FillAsync("1");
@@ -329,7 +329,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Page.GetByLabel("Tags").FillAsync($"{tag}, {tag.ToUpperInvariant()}");
         await Page.GetByText("+ Add topic", new() { Exact = true }).ClickAsync();
         await Page.GetByLabel(topicName, new() { Exact = true }).CheckAsync();
-        await Page.GetByLabel("Article Markdown").FillAsync(body);
+        await Page.GetByLabel("Article Html").FillAsync(body);
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
