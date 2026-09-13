@@ -55,7 +55,7 @@
 
     --site-gutter: clamp(1rem, 4vw, 2rem);
     --site-width: 80rem;
-    --article-width: 48rem;
+    --article-width: 60rem;
     --header-height: 6.25rem;
 
     --transition-fast: 140ms ease;
