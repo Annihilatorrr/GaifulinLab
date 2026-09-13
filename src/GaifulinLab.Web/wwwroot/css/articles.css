@@ -13,6 +13,13 @@
     overflow-wrap: break-word;
 }
 
+/* Псевдоэлемент удерживает float, если иллюстрация завершает статью. */
+.article-content::after {
+    display: table;
+    clear: both;
+    content: "";
+}
+
 /* Ссылки <a> внутри статьи: фирменный цвет и заметное состояние наведения. */
 .article-content a {
     color: var(--color-accent);
@@ -327,8 +334,9 @@
 
 /*
  * Иллюстрации .article-figure: компактный рисунок с подписью <figcaption>.
- * --placeholder создаёт макет рисунка, --wide расширяет его, __canvas и __index
- * оформляют область-заглушку и номер иллюстрации.
+ * --left/--right включают обтекание, --small и --wide задают размер, --center
+ * выравнивает иллюстрацию без обтекания. __canvas и __index оформляют макет
+ * рисунка и номер иллюстрации.
  */
 .article-content .article-figure {
     margin-inline: auto;
@@ -338,8 +346,40 @@
     max-width: 42.5rem;
 }
 
+.article-content .article-figure--left,
+.article-content .article-figure--right {
+    width: min(45%, 22rem);
+    max-width: min(45%, 22rem);
+}
+
+.article-content .article-figure--left {
+    float: left;
+    margin-inline: 0 1.25rem;
+}
+
+.article-content .article-figure--right {
+    float: right;
+    margin-inline: 1.25rem 0;
+}
+
+.article-content .article-figure--small {
+    width: min(100%, 18rem);
+}
+
 .article-content .article-figure--wide {
+    width: 100%;
     max-width: 47.5rem;
+}
+
+.article-content .article-figure--left > img,
+.article-content .article-figure--right > img,
+.article-content .article-figure--small > img,
+.article-content .article-figure--wide > img {
+    width: 100%;
+}
+
+.article-content .article-figure--center > img {
+    margin-inline: auto;
 }
 
 .article-content .article-figure figcaption {
@@ -351,6 +391,11 @@
 
 .article-content .article-figure--placeholder figcaption {
     text-align: center;
+}
+
+/* Применяется к следующему элементу, когда текст больше не должен обтекать рисунок. */
+.article-content .article-clear {
+    clear: both;
 }
 
 .article-content .article-figure__canvas {
@@ -453,6 +498,14 @@
     .article-content .article-figure__canvas {
         min-height: 11.875rem;
         padding: 1.5rem 1.125rem;
+    }
+
+    .article-content .article-figure--left,
+    .article-content .article-figure--right {
+        float: none;
+        width: 100%;
+        max-width: none;
+        margin-inline: 0;
     }
 }
 

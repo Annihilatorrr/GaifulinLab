@@ -66,16 +66,18 @@ public sealed class ArticleHtmlSanitizerTests
         const string html = """
             <aside class="article-summary article-toc article-example article-example__title
                 article-callout--note article-callout--important article-callout--tip article-callout--deep
-                article-formula--accent article-figure--placeholder article-figure--wide
-                article-figure__canvas article-figure__index article-next article-next__eyebrow">Content</aside>
+                article-formula--accent article-figure--placeholder article-figure--center article-figure--left
+                article-figure--right article-figure--small article-figure--wide article-figure__canvas
+                article-figure__index article-clear article-next article-next__eyebrow">Content</aside>
             """;
         string[] expectedClasses =
         [
             "article-summary", "article-toc", "article-example", "article-example__title",
             "article-callout--note", "article-callout--important", "article-callout--tip",
             "article-callout--deep", "article-formula--accent", "article-figure--placeholder",
-            "article-figure--wide", "article-figure__canvas", "article-figure__index",
-            "article-next", "article-next__eyebrow"
+            "article-figure--center", "article-figure--left", "article-figure--right",
+            "article-figure--small", "article-figure--wide", "article-figure__canvas",
+            "article-figure__index", "article-clear", "article-next", "article-next__eyebrow"
         ];
 
         var sanitized = _sanitizer.Sanitize(html);
