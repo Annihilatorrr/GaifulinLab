@@ -1,0 +1,324 @@
+@inject AdminArticlesClient ArticlesClient
+
+<section class="taxonomy-manager" aria-labelledby="taxonomy-manager-title">
+    <header class="page-heading">
+        <div>
+            <span class="eyebrow">Workspace taxonomy</span>
+            <h1 id="taxonomy-manager-title">@(IsSeries ? "Series" : "Topics")</h1>
+            <p>@(IsSeries ? "Group articles into ordered collections." : "Organize articles by subject.")</p>
+        </div>
+        <a class="button button-secondary" href="/admin/articles">My articles</a>
+    </header>
+
+    @if (_loading)
+    {
+        <div class="state surface" role="status">Loading @(IsSeries ? "series" : "topics")…</div>
+    }
+    else
+    {
+        <form class="taxonomy-create surface" @onsubmit="CreateAsync" @onsubmit:preventDefault="true">
+            <h2>Create @(IsSeries ? "series" : "topic")</h2>
+            <div class="taxonomy-form-grid">
+                <label>Language
+                    <select @bind="_createLanguage" disabled="@_creating">
+                        <option value="en">English (EN)</option>
+                        <option value="ru">Russian (RU)</option>
+                    </select>
+                </label>
+                <label>@(IsSeries ? "Title" : "Name")
+                    <input type="text" @bind="_createName" disabled="@_creating" required />
+                </label>
+                <label>Slug
+                    <input type="text" @bind="_createSlug" placeholder="lowercase-ascii-slug" spellcheck="false" disabled="@_creating" required />
+                </label>
+                <label class="taxonomy-description">Description <span>(optional)</span>
+                    <textarea @bind="_createDescription" rows="2" disabled="@_creating"></textarea>
+                </label>
+            </div>
+            @if (_createError is not null) { <p class="taxonomy-error" role="alert">@_createError</p> }
+            <button class="button button-primary" type="submit" disabled="@_creating">@(_creating ? "Creating…" : "Create")</button>
+        </form>
+
+        @if (_error is not null)
+        {
+            <div class="state surface error" role="alert">
+                <h2>Taxonomy could not be loaded</h2>
+                <p>@_error</p>
+                <button class="button button-secondary" type="button" @onclick="LoadAsync">Try again</button>
+            </div>
+        }
+        else if (_entities.Count == 0)
+        {
+            <div class="state surface">
+                <h2>No @(IsSeries ? "series" : "topics") yet</h2>
+                <p>Create the first one above. It will be available from every article editor.</p>
+            </div>
+        }
+        else
+        {
+            <div class="taxonomy-list">
+                @foreach (var entity in _entities)
+                {
+                    <article class="taxonomy-item surface" @key="entity.Id">
+                        <header>
+                            <h2>@entity.DisplayName</h2>
+                        </header>
+                        @foreach (var localization in entity.Localizations)
+                        {
+                            <form class="taxonomy-localization-form" @onsubmit="() => SaveAsync(localization)" @onsubmit:preventDefault="true">
+                                <h3><span class="taxonomy-language">@localization.LanguageCode.ToUpperInvariant()</span> localization</h3>
+                                <div class="taxonomy-form-grid">
+                                    <label>@(IsSeries ? "Title" : "Name")
+                                        <input type="text" @bind="localization.EntityName" disabled="@IsSaving(localization)" required />
+                                    </label>
+                                    <label>Slug
+                                        <input type="text" @bind="localization.Slug" spellcheck="false" disabled="@IsSaving(localization)" required />
+                                    </label>
+                                    <label class="taxonomy-description">Description <span>(optional)</span>
+                                        <textarea @bind="localization.Description" rows="2" disabled="@IsSaving(localization)"></textarea>
+                                    </label>
+                                </div>
+                                @if (localization.Error is not null) { <p class="taxonomy-error" role="alert">@localization.Error</p> }
+                                <button class="button button-secondary" type="submit" disabled="@IsSaving(localization)">@(IsSaving(localization) ? "Saving…" : "Save changes")</button>
+                            </form>
+                        }
+                        @if (_addLocalizations.TryGetValue(entity.Id, out var addition))
+                        {
+                            <details class="taxonomy-add-localization">
+                                <summary>Add localization</summary>
+                                <form @onsubmit="() => AddLocalizationAsync(entity.Id, addition)" @onsubmit:preventDefault="true">
+                                    <div class="taxonomy-form-grid">
+                                        <label>Language
+                                            <select @bind="addition.LanguageCode" disabled="@IsAdding(entity.Id)">
+                                                @foreach (var language in entity.MissingLanguages)
+                                                {
+                                                    <option value="@language">@(language == "ru" ? "Russian (RU)" : "English (EN)")</option>
+                                                }
+                                            </select>
+                                        </label>
+                                        <label>@(IsSeries ? "Title" : "Name")
+                                            <input type="text" @bind="addition.Name" disabled="@IsAdding(entity.Id)" required />
+                                        </label>
+                                        <label>Slug
+                                            <input type="text" @bind="addition.Slug" spellcheck="false" disabled="@IsAdding(entity.Id)" required />
+                                        </label>
+                                        <label class="taxonomy-description">Description <span>(optional)</span>
+                                            <textarea @bind="addition.Description" rows="2" disabled="@IsAdding(entity.Id)"></textarea>
+                                        </label>
+                                    </div>
+                                    @if (addition.Error is not null) { <p class="taxonomy-error" role="alert">@addition.Error</p> }
+                                    <button class="button button-secondary" type="submit" disabled="@IsAdding(entity.Id)">@(IsAdding(entity.Id) ? "Adding…" : "Add localization")</button>
+                                </form>
+                            </details>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public bool IsSeries { get; set; }
+
+    private static readonly string[] SupportedLanguages = ["en", "ru"];
+    private readonly List<TaxonomyEntityEditor> _entities = [];
+    private readonly Dictionary<Guid, NewLocalizationEditor> _addLocalizations = [];
+    private bool _loading = true;
+    private bool _creating;
+    private string _createLanguage = "en";
+    private string _createName = string.Empty;
+    private string _createSlug = string.Empty;
+    private string? _createDescription;
+    private string? _createError;
+    private string? _error;
+    private string? _savingKey;
+    private Guid? _addingEntityId;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var taxonomy = await ArticlesClient.GetTaxonomyAsync();
+            _entities.Clear();
+            _addLocalizations.Clear();
+            if (IsSeries)
+            {
+                foreach (var series in taxonomy.Series)
+                {
+                    AddEntity(series.Id, series.Localizations.Select(localization =>
+                        new TaxonomyLocalizationEditor(series.Id, localization.LanguageCode, localization.Title, localization.Slug, localization.Description)));
+                }
+            }
+            else
+            {
+                foreach (var topic in taxonomy.Topics)
+                {
+                    AddEntity(topic.Id, topic.Localizations.Select(localization =>
+                        new TaxonomyLocalizationEditor(topic.Id, localization.LanguageCode, localization.Name, localization.Slug, localization.Description)));
+                }
+            }
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            _error = exception.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _createError = null;
+        _creating = true;
+        try
+        {
+            if (IsSeries)
+            {
+                await ArticlesClient.CreateSeriesAsync(new(_createLanguage, _createName, _createSlug, _createDescription));
+            }
+            else
+            {
+                await ArticlesClient.CreateTopicAsync(new(_createLanguage, _createName, _createSlug, _createDescription));
+            }
+
+            _createName = string.Empty;
+            _createSlug = string.Empty;
+            _createDescription = null;
+            await LoadAsync();
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            _createError = exception.Message;
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private async Task SaveAsync(TaxonomyLocalizationEditor localization)
+    {
+        localization.Error = null;
+        _savingKey = localization.Key;
+        try
+        {
+            if (IsSeries)
+            {
+                await ArticlesClient.UpdateSeriesLocalizationAsync(
+                    localization.EntityId,
+                    localization.LanguageCode,
+                    new(localization.EntityName, localization.Slug, localization.Description));
+            }
+            else
+            {
+                await ArticlesClient.UpdateTopicLocalizationAsync(
+                    localization.EntityId,
+                    localization.LanguageCode,
+                    new(localization.EntityName, localization.Slug, localization.Description));
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            localization.Error = exception.Message;
+        }
+        finally
+        {
+            _savingKey = null;
+        }
+    }
+
+    private bool IsSaving(TaxonomyLocalizationEditor localization) => _savingKey == localization.Key;
+
+    private bool IsAdding(Guid entityId) => _addingEntityId == entityId;
+
+    private void AddEntity(Guid entityId, IEnumerable<TaxonomyLocalizationEditor> localizations)
+    {
+        var entityLocalizations = localizations.ToArray();
+        var missingLanguages = SupportedLanguages
+            .Except(entityLocalizations.Select(localization => localization.LanguageCode), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        _entities.Add(new TaxonomyEntityEditor(entityId, entityLocalizations, missingLanguages));
+        if (missingLanguages.Length > 0)
+        {
+            _addLocalizations[entityId] = new NewLocalizationEditor(missingLanguages[0]);
+        }
+    }
+
+    private async Task AddLocalizationAsync(Guid entityId, NewLocalizationEditor addition)
+    {
+        addition.Error = null;
+        _addingEntityId = entityId;
+        try
+        {
+            if (IsSeries)
+            {
+                await ArticlesClient.AddSeriesLocalizationAsync(
+                    entityId,
+                    new(addition.LanguageCode, addition.Name, addition.Slug, addition.Description));
+            }
+            else
+            {
+                await ArticlesClient.AddTopicLocalizationAsync(
+                    entityId,
+                    new(addition.LanguageCode, addition.Name, addition.Slug, addition.Description));
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            addition.Error = exception.Message;
+        }
+        finally
+        {
+            _addingEntityId = null;
+        }
+    }
+
+    private sealed class TaxonomyLocalizationEditor(
+        Guid entityId,
+        string languageCode,
+        string entityName,
+        string slug,
+        string? description)
+    {
+        public Guid EntityId { get; } = entityId;
+        public string LanguageCode { get; } = languageCode;
+        public string EntityName { get; set; } = entityName;
+        public string Slug { get; set; } = slug;
+        public string? Description { get; set; } = description;
+        public string? Error { get; set; }
+        public string Key => $"{EntityId}:{LanguageCode}";
+    }
+
+    private sealed class TaxonomyEntityEditor(
+        Guid id,
+        IReadOnlyList<TaxonomyLocalizationEditor> localizations,
+        IReadOnlyList<string> missingLanguages)
+    {
+        public Guid Id { get; } = id;
+        public IReadOnlyList<TaxonomyLocalizationEditor> Localizations { get; } = localizations;
+        public IReadOnlyList<string> MissingLanguages { get; } = missingLanguages;
+        public string DisplayName => Localizations.FirstOrDefault(localization => localization.LanguageCode == "en")?.EntityName
+            ?? Localizations.FirstOrDefault()?.EntityName
+            ?? "Untitled";
+    }
+
+    private sealed class NewLocalizationEditor(string languageCode)
+    {
+        public string LanguageCode { get; set; } = languageCode;
+        public string Name { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? Error { get; set; }
+    }
+}

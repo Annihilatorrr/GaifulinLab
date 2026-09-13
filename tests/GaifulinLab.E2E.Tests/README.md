@@ -33,10 +33,11 @@ visible in the normal local application. Repeated runs therefore accumulate
 E2E fixtures. `e2e.runsettings` contains a local-only deterministic Identity
 administrator; the fixture creates it when it starts the API.
 
-The registration/article workflow also seeds a uniquely named topic directly
-into the development database, because the application currently has no UI or
-admin endpoint for creating taxonomy. The browser still performs the actual
-topic assignment and verifies the public topic and filtered article pages.
+The registration/article workflow may seed uniquely named taxonomy directly
+when a test needs controlled public-content fixtures. The application also
+provides authenticated workspace UI and endpoints for creating and managing
+topics and series; browser tests cover creating taxonomy from the article
+editor.
 
 Run the E2E suite explicitly:
 

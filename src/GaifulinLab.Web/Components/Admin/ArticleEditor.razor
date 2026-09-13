@@ -153,6 +153,15 @@
                                     }
                                 </div>
                             }
+                            <form class="taxonomy-create-form" @onsubmit="CreateTopicAsync" @onsubmit:preventDefault="true">
+                                <label>New topic name <input type="text" @bind="_newTopicName" disabled="@IsBusy" required /></label>
+                                <label>Slug <input type="text" @bind="_newTopicSlug" placeholder="mathematics" spellcheck="false" disabled="@IsBusy" required /></label>
+                                @if (_topicCreateError is not null) { <span class="taxonomy-create-error" role="alert">@_topicCreateError</span> }
+                                <div class="taxonomy-create-actions">
+                                    <button class="button button-secondary" type="submit" disabled="@IsBusy">@(_taxonomyCreating ? "Creating…" : "Create topic")</button>
+                                    <a href="/admin/topics">Manage topics</a>
+                                </div>
+                            </form>
                         </div>
                     </details>
                 </div>
@@ -182,6 +191,15 @@
                                     }
                                 </div>
                             }
+                            <form class="taxonomy-create-form" @onsubmit="CreateSeriesAsync" @onsubmit:preventDefault="true">
+                                <label>New series title <input type="text" @bind="_newSeriesTitle" disabled="@IsBusy" required /></label>
+                                <label>Slug <input type="text" @bind="_newSeriesSlug" placeholder="complex-numbers" spellcheck="false" disabled="@IsBusy" required /></label>
+                                @if (_seriesCreateError is not null) { <span class="taxonomy-create-error" role="alert">@_seriesCreateError</span> }
+                                <div class="taxonomy-create-actions">
+                                    <button class="button button-secondary" type="submit" disabled="@IsBusy">@(_taxonomyCreating ? "Creating…" : "Create series")</button>
+                                    <a href="/admin/series">Manage series</a>
+                                </div>
+                            </form>
                         </div>
                     </details>
                 </div>
@@ -299,6 +317,13 @@
     private string? _previewError;
     private string? _pdfExportError;
     private string? _imageUploadError;
+    private string _newTopicName = string.Empty;
+    private string _newTopicSlug = string.Empty;
+    private string _newSeriesTitle = string.Empty;
+    private string _newSeriesSlug = string.Empty;
+    private string? _topicCreateError;
+    private string? _seriesCreateError;
+    private bool _taxonomyCreating;
     private string _codeLanguage = "csharp";
     private string? _message;
     private bool _hasError;
@@ -336,7 +361,7 @@
     private ArticleTypography _typography = ArticleTypography.Default;
     private DateTimeOffset? _savedAt;
     private LocalizationModel Current => _localizations[_activeLanguage];
-    private bool IsBusy => _loading || _saving || _coverUploading || _pdfExportInProgress;
+    private bool IsBusy => _loading || _saving || _coverUploading || _pdfExportInProgress || _taxonomyCreating;
     private bool CanSave => !IsBusy
         && _conflictLanguage is null
         && (ArticleId is null || _isDirty || _saveFailed || _exportRequiresManualSave);
@@ -1160,10 +1185,74 @@
         if (changed) MarkDirty(taxonomy: true);
     }
 
+    private async Task CreateTopicAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        _topicCreateError = null;
+        _taxonomyCreating = true;
+        try
+        {
+            var created = await ArticlesClient.CreateTopicAsync(new(
+                _activeLanguage,
+                _newTopicName,
+                _newTopicSlug,
+                null));
+            _taxonomy = await ArticlesClient.GetTaxonomyAsync();
+            _topicIds.Add(created.Id);
+            _newTopicName = string.Empty;
+            _newTopicSlug = string.Empty;
+            MarkDirty(taxonomy: true);
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            _topicCreateError = exception.Message;
+        }
+        finally
+        {
+            _taxonomyCreating = false;
+        }
+    }
+
     private void ToggleSeries(Guid id, ChangeEventArgs args)
     {
         var changed = args.Value is true ? _series.TryAdd(id, 1) : _series.Remove(id);
         if (changed) MarkDirty(taxonomy: true);
+    }
+
+    private async Task CreateSeriesAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        _seriesCreateError = null;
+        _taxonomyCreating = true;
+        try
+        {
+            var created = await ArticlesClient.CreateSeriesAsync(new(
+                _activeLanguage,
+                _newSeriesTitle,
+                _newSeriesSlug,
+                null));
+            _taxonomy = await ArticlesClient.GetTaxonomyAsync();
+            _series[created.Id] = NextSeriesPosition(created.Id);
+            _newSeriesTitle = string.Empty;
+            _newSeriesSlug = string.Empty;
+            MarkDirty(taxonomy: true);
+        }
+        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        {
+            _seriesCreateError = exception.Message;
+        }
+        finally
+        {
+            _taxonomyCreating = false;
+        }
     }
 
     private void SetSeriesPosition(Guid id, ChangeEventArgs args)
@@ -1179,6 +1268,21 @@
 
     private void RemoveTopic(Guid id) { if (_topicIds.Remove(id)) MarkDirty(taxonomy: true); }
     private void RemoveSeries(Guid id) { if (_series.Remove(id)) MarkDirty(taxonomy: true); }
+    private int NextSeriesPosition(Guid seriesId)
+    {
+        var usedPositions = _taxonomy.Series
+            .Single(series => series.Id == seriesId)
+            .Articles
+            .Select(article => article.Position)
+            .ToHashSet();
+        var position = 1;
+        while (usedPositions.Contains(position))
+        {
+            position++;
+        }
+
+        return position;
+    }
     private void RemoveTag(string tag)
     {
         var tags = ParseTags().Where(item => !string.Equals(item, tag, StringComparison.OrdinalIgnoreCase)).ToArray();

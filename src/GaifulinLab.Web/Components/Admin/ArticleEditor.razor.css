@@ -1166,3 +1166,49 @@
 .editor-cover-preview { display: block; width: 100%; max-height: 10rem; object-fit: cover; border-radius: var(--radius-sm); margin-bottom: .5rem; }
 .cover-setting .metadata-popover-content { display: grid; gap: .6rem; }
 .cover-setting input[type=file] { max-width: 100%; margin-top: .5rem; }
+
+.taxonomy-create-form {
+    display: grid;
+    gap: var(--space-2);
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-3);
+}
+
+.taxonomy-create-form label {
+    display: grid;
+    gap: 0.25rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+}
+
+.taxonomy-create-form input {
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.45rem 0.55rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+.taxonomy-create-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.taxonomy-create-actions .button {
+    min-height: 2rem;
+    padding: 0.35rem 0.65rem;
+}
+
+.taxonomy-create-actions a {
+    color: var(--color-accent);
+    font-size: var(--text-xs);
+    font-weight: 700;
+}
+
+.taxonomy-create-error {
+    color: var(--color-danger, #b42318);
+    font-size: var(--text-xs);
+}

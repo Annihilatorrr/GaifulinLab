@@ -2,6 +2,8 @@
 .page-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-6); margin-bottom: var(--space-8); }
 .page-heading h1 { margin: var(--space-2) 0; font-size: var(--text-3xl); }
 .page-heading p { max-width: 42rem; margin: 0; }
+.taxonomy-links { display: flex; gap: var(--space-3); margin-top: var(--space-3); }
+.taxonomy-links a { color: var(--color-accent); font-size: var(--text-sm); font-weight: 700; }
 .state { min-height: 20rem; display: grid; place-items: center; align-content: center; gap: var(--space-3); padding: var(--space-8); text-align: center; }
 .state h2, .state p { margin: 0; }
 .state .button { margin-top: var(--space-3); }

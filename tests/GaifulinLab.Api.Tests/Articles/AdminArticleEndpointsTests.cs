@@ -435,6 +435,95 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
     }
 
     [Fact]
+    public async Task TaxonomyCreationAndLocalizationEditing_UseLanguageScopedUniqueSlugs()
+    {
+        using var client = await CreateAuthenticatedClient();
+        var suffix = Guid.NewGuid().ToString("N");
+
+        var topicResponse = await client.PostAsJsonAsync(
+            "/api/admin/taxonomy/topics",
+            new CreateTopicRequest("ru", "Математика", $"matematika-{suffix}", "Раздел математики"));
+        Assert.Equal(HttpStatusCode.Created, topicResponse.StatusCode);
+        Assert.Equal("/api/admin/taxonomy", topicResponse.Headers.Location?.ToString());
+        var topic = await topicResponse.Content.ReadFromJsonAsync<AdminTopicDto>();
+        Assert.NotNull(topic);
+        Assert.Equal("Математика", Assert.Single(topic.Localizations).Name);
+
+        var addedTopicLocalization = await client.PostAsJsonAsync(
+            $"/api/admin/taxonomy/topics/{topic.Id}/localizations",
+            new CreateTopicRequest("en", "Mathematics", $"mathematics-{suffix}", "Mathematics subject"));
+        Assert.Equal(HttpStatusCode.Created, addedTopicLocalization.StatusCode);
+        Assert.Equal("/api/admin/taxonomy", addedTopicLocalization.Headers.Location?.ToString());
+        var topicWithEnglish = await addedTopicLocalization.Content.ReadFromJsonAsync<AdminTopicDto>();
+        Assert.Equal(2, topicWithEnglish!.Localizations.Count);
+
+        var duplicateTopicLocalization = await client.PostAsJsonAsync(
+            $"/api/admin/taxonomy/topics/{topic.Id}/localizations",
+            new CreateTopicRequest("en", "Duplicate", $"duplicate-topic-{suffix}", null));
+        Assert.Equal(HttpStatusCode.Conflict, duplicateTopicLocalization.StatusCode);
+        Assert.Equal(
+            "taxonomy_localization_conflict",
+            (await duplicateTopicLocalization.Content.ReadFromJsonAsync<ApiErrorResponse>())?.Code);
+
+        var seriesResponse = await client.PostAsJsonAsync(
+            "/api/admin/taxonomy/series",
+            new CreateSeriesRequest("ru", "Комплексные числа", $"complex-{suffix}", null));
+        Assert.Equal(HttpStatusCode.Created, seriesResponse.StatusCode);
+        var series = await seriesResponse.Content.ReadFromJsonAsync<AdminSeriesDto>();
+        Assert.NotNull(series);
+        Assert.Equal("Комплексные числа", Assert.Single(series.Localizations).Title);
+
+        var articleResponse = await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest("en", "Series member", null, "Content", $"series-member-{suffix}"));
+        var article = await articleResponse.Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(article);
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await client.PutAsJsonAsync(
+                $"/api/admin/articles/{article!.ArticleId}/taxonomy",
+                new UpdateArticleTaxonomyRequest([], [new SeriesAssignmentRequest(series.Id, 1)], []))).StatusCode);
+
+        var addedSeriesLocalization = await client.PostAsJsonAsync(
+            $"/api/admin/taxonomy/series/{series.Id}/localizations",
+            new CreateSeriesRequest("en", "Complex numbers", $"complex-numbers-{suffix}", null));
+        Assert.Equal(HttpStatusCode.Created, addedSeriesLocalization.StatusCode);
+        var seriesWithEnglish = await addedSeriesLocalization.Content.ReadFromJsonAsync<AdminSeriesDto>();
+        Assert.Equal(2, seriesWithEnglish!.Localizations.Count);
+        Assert.Equal(new AdminSeriesArticleDto(article.ArticleId, 1), Assert.Single(seriesWithEnglish.Articles));
+
+        var duplicate = await client.PostAsJsonAsync(
+            "/api/admin/taxonomy/topics",
+            new CreateTopicRequest("ru", "Другая тема", $"matematika-{suffix}", null));
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+        Assert.Equal(
+            "taxonomy_slug_conflict",
+            (await duplicate.Content.ReadFromJsonAsync<ApiErrorResponse>())?.Code);
+
+        var update = await client.PutAsJsonAsync(
+            $"/api/admin/taxonomy/topics/{topic!.Id}/localizations/ru",
+            new UpdateTopicLocalizationRequest("Высшая математика", $"higher-math-{suffix}", "Обновлённое описание"));
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var taxonomy = await client.GetFromJsonAsync<AdminTaxonomyDto>("/api/admin/taxonomy");
+        Assert.Contains(taxonomy!.Topics, candidate => candidate.Id == topic.Id
+            && candidate.Localizations.Single(localization => localization.LanguageCode == "ru").Name == "Высшая математика");
+        Assert.Contains(taxonomy.Series, candidate => candidate.Id == series!.Id);
+    }
+
+    [Fact]
+    public async Task TaxonomyMutation_RequiresAuthentication()
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/admin/taxonomy/topics",
+            new CreateTopicRequest("en", "Mathematics", "mathematics", null));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task UpdateTaxonomy_ReplacesAssignmentsAndCreatesMissingTags()
     {
         await using var isolatedFactory = new AuthWebApplicationFactory();

@@ -31,6 +31,7 @@ public static class DependencyInjection
 
         services.AddScoped<IAppDbContext>(serviceProvider =>
             serviceProvider.GetRequiredService<AppDbContext>());
+        services.AddSingleton<ITaxonomyPersistenceConflictDetector, NpgsqlTaxonomyPersistenceConflictDetector>();
         services.AddSingleton<IArticleHtmlSanitizer, ArticleHtmlSanitizer>();
         services.AddScoped<GaifulinLab.Application.Articles.Public.IArticleSearch, Content.ArticleSearch>();
         services.AddSingleton<IMediaStorage>(_ => new FileSystemMediaStorage(
