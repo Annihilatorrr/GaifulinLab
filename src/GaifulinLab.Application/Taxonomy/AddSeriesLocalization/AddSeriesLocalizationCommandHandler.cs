@@ -10,8 +10,7 @@ namespace GaifulinLab.Application.Taxonomy.AddSeriesLocalization;
 
 internal sealed class AddSeriesLocalizationCommandHandler(
     IAppDbContext dbContext,
-    TimeProvider timeProvider,
-    ITaxonomyPersistenceConflictDetector conflictDetector)
+    TimeProvider timeProvider)
     : IRequestHandler<AddSeriesLocalizationCommand, AdminSeriesDto>
 {
     public async Task<AdminSeriesDto> Handle(
@@ -48,22 +47,7 @@ internal sealed class AddSeriesLocalizationCommandHandler(
             timeProvider.GetUtcNow());
         dbContext.SeriesLocalizations.Add(localization);
 
-        try
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException exception)
-        {
-            switch (conflictDetector.Detect(exception))
-            {
-                case TaxonomyPersistenceConflict.SlugAlreadyUsed:
-                    throw CreateSeriesCommandHandler.SlugConflict(languageCode, normalizedSlug);
-                case TaxonomyPersistenceConflict.LocalizationAlreadyExists:
-                    throw LocalizationConflict("series", languageCode);
-                default:
-                    throw;
-            }
-        }
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return CreateSeriesCommandHandler.ToDto(series);
     }

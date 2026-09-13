@@ -10,8 +10,7 @@ namespace GaifulinLab.Application.Taxonomy.AddTopicLocalization;
 
 internal sealed class AddTopicLocalizationCommandHandler(
     IAppDbContext dbContext,
-    TimeProvider timeProvider,
-    ITaxonomyPersistenceConflictDetector conflictDetector)
+    TimeProvider timeProvider)
     : IRequestHandler<AddTopicLocalizationCommand, AdminTopicDto>
 {
     public async Task<AdminTopicDto> Handle(
@@ -47,22 +46,7 @@ internal sealed class AddTopicLocalizationCommandHandler(
             timeProvider.GetUtcNow());
         dbContext.TopicLocalizations.Add(localization);
 
-        try
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException exception)
-        {
-            switch (conflictDetector.Detect(exception))
-            {
-                case TaxonomyPersistenceConflict.SlugAlreadyUsed:
-                    throw CreateTopicCommandHandler.SlugConflict(languageCode, normalizedSlug);
-                case TaxonomyPersistenceConflict.LocalizationAlreadyExists:
-                    throw LocalizationConflict("topic", languageCode);
-                default:
-                    throw;
-            }
-        }
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return CreateTopicCommandHandler.ToDto(topic);
     }
