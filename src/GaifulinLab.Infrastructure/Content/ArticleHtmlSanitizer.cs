@@ -43,8 +43,13 @@ public sealed class ArticleHtmlSanitizer : IArticleHtmlSanitizer
         sanitizer.AllowedClasses.Clear();
         sanitizer.AllowedClasses.UnionWith(
         [
-            "article-callout", "article-callout--danger", "article-callout--info",
-            "article-callout--warning", "article-figure", "article-formula", "math",
+            "article-callout", "article-callout--danger", "article-callout--deep",
+            "article-callout--important", "article-callout--info", "article-callout--note",
+            "article-callout--tip", "article-callout--warning", "article-example",
+            "article-example__title", "article-figure", "article-figure--placeholder",
+            "article-figure--wide", "article-figure__canvas", "article-figure__index",
+            "article-formula", "article-formula--accent", "article-next", "article-next__eyebrow",
+            "article-summary", "article-toc", "math",
             "language-bash", "language-c", "language-cpp", "language-csharp", "language-css",
             "language-go", "language-java", "language-javascript", "language-json", "language-php",
             "language-python", "language-rust", "language-sql", "language-typescript", "language-xml",

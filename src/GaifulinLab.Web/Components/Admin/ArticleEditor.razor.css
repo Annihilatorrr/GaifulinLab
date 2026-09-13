@@ -903,7 +903,7 @@
 
 #article-html {
     width: 100%;
-    min-height: 0;
+    min-height: 20rem;
     flex: 1;
     resize: none;
     border: 0;

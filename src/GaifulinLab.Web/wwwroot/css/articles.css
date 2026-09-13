@@ -1,39 +1,99 @@
 /*
- * Article HTML is supplied by authors. Every selector stays under this root so
- * article-specific classes cannot change the surrounding application chrome.
+ * Общая область статьи. Правила применяются только к содержимому внутри
+ * .article-content, поэтому авторская разметка не меняет интерфейс сайта.
  */
+.article-content,
+.article-content * {
+    box-sizing: border-box;
+}
+
 .article-content {
     color: var(--color-text);
     line-height: var(--article-line-height, 1.75);
+    overflow-wrap: break-word;
 }
 
+/* Ссылки <a> внутри статьи: фирменный цвет и заметное состояние наведения. */
+.article-content a {
+    color: var(--color-accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: .18em;
+}
+
+.article-content a:hover {
+    text-decoration-thickness: 2px;
+}
+
+/*
+ * Заголовки <h1>–<h6>: компактная иерархия без больших разрывов между
+ * заголовком и следующим абзацем. Первый элемент статьи не получает отступ сверху.
+ */
 .article-content h1,
 .article-content h2,
 .article-content h3,
 .article-content h4,
 .article-content h5,
 .article-content h6 {
-    margin-block: 1.75em .65em;
     line-height: var(--line-heading);
+    text-wrap: balance;
 }
 
-.article-content > :first-child { margin-top: 0; }
-.article-content h1 { font-size: var(--text-3xl); }
-.article-content h2 { font-size: clamp(1.5rem, 2vw, 2rem); }
-.article-content h3 { font-size: var(--text-xl); }
+.article-content > :first-child {
+    margin-top: 0;
+}
 
+.article-content h1 {
+    margin-block: 0 .6rem;
+    font-size: clamp(1.85rem, 4vw, 2.45rem);
+    letter-spacing: -.025em;
+}
+
+.article-content h2 {
+    margin-block: 1.05rem .35rem;
+    font-size: clamp(1.28rem, 2.4vw, 1.55rem);
+    letter-spacing: -.015em;
+}
+
+.article-content h3 {
+    margin-block: .75rem .25rem;
+    font-size: 1rem;
+    line-height: 1.25;
+}
+
+.article-content h4,
+.article-content h5,
+.article-content h6 {
+    margin-block: .65rem .25rem;
+}
+
+/*
+ * Обычный поток: абзацы <p>, списки <ul>/<ol>, цитаты <blockquote> и таблицы
+ * используют настраиваемый читателем --article-block-spacing.
+ */
 .article-content p,
 .article-content ul,
 .article-content ol,
 .article-content blockquote,
-.article-content pre,
-.article-content table,
-.article-content figure,
-.article-content .article-callout,
-.article-content .article-formula {
+.article-content table {
     margin-block: 0 var(--article-block-spacing, .75rem);
 }
 
+.article-content ul,
+.article-content ol {
+    padding-left: 1.4em;
+}
+
+.article-content li + li {
+    margin-top: .18em;
+}
+
+/* Секции <section> дают якорям место под шапку, но не добавляют скрытый отступ. */
+.article-content section {
+    padding-top: 0;
+    scroll-margin-top: 1.5rem;
+}
+
+/* Цитаты <blockquote>: акцентная линия слева и приглушённый текст. */
 .article-content blockquote {
     margin-inline: 0;
     border-left: 3px solid var(--color-accent);
@@ -41,6 +101,169 @@
     color: var(--color-text-muted);
 }
 
+/*
+ * Резюме .article-summary и оглавление .article-toc: компактные служебные
+ * карточки. Внутренние первый и последний элементы не создают лишних полей.
+ */
+.article-content .article-summary,
+.article-content .article-toc {
+    margin-block: .8rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.125rem;
+    background: var(--color-surface-subtle);
+}
+
+.article-content .article-summary > :first-child,
+.article-content .article-toc > :first-child {
+    margin-top: 0;
+}
+
+.article-content .article-summary > :last-child,
+.article-content .article-toc > :last-child {
+    margin-bottom: 0;
+}
+
+.article-content .article-toc h2 {
+    margin-block: 0 .3rem;
+    font-size: 1.08rem;
+}
+
+.article-content .article-toc a {
+    color: var(--color-text);
+    text-decoration-color: var(--color-border-strong);
+}
+
+.article-content .article-toc a:hover {
+    color: var(--color-accent);
+    text-decoration-color: currentColor;
+}
+
+/*
+ * Примеры .article-example: отдельный учебный блок с акцентной линией.
+ * .article-example__title оформляет короткую метку вида «Пример».
+ */
+.article-content .article-example {
+    margin-block: .65rem;
+    border-left: 4px solid var(--color-accent);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    padding: 1rem 1.125rem;
+    background: var(--color-surface-subtle);
+}
+
+.article-content .article-example__title {
+    margin: 0 0 .3rem;
+    color: var(--color-accent);
+    font-size: .82rem;
+    font-weight: 800;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+}
+
+.article-content .article-example > :first-child {
+    margin-top: 0;
+}
+
+.article-content .article-example > :last-child {
+    margin-bottom: 0;
+}
+
+.article-content .article-example h3 {
+    margin-block: 0 .3rem;
+}
+
+/*
+ * Врезки .article-callout: базовая карточка и смысловые модификаторы цвета.
+ * Доступны --note, --important, --tip, --deep и прежние --info/--warning/--danger.
+ */
+.article-content .article-callout {
+    margin-block: .65rem;
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-accent);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.125rem;
+    background: var(--color-surface-subtle);
+}
+
+.article-content .article-callout > :first-child {
+    margin-top: 0;
+}
+
+.article-content .article-callout > :last-child {
+    margin-bottom: 0;
+}
+
+.article-content .article-callout h3 {
+    margin-block: 0 .3rem;
+}
+
+.article-content .article-callout--note {
+    background: var(--color-surface-subtle);
+}
+
+.article-content .article-callout--info {
+    border-color: var(--color-accent);
+    background: var(--color-surface-accent);
+}
+
+.article-content .article-callout--important,
+.article-content .article-callout--warning {
+    border-color: #d69e2e;
+    background: color-mix(in srgb, #d69e2e 12%, var(--color-surface));
+}
+
+.article-content .article-callout--tip {
+    border-color: #56a66c;
+    background: color-mix(in srgb, #56a66c 12%, var(--color-surface));
+}
+
+.article-content .article-callout--deep {
+    border-color: #8064d9;
+    background: color-mix(in srgb, #8064d9 12%, var(--color-surface));
+}
+
+.article-content .article-callout--danger {
+    border-color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
+}
+
+/*
+ * Формулы .article-formula/.math и блочный вывод MathJax CHTML: горизонтальная
+ * прокрутка защищает узкие экраны. --accent добавляет акцентную подложку.
+ */
+.article-content .article-formula,
+.article-content .math,
+.article-content mjx-container[display="true"] {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.article-content .article-formula {
+    margin-block: .18em;
+    text-align: center;
+}
+
+.article-content .article-formula--accent {
+    border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+    border-radius: var(--radius-md);
+    padding: .625rem .875rem;
+    background: var(--color-surface-accent);
+}
+
+.article-content mjx-container[display="true"] {
+    margin-block: .18em !important;
+    padding-block: 0;
+}
+
+.article-content .article-formula > mjx-container[display="true"] {
+    margin-block: 0 !important;
+}
+
+/*
+ * Код <code>/<pre> и клавиши <kbd>: inline-код остаётся в строке, а <pre>
+ * получает компактную панель с горизонтальной прокруткой.
+ */
 .article-content code,
 .article-content pre,
 .article-content kbd {
@@ -56,20 +279,23 @@
 }
 
 .article-content pre {
+    margin-block: .65rem;
     overflow-x: auto;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: var(--space-5);
+    padding: .8rem 1rem;
     background: var(--color-surface-subtle);
+    line-height: 1.45;
 }
 
 .article-content pre code {
     display: block;
     padding: 0;
     background: transparent;
-    font-size: .9em;
+    font-size: inherit;
 }
 
+/* Таблицы <table>: ячейки читаемы, а широкая таблица прокручивается по горизонтали. */
 .article-content table {
     display: block;
     width: 100%;
@@ -86,6 +312,7 @@
     vertical-align: top;
 }
 
+/* Обычные изображения <img> не выходят за ширину статьи и сохраняют пропорции. */
 .article-content img {
     display: block;
     max-width: 100%;
@@ -93,55 +320,174 @@
     border-radius: var(--radius-md);
 }
 
-.article-content .article-figure { margin-inline: 0; }
-.article-content .article-figure figcaption { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--text-sm); }
+.article-content figure {
+    margin-block: .8rem;
+    margin-inline: 0;
+}
 
-.article-content .article-callout {
-    border-left: 4px solid var(--color-accent);
+/*
+ * Иллюстрации .article-figure: компактный рисунок с подписью <figcaption>.
+ * --placeholder создаёт макет рисунка, --wide расширяет его, __canvas и __index
+ * оформляют область-заглушку и номер иллюстрации.
+ */
+.article-content .article-figure {
+    margin-inline: auto;
+}
+
+.article-content .article-figure--placeholder {
+    max-width: 42.5rem;
+}
+
+.article-content .article-figure--wide {
+    max-width: 47.5rem;
+}
+
+.article-content .article-figure figcaption {
+    margin-top: .45rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+}
+
+.article-content .article-figure--placeholder figcaption {
+    text-align: center;
+}
+
+.article-content .article-figure__canvas {
+    display: grid;
+    min-height: 15rem;
+    place-items: center;
+    align-content: center;
+    gap: .625rem;
+    border: 2px dashed var(--color-border-strong, var(--color-border));
     border-radius: var(--radius-md);
-    padding: var(--space-4) var(--space-5);
+    padding: 2.125rem;
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--color-accent) 4%, transparent),
+        color-mix(in srgb, var(--color-accent) 8%, transparent));
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.article-content .article-figure__canvas strong {
+    color: var(--color-text);
+    font-size: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.article-content .article-figure__index {
+    color: var(--color-accent);
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+/*
+ * .article-next оформляет рекомендацию следующей статьи;
+ * .article-next__eyebrow — её короткую надпись над заголовком.
+ */
+.article-content .article-next {
+    margin-block: .8rem;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
     background: var(--color-surface-accent);
 }
 
-.article-content .article-callout > :last-child { margin-bottom: 0; }
-.article-content .article-callout--warning { border-color: #d69e2e; background: color-mix(in srgb, #d69e2e 12%, var(--color-surface)); }
-.article-content .article-callout--info { border-color: var(--color-accent); }
-.article-content .article-callout--danger { border-color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface)); }
-
-.article-content .article-formula,
-.article-content .math,
-.article-content mjx-container[display="true"] {
-    max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
+.article-content .article-next > :first-child {
+    margin-top: 0;
 }
 
-.article-content mjx-container[display="true"] {
-    margin-block: var(--article-block-spacing, .75rem) !important;
-    padding-block: 0;
+.article-content .article-next > :last-child {
+    margin-bottom: 0;
 }
 
-/* highlight.js token colors. Plain code remains readable if the highlighter is unavailable. */
+.article-content .article-next__eyebrow {
+    margin: 0 0 .3rem;
+    color: var(--color-accent);
+    font-size: .8rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.article-content .article-next h2 {
+    margin-block: 0 .3rem;
+    font-size: 1.28rem;
+}
+
+/* Цвета токенов highlight.js; без подсветчика обычный код остаётся читаемым. */
 .article-content .hljs-keyword,
 .article-content .hljs-selector-tag,
-.article-content .hljs-title.function_ { color: var(--color-code-keyword); }
+.article-content .hljs-title.function_ {
+    color: var(--color-code-keyword);
+}
+
 .article-content .hljs-string,
 .article-content .hljs-attr,
-.article-content .hljs-template-variable { color: var(--color-code-string); }
-.article-content .hljs-number,
-.article-content .hljs-literal { color: var(--color-code-number); }
-.article-content .hljs-comment { color: var(--color-code-comment); font-style: italic; }
+.article-content .hljs-template-variable {
+    color: var(--color-code-string);
+}
 
+.article-content .hljs-number,
+.article-content .hljs-literal {
+    color: var(--color-code-number);
+}
+
+.article-content .hljs-comment {
+    color: var(--color-code-comment);
+    font-style: italic;
+}
+
+/* На узких экранах уменьшаются внутренние поля крупных авторских блоков. */
+@media (max-width: 45rem) {
+    .article-content .article-summary,
+    .article-content .article-toc,
+    .article-content .article-callout,
+    .article-content .article-example,
+    .article-content .article-next {
+        padding: 1rem;
+    }
+
+    .article-content .article-figure__canvas {
+        min-height: 11.875rem;
+        padding: 1.5rem 1.125rem;
+    }
+}
+
+/*
+ * Печать/PDF: значимые блоки не разрываются между страницами, а длинный код
+ * переносится вместо обрезания. Цвета продолжают задаваться печатной темой страницы.
+ */
 @media print {
     .article-content h1,
     .article-content h2,
     .article-content h3,
-    .article-content h4 { break-after: avoid-page; }
+    .article-content h4 {
+        break-after: avoid-page;
+    }
+
     .article-content img,
     .article-content pre,
     .article-content table,
     .article-content blockquote,
     .article-content .article-callout,
-    .article-content mjx-container { break-inside: avoid-page; }
-    .article-content pre { overflow: visible; white-space: pre-wrap; }
+    .article-content .article-example,
+    .article-content .article-formula--accent,
+    .article-content .article-figure__canvas,
+    .article-content .article-next,
+    .article-content mjx-container {
+        break-inside: avoid-page;
+    }
+
+    .article-content pre {
+        overflow: visible;
+        white-space: pre-wrap;
+    }
+
+    .article-content .article-toc a {
+        color: var(--color-text);
+        text-decoration: none;
+    }
 }

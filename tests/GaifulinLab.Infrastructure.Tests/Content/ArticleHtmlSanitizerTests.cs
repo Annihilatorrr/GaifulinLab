@@ -1,4 +1,5 @@
 using GaifulinLab.Infrastructure.Content;
+using System.Xml.Linq;
 
 namespace GaifulinLab.Infrastructure.Tests.Content;
 
@@ -57,6 +58,34 @@ public sealed class ArticleHtmlSanitizerTests
         Assert.Contains("language-python", sanitized);
         Assert.DoesNotContain("button", sanitized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("menu", sanitized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Sanitize_PreservesArticleLayoutClasses()
+    {
+        const string html = """
+            <aside class="article-summary article-toc article-example article-example__title
+                article-callout--note article-callout--important article-callout--tip article-callout--deep
+                article-formula--accent article-figure--placeholder article-figure--wide
+                article-figure__canvas article-figure__index article-next article-next__eyebrow">Content</aside>
+            """;
+        string[] expectedClasses =
+        [
+            "article-summary", "article-toc", "article-example", "article-example__title",
+            "article-callout--note", "article-callout--important", "article-callout--tip",
+            "article-callout--deep", "article-formula--accent", "article-figure--placeholder",
+            "article-figure--wide", "article-figure__canvas", "article-figure__index",
+            "article-next", "article-next__eyebrow"
+        ];
+
+        var sanitized = _sanitizer.Sanitize(html);
+        var actualClasses = XElement
+            .Parse(sanitized)
+            .Attribute("class")!
+            .Value
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(expectedClasses.Order(), actualClasses.Order());
     }
 
     [Fact]
