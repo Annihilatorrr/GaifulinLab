@@ -12,18 +12,18 @@
         linear-gradient(120deg, #091120, #121a38 72%, #111936);
     border-bottom: 1px solid #202b43;
 }
-.search-bar { display: flex; align-items: center; gap: 1rem; width: 100%; max-width: 70rem; min-height: 5.45rem; margin: auto; padding: .45rem .5rem .45rem 1.85rem; border-radius: var(--radius-pill); background: rgb(8 17 32 / .82); border: 1px solid var(--search-hero-border); box-shadow: 0 18px 42px rgb(0 0 0 / .22); }
+.search-bar { display: flex; align-items: center; gap: .75rem; width: 100%; max-width: 70rem; min-height: 2.875rem; margin: auto; padding: 0 .25rem 0 1rem; border-radius: var(--radius-pill); background: rgb(8 17 32 / .82); border: 1px solid var(--search-hero-border); box-shadow: 0 18px 42px rgb(0 0 0 / .22); }
 .search-bar:focus-within { border-color: #7990ff; outline: 2px solid rgb(121 144 255 / .42); outline-offset: 3px; }
 .search-bar svg { flex: 0 0 1.65rem; width: 1.65rem; fill: none; stroke: var(--search-hero-muted); stroke-width: 1.8; }
-.search-bar input { min-width: 0; width: 100%; padding: .85rem 0; border: 0; background: transparent; color: var(--search-hero-text); font: inherit; font-size: var(--text-lg); outline: none; }
+.search-bar input { min-width: 0; width: 100%; padding: .35rem 0; border: 0; background: transparent; color: var(--search-hero-text); font: inherit; font-size: var(--text-lg); outline: none; }
 .search-bar input::placeholder { color: #7f8ba3; opacity: 1; }
-.search-bar button { flex-shrink: 0; min-width: 10.5rem; min-height: 4.45rem; border: 0; border-radius: var(--radius-pill); padding: .95rem 1.8rem; background: linear-gradient(135deg, #7f98ff, #647dff); color: #0a1530; font: inherit; font-weight: 700; cursor: pointer; transition: filter var(--transition-fast), transform var(--transition-fast); }
+.search-bar button { flex-shrink: 0; min-width: 10.5rem; min-height: 2.75rem; border: 0; border-radius: var(--radius-pill); padding: .5rem 1.5rem; background: linear-gradient(135deg, #7f98ff, #647dff); color: #0a1530; font: inherit; font-weight: 700; cursor: pointer; transition: filter var(--transition-fast), transform var(--transition-fast); }
 .search-bar button:hover { filter: brightness(1.08); }
 .search-bar button:active { transform: translateY(1px); }
 .search-bar button:focus-visible { outline: 3px solid #c5d0ff; outline-offset: 2px; }
 .search-bar button span { margin-left: .7rem; }
 .search-filters { display: grid; grid-template-columns: 12rem 12rem 12.5rem 14rem; justify-content: center; gap: 1rem; margin-top: 1.6rem; }
-.search-filters select, .tag-picker summary { width: 100%; min-height: 3.9rem; border: 1px solid var(--search-hero-border); border-radius: var(--radius-md); padding: .75rem 1.25rem; background: var(--search-hero-control); color: var(--search-hero-text); font: inherit; font-size: 1rem; cursor: pointer; color-scheme: dark; box-shadow: 0 8px 22px rgb(0 0 0 / .14); transition: border-color var(--transition-fast), background var(--transition-fast); }
+.search-filters select, .tag-picker summary { width: 100%; min-height: 2.75rem; border: 1px solid var(--search-hero-border); border-radius: var(--radius-md); padding: .4rem 1rem; background: var(--search-hero-control); color: var(--search-hero-text); font: inherit; font-size: 1rem; cursor: pointer; color-scheme: dark; box-shadow: 0 8px 22px rgb(0 0 0 / .14); transition: border-color var(--transition-fast), background var(--transition-fast); }
 .search-filters select:hover, .tag-picker summary:hover { border-color: #415171; background: #101b30; }
 .search-filters select:focus-visible, .tag-picker summary:focus-visible { border-color: #7990ff; outline: 2px solid rgb(121 144 255 / .42); outline-offset: 2px; }
 .tag-picker { position: relative; text-align: left; }
@@ -87,13 +87,13 @@
 }
 @media (max-width: 40rem) {
     .search-hero { padding: 2.25rem 0 1.75rem; }
-    .search-bar { gap: .55rem; padding-left: .85rem; }
+    .search-bar { gap: .5rem; padding-left: .75rem; }
     .search-bar input { font-size: 1rem; }
-    .search-bar button { min-width: 7.25rem; padding: .8rem 1rem; }
+    .search-bar button { min-width: 7.25rem; padding: .5rem .85rem; }
     .search-bar button span { margin-left: .35rem; }
     .search-filters { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
     .search-filters label, .search-filters select { min-width: 0; width: 100%; max-width: none; }
-    .search-filters select, .tag-picker summary { min-height: 3.35rem; padding: .65rem .8rem; font-size: .9rem; }
+    .search-filters select, .tag-picker summary { min-height: 2.75rem; padding: .4rem .8rem; font-size: .9rem; }
     .tag-options { left: auto; right: 0; width: min(17rem, 85vw); }
     .results-toolbar { align-items: flex-start; flex-direction: column; }
     .results-toolbar label { width: 100%; justify-content: space-between; }

@@ -198,6 +198,15 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
             .EvaluateAllAsync<double[]>("elements => elements.map(element => element.getBoundingClientRect().top)");
         Assert.InRange(filterTops.Max() - filterTops.Min(), 0, 1);
 
+        // Search controls remain compact while preserving the 44px interactive-area minimum.
+        var searchBar = Assert.IsType<LocatorBoundingBoxResult>(await Page.Locator(".search-bar").BoundingBoxAsync());
+        var submitButton = Assert.IsType<LocatorBoundingBoxResult>(await Page.GetByRole(AriaRole.Button, new() { Name = "Find", Exact = true }).BoundingBoxAsync());
+        var filterHeights = await Page.Locator(".search-filters > *")
+            .EvaluateAllAsync<double[]>("elements => elements.map(element => element.getBoundingClientRect().height)");
+        Assert.InRange(searchBar.Height, 44, 48);
+        Assert.InRange(submitButton.Height, 44, 48);
+        Assert.All(filterHeights, height => Assert.InRange(height, 44, 48));
+
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("23 articles found");
         await Page.GetByRole(AriaRole.Link, new() { Name = "Page 2", Exact = true }).ClickAsync();
         await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
