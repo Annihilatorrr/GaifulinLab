@@ -181,8 +181,23 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         Assert.Equal(23, response!.TotalCount);
         Assert.Equal(HttpStatusCode.BadRequest, (await api.GetAsync("/api/public/search?page=0")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await api.GetAsync("/api/public/search?scope=wrong")).StatusCode);
+        await Page.SetViewportSizeAsync(1440, 1100);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/search?tag={token}").ToString());
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10, new() { Timeout = 15000 });
+
+        // The compact hero keeps its accessible name while removing all visible introductory copy.
+        await Expect(Page.GetByRole(AriaRole.Region, new() { Name = "Search", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.Locator(".search-hero > .site-container > h1")).ToHaveCountAsync(0);
+        await Expect(Page.Locator(".search-hero > .site-container > p")).ToHaveCountAsync(0);
+        await Expect(Page.Locator(".search-hero .eyebrow")).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Find", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.Locator(".search-filters > *")).ToHaveCountAsync(4);
+
+        // All four controls stay on one row at the reference desktop width.
+        var filterTops = await Page.Locator(".search-filters > *")
+            .EvaluateAllAsync<double[]>("elements => elements.map(element => element.getBoundingClientRect().top)");
+        Assert.InRange(filterTops.Max() - filterTops.Min(), 0, 1);
+
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("23 articles found");
         await Page.GetByRole(AriaRole.Link, new() { Name = "Page 2", Exact = true }).ClickAsync();
         await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
@@ -218,7 +233,6 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Page.GetByLabel("Sort by", new() { Exact = true }).SelectOptionAsync("oldest");
         await Expect(Page.Locator(".search-card h2").First).ToHaveTextAsync("Search interface lesson 00");
         Directory.CreateDirectory(Path.Combine("TestResults", "search"));
-        await Page.SetViewportSizeAsync(1440, 1100);
         await Page.EvaluateAsync("window.scrollTo({top: 0, behavior: 'instant'}); document.activeElement?.blur()");
         await Page.EvaluateAsync("document.documentElement.dataset.theme = 'light'");
         await Page.ScreenshotAsync(new() { Path = Path.Combine("TestResults", "search", "desktop-light.png"), FullPage = true });
@@ -226,11 +240,12 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Page.ScreenshotAsync(new() { Path = Path.Combine("TestResults", "search", "desktop-dark.png"), FullPage = true });
         await Page.SetViewportSizeAsync(390, 844);
         Assert.True(await Page.EvaluateAsync<bool>("document.documentElement.scrollWidth <= innerWidth"));
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Find", Exact = true })).ToBeVisibleAsync();
         await Page.ScreenshotAsync(new() { Path = Path.Combine("TestResults", "search", "mobile-dark.png"), FullPage = true });
         await Page.EvaluateAsync("document.documentElement.dataset.theme = 'light'");
         await Page.ScreenshotAsync(new() { Path = Path.Combine("TestResults", "search", "mobile-light.png"), FullPage = true });
         await Page.GetByLabel("Search articles", new() { Exact = true }).FillAsync("no-such-article");
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Search", Exact = false }).First.ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Find", Exact = true }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "No articles found" })).ToBeVisibleAsync();
         // Exercise a failed request and recovery without changing server availability.
         await Page.RouteAsync("**/api/public/search?**", route => route.AbortAsync());

@@ -1,14 +1,14 @@
 # Article search
 
 `/search` implements the reference layout using the site's existing design tokens,
-light/dark themes and public content client. The interface remains in English,
-consistent with the rest of the site; English and Russian article languages are
-selectable independently.
+light/dark themes and public content client. The interface is available in English
+and Russian through the existing language switcher. Search results and taxonomy
+use the content language associated with the current UI culture.
 
 ## Behavior
 
-- Submit text with Enter or Search. Topic, tags, scope, publication period and
-  sort changes apply immediately and reset the page.
+- Submit text with Enter or the localized Find/«Найти» button. Topic, tags, scope,
+  publication period and sort changes apply immediately and reset the page.
 - Multiple tags match **any** selected tag. Text, topic, tag selection and period
   are combined with AND. An empty text query lists published articles.
 - Scopes: `all`, `title`, `content` (summary or article body), `topics`, `tags`.

@@ -6,16 +6,13 @@
 
 <PageTitle>@L["search.pageTitle"] · Gaifulin Lab</PageTitle>
 <main id="main-content" class="search-page">
-    <section class="search-hero" aria-labelledby="search-title">
+    <section class="search-hero" aria-label="@L["search.pageTitle"]">
         <div class="site-container">
-            <span class="eyebrow">@L["search.eyebrow"]</span>
-            <h1 id="search-title">@L["search.title"]</h1>
-            <p>@L["search.description"]</p>
             <form class="search-bar" @onsubmit="Submit" @onsubmit:preventDefault role="search">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
                 <label for="article-search" class="visually-hidden">@L["search.articles"]</label>
                 <input id="article-search" type="search" placeholder="@L["search.placeholder"]" maxlength="200" autocomplete="off" @bind="_text" @bind:event="oninput" />
-                <button type="submit">@L["nav.search"] <span aria-hidden="true">→</span></button>
+                <button type="submit">@L["search.submit"] <span aria-hidden="true">→</span></button>
             </form>
             <div class="search-filters" aria-label="@L["search.filters"]">
                 <label><span class="visually-hidden">@L["search.topic"]</span><select aria-label="@L["search.topic"]" @bind="_request.Topic" @bind:after="Apply">
@@ -23,7 +20,10 @@
                     @foreach (var topic in _topics) { <option value="@topic.Slug">@topic.Name</option> }
                 </select></label>
                 <details class="tag-picker" data-dismiss-on-outside-click>
-                    <summary>@L["nav.tags"] @(_request.Tag.Length > 0 ? $"({_request.Tag.Length})" : "") <span aria-hidden="true">⌄</span></summary>
+                    <summary>
+                        <span>@(_request.Tag.Length == 0 ? L["search.allTags"] : $"{L["nav.tags"]} ({_request.Tag.Length})")</span>
+                        <span aria-hidden="true">⌄</span>
+                    </summary>
                     <div class="tag-options">
                         <p class="tag-hint">@L["search.tagHint"]</p>
                         <label class="visually-hidden" for="tag-filter">@L["search.findTag"]</label>

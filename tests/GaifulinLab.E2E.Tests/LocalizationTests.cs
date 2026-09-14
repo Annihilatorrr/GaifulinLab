@@ -18,6 +18,33 @@ public sealed class LocalizationTests : E2EPageTest
     }
 
     [Fact]
+    public async Task SearchForm_UsesCompactRussianCopyAndAccessibleLabels()
+    {
+        await Page.RouteAsync("**/api/public/**", route => route.FulfillAsync(new()
+        {
+            Status = 200,
+            ContentType = "application/json",
+            Body = route.Request.Url.Contains("/search", StringComparison.Ordinal)
+                ? "{\"items\":[],\"totalCount\":0,\"page\":1,\"pageSize\":10,\"totalPages\":0}"
+                : "[]"
+        }));
+        await Page.GotoAsync(BaseUri.ToString());
+        await Page.EvaluateAsync("localStorage.setItem('GaifulinLab.Web.UiCulture', 'ru')");
+        await Page.GotoAsync(new Uri(BaseUri, "/search").ToString());
+
+        // The visible Russian form contains only its controls, while the section and field remain named.
+        var searchRegion = Page.GetByRole(AriaRole.Region, new() { Name = "Поиск", Exact = true });
+        await Expect(searchRegion).ToBeVisibleAsync();
+        await Expect(searchRegion.GetByRole(AriaRole.Searchbox, new() { Name = "Поиск статей", Exact = true })).ToBeVisibleAsync();
+        await Expect(searchRegion.GetByRole(AriaRole.Button, new() { Name = "Найти", Exact = true })).ToBeVisibleAsync();
+        await Expect(searchRegion.Locator(".tag-picker summary")).ToContainTextAsync("Все теги");
+        await Expect(searchRegion.Locator(".search-filters > *")).ToHaveCountAsync(4);
+        await Expect(Page.GetByText("Исследуйте лабораторию", new() { Exact = true })).ToHaveCountAsync(0);
+        await Expect(Page.GetByText("Найдите следующую идею.", new() { Exact = true })).ToHaveCountAsync(0);
+        await Expect(Page.GetByText("Ищите по темам, тегам, заголовкам и текстам статей.", new() { Exact = true })).ToHaveCountAsync(0);
+    }
+
+    [Fact]
     public async Task GlobalLanguageSwitcher_ChangesContentLanguageAndPersistsAcrossReload()
     {
         var requestedUrls = new List<string>();
