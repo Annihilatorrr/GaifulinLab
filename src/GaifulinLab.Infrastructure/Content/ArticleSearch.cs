@@ -115,12 +115,26 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
                     ? row.Localization.SearchText ?? "" : row.Localization.Summary).Substring(0, 260)
                 : EF.Functions.ToTsQuery(config, prefixQuery).GetResultHeadline(config: config,
                     document: ((row.Localization.Summary ?? "") + " " + (row.Localization.SearchText ?? ""))
-                        .Replace("\uE000", "").Replace("\uE001", ""),
-                    options: "StartSel=\uE000, StopSel=\uE001, MaxWords=42, MinWords=16, MaxFragments=1"),
+                        .Replace("\uE000", "").Replace("\uE001", "")
+                        .Replace("C++", "glcpp").Replace("c++", "glcpp")
+                        .Replace("C#", "glcsharp").Replace("c#", "glcsharp")
+                        .Replace(".NET", "gldotnet").Replace(".NEt", "gldotnet")
+                        .Replace(".NeT", "gldotnet").Replace(".Net", "gldotnet")
+                        .Replace(".nET", "gldotnet").Replace(".nEt", "gldotnet")
+                        .Replace(".neT", "gldotnet").Replace(".net", "gldotnet"),
+                    options: "StartSel=\uE000, StopSel=\uE001, MaxWords=42, MinWords=16, MaxFragments=1")
+                    .Replace("glcpp", "C++").Replace("glcsharp", "C#").Replace("gldotnet", ".NET"),
             Headline = text.Length == 0 ? row.Localization.Title
                 : EF.Functions.ToTsQuery(config, prefixQuery).GetResultHeadline(config: config,
-                    document: row.Localization.Title.Replace("\uE000", "").Replace("\uE001", ""),
+                    document: row.Localization.Title.Replace("\uE000", "").Replace("\uE001", "")
+                        .Replace("C++", "glcpp").Replace("c++", "glcpp")
+                        .Replace("C#", "glcsharp").Replace("c#", "glcsharp")
+                        .Replace(".NET", "gldotnet").Replace(".NEt", "gldotnet")
+                        .Replace(".NeT", "gldotnet").Replace(".Net", "gldotnet")
+                        .Replace(".nET", "gldotnet").Replace(".nEt", "gldotnet")
+                        .Replace(".neT", "gldotnet").Replace(".net", "gldotnet"),
                     options: "StartSel=\uE000, StopSel=\uE001, HighlightAll=true")
+                    .Replace("glcpp", "C++").Replace("glcsharp", "C#").Replace("gldotnet", ".NET")
         }).ToListAsync(cancellationToken);
 
         // Reuse the existing batched loaders after pagination: three taxonomy queries

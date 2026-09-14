@@ -94,7 +94,20 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
             titleMatch.Localizations.First(x => x.LanguageCode == "en").Slug, now);
         await db.SaveChangesAsync();
         var technicalSnippet = Assert.Single((await search.SearchAsync(Request("C++", "content"), default)).Items).SearchSnippet!;
-        Assert.Contains("C++", technicalSnippet.Replace("\uE000", "").Replace("\uE001", ""));
+        var displayedTechnicalSnippet = technicalSnippet.Replace("\uE000", "").Replace("\uE001", "");
+        // PostgreSQL's headline omits trailing punctuation, but the result must use the C++ context and display text.
+        Assert.Contains("Learning C++ programming", displayedTechnicalSnippet);
+        Assert.DoesNotContain("glcpp", technicalSnippet);
+        var neighboringSnippet = Assert.Single((await search.SearchAsync(Request("programming", "content"), default)).Items).SearchSnippet!;
+        Assert.Contains("C++", neighboringSnippet);
+        Assert.DoesNotContain("glcpp", neighboringSnippet);
+        var dotNetArticle = Make(".Net context", string.Join(' ', Enumerable.Repeat("Distant galaxies", 100)) + " Learning .Net programming.");
+        await db.SaveChangesAsync();
+        var dotNetSnippet = Assert.Single((await search.SearchAsync(Request(".Net", "content"), default)).Items).SearchSnippet!;
+        Assert.Contains("Learning .NET programming", dotNetSnippet.Replace("\uE000", "").Replace("\uE001", ""));
+        Assert.DoesNotContain("gldotnet", dotNetSnippet);
+        dotNetArticle.Delete(now);
+        await db.SaveChangesAsync();
         Assert.Equal(0, (await search.SearchAsync(Request("absentword"), default)).TotalCount);
         var russian = Request("фильтры", "content"); russian.LanguageCode = "ru";
         Assert.Single((await search.SearchAsync(russian, default)).Items);
