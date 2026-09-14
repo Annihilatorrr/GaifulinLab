@@ -427,10 +427,6 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
     private Process StartWeb()
     {
-        var runtimeConfig = GetBuildOutputPath(
-            "src/GaifulinLab.Web",
-            "GaifulinLab.Web.runtimeconfig.json");
-        var wasmAppHost = FindWasmAppHost();
         var startInfo = new ProcessStartInfo("dotnet")
         {
             WorkingDirectory = _repositoryRoot,
@@ -439,9 +435,13 @@ public sealed class E2EEnvironment : IAsyncLifetime
         };
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
         startInfo.Environment["ASPNETCORE_URLS"] = DefaultBaseUrl;
-        startInfo.ArgumentList.Add(wasmAppHost);
-        startInfo.ArgumentList.Add("--use-staticwebassets");
-        startInfo.ArgumentList.Add($"--runtime-config={runtimeConfig}");
+        startInfo.ArgumentList.Add("run");
+        startInfo.ArgumentList.Add("--project");
+        startInfo.ArgumentList.Add("src/GaifulinLab.Web/GaifulinLab.Web.csproj");
+        startInfo.ArgumentList.Add("--configuration");
+        startInfo.ArgumentList.Add(GetBuildConfiguration());
+        startInfo.ArgumentList.Add("--no-build");
+        startInfo.ArgumentList.Add("--no-launch-profile");
 
         return Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start the Web application.");
@@ -449,34 +449,17 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
     private string GetBuildOutputPath(string relativeProjectDirectory, string fileName)
     {
-        var configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent?.Name ?? "Debug";
         return Path.Combine(
             _repositoryRoot,
             relativeProjectDirectory,
             "bin",
-            configuration,
+            GetBuildConfiguration(),
             "net10.0",
             fileName);
     }
 
-    private static string FindWasmAppHost()
-    {
-        var packagesRoot = Environment.GetEnvironmentVariable("NUGET_PACKAGES")
-            ?? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".nuget",
-                "packages");
-        var packageRoot = Path.Combine(packagesRoot, "microsoft.net.sdk.webassembly.pack");
-        var wasmAppHost = Directory.Exists(packageRoot)
-            ? Directory.EnumerateFiles(packageRoot, "WasmAppHost.dll", SearchOption.AllDirectories)
-                .OrderByDescending(File.GetLastWriteTimeUtc)
-                .FirstOrDefault()
-            : null;
-
-        return wasmAppHost
-            ?? throw new InvalidOperationException(
-                "WasmAppHost was not found. Build GaifulinLab.Web before running E2E tests.");
-    }
+    private static string GetBuildConfiguration() =>
+        new DirectoryInfo(AppContext.BaseDirectory).Parent?.Name ?? "Debug";
 
     private async Task WaitForPortAsync(Uri uri, string serviceName)
     {
