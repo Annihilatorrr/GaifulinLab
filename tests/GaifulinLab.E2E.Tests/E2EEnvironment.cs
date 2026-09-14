@@ -145,8 +145,8 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
         await using (var articleCommand = new NpgsqlCommand(
             """
-            INSERT INTO articles ("Id", "OwnerUserId", "CreatedAt", "UpdatedAt")
-            VALUES (@articleId, @ownerUserId, @createdAt, @updatedAt)
+            INSERT INTO articles ("Id", "OwnerUserId", "CreatedAt", "UpdatedAt", "Version")
+            VALUES (@articleId, @ownerUserId, @createdAt, @updatedAt, 1)
             """,
             connection,
             transaction))
@@ -160,8 +160,8 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
         await using (var localizationCommand = new NpgsqlCommand(
             """
-            INSERT INTO article_localizations ("Id", "ArticleId", "LanguageCode", "Slug", "Title", "Summary", "Html", "Status", "PublishedAt", "UpdatedAt", "LastEditedAt")
-            VALUES (@localizationId, @articleId, 'en', @slug, @title, NULL, @html, 'Published', @publishedAt, @updatedAt, @lastEditedAt)
+            INSERT INTO article_localizations ("Id", "ArticleId", "LanguageCode", "Slug", "Title", "Summary", "Html", "Status", "PublishedAt", "UpdatedAt", "LastEditedAt", "Version")
+            VALUES (@localizationId, @articleId, 'en', @slug, @title, NULL, @html, 'Published', @publishedAt, @updatedAt, @lastEditedAt, 1)
             """,
             connection,
             transaction))
@@ -248,6 +248,17 @@ public sealed class E2EEnvironment : IAsyncLifetime
         if (_usesExternalSite || _startedPdfWorker)
         {
             return;
+        }
+
+        try
+        {
+            await RunCommandAsync("docker", _repositoryRoot, ["info"]);
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(
+                "Docker is required for the image/PDF E2E workflow. Start Docker Desktop and verify that 'docker info' succeeds before rerunning the test.",
+                exception);
         }
 
         if (await IsPdfWorkerRunningAsync(E2EPdfWorkerService))
@@ -347,6 +358,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
         startInfo.Environment["MEDIA_STORAGE_PATH"] = Path.Combine(_repositoryRoot, "runtime", "media");
         startInfo.Environment["RateLimiting__LoginPermitLimit"] = "100";
         startInfo.Environment["RateLimiting__RegistrationPermitLimit"] = "100";
+        startInfo.Environment["Features__PublicPdfDownloadEnabled"] = "true";
         startInfo.Environment["Logging__LogLevel__Microsoft.AspNetCore.DataProtection"] = "None";
         startInfo.Environment["Logging__EventLog__LogLevel__Default"] = "None";
         startInfo.ArgumentList.Add(apiAssembly);
@@ -389,10 +401,13 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
         await using (var userCommand = new NpgsqlCommand(
             """
-            INSERT INTO "AspNetUsers" ("Id", "UserName", "NormalizedUserName", "Email", "NormalizedEmail", "EmailConfirmed", "PasswordHash", "SecurityStamp", "ConcurrencyStamp", "PhoneNumber", "PhoneNumberConfirmed", "TwoFactorEnabled", "LockoutEnd", "LockoutEnabled", "AccessFailedCount")
-            VALUES (@userId, @login, @normalizedLogin, NULL, NULL, false, @passwordHash, @securityStamp, @concurrencyStamp, NULL, false, false, NULL, true, 0)
+            INSERT INTO "AspNetUsers" ("Id", "UserName", "NormalizedUserName", "Email", "NormalizedEmail", "EmailConfirmed", "PasswordHash", "SecurityStamp", "ConcurrencyStamp", "PhoneNumber", "PhoneNumberConfirmed", "TwoFactorEnabled", "LockoutEnd", "LockoutEnabled", "AccessFailedCount", "DisplayName", "PdfSubscriptionTier")
+            VALUES (@userId, @login, @normalizedLogin, NULL, NULL, false, @passwordHash, @securityStamp, @concurrencyStamp, NULL, false, false, NULL, true, 0, 'E2E Administrator', 0)
             ON CONFLICT ("NormalizedUserName") DO UPDATE
-            SET "PasswordHash" = EXCLUDED."PasswordHash", "SecurityStamp" = EXCLUDED."SecurityStamp"
+            SET "PasswordHash" = EXCLUDED."PasswordHash",
+                "SecurityStamp" = EXCLUDED."SecurityStamp",
+                "DisplayName" = EXCLUDED."DisplayName",
+                "PdfSubscriptionTier" = EXCLUDED."PdfSubscriptionTier"
             """,
             connection,
             transaction))
@@ -433,7 +448,8 @@ public sealed class E2EEnvironment : IAsyncLifetime
             UseShellExecute = false,
             CreateNoWindow = true
         };
-        startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
+        startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "E2E";
+        startInfo.Environment["DOTNET_ENVIRONMENT"] = "E2E";
         startInfo.Environment["ASPNETCORE_URLS"] = DefaultBaseUrl;
         startInfo.ArgumentList.Add("run");
         startInfo.ArgumentList.Add("--project");

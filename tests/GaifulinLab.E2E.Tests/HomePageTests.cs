@@ -5,7 +5,7 @@ using Microsoft.Playwright.Xunit;
 namespace GaifulinLab.E2E.Tests;
 
 [Collection(E2ECollection.Name)]
-public sealed class HomePageTests(E2EEnvironment environment) : PageTest
+public sealed class HomePageTests(E2EEnvironment environment) : E2EPageTest
 {
     [Fact]
     public async Task Home_ShowsOnlyTheLatestThreeArticlesAndFiveTaxonomyItems()
@@ -23,8 +23,8 @@ public sealed class HomePageTests(E2EEnvironment environment) : PageTest
             ["Latest article 4", "Latest article 3", "Latest article 2"],
             await articles.Locator("strong").AllTextContentsAsync());
         await Expect(articles.First).ToContainTextAsync("By Author 4");
-        await Expect(topics.First).ToContainTextAsync("1 article(s)");
-        await Expect(series.First).ToContainTextAsync("1 article(s)");
+        await Expect(topics.First).ToContainTextAsync("1 article");
+        await Expect(series.First).ToContainTextAsync("1 article");
     }
 
     [Fact]

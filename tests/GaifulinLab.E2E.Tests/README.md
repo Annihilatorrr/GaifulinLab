@@ -5,20 +5,27 @@ publication, and the complete article-image flow: upload in the editor,
 HTML insertion and preview, public rendering, and PDF download.
 
 It is included in `GaifulinLab.slnx` for discovery in Visual Studio Test
-Explorer. With the default URL, the fixture starts Web and API automatically.
-The image/PDF scenario also starts the local PDF worker when Docker is
-available.
+Explorer. By default, the fixture starts Web and API locally, applies pending
+migrations, and seeds its Identity administrator. The image/PDF scenario also
+starts the local PDF worker.
 
 ## Prerequisites
 
 - Chromium for Playwright.
+- PostgreSQL at the connection string in `e2e.runsettings`.
+- Docker Desktop only for the real image/PDF workflow. Start it first and check
+  that `docker info` succeeds.
 
-The local PostgreSQL instance must still be available. E2E intentionally uses
-the normal `gaifulinlab` development database, configured through
+E2E intentionally uses the normal `gaifulinlab` development database, configured through
 `GAIFULINLAB_E2E_CONNECTION_STRING` in `e2e.runsettings`. The fixture creates
 it when necessary, applies pending migrations, and then creates its Identity
 administrator. Chromium runs in the separate `pdf-worker-e2e` container, using
 the same development database and `runtime/media` folder as the API.
+
+The fixture starts the Web client with its `E2E` configuration. That config
+points the browser to the local API and enables public PDF download only for the
+test process; it does not alter the normal application settings. The fixture
+also enables the matching API feature only in its child API process.
 
 Install Chromium after building the test project:
 
@@ -50,3 +57,8 @@ Identity credentials from `e2e.runsettings`, which is attached to this test
 project. The fixture starts and stops its own Web, API, and PDF worker as
 needed; it refuses to reuse already running services, because they could be
 connected to a different database.
+
+To run against an already deployed or manually started site, set
+`GAIFULINLAB_E2E_BASE_URL` to its absolute HTTP(S) URL. This explicit external
+mode does not create a database, apply migrations, seed data, or start local
+Web/API/PDF-worker processes.

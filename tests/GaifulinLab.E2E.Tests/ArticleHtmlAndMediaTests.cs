@@ -7,7 +7,7 @@ using Microsoft.Playwright.Xunit;
 namespace GaifulinLab.E2E.Tests;
 
 [Collection(E2ECollection.Name)]
-public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : PageTest
+public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPageTest
 {
     private static readonly byte[] OnePixelPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");

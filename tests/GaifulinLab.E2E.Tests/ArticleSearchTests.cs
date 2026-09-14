@@ -21,7 +21,7 @@ using Xunit.Abstractions;
 namespace GaifulinLab.E2E.Tests;
 
 [Collection(E2ECollection.Name)]
-public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHelper output) : PageTest
+public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHelper output) : E2EPageTest
 {
     [Fact]
     public async Task PostgreSql_SearchScopesRankingPaginationAndLiveChanges()

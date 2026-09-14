@@ -3,12 +3,11 @@ using Microsoft.Playwright.Xunit;
 
 namespace GaifulinLab.E2E.Tests;
 
-public sealed class LocalizationTests : PageTest
+[Collection(E2ECollection.Name)]
+public sealed class LocalizationTests : E2EPageTest
 {
     private static readonly Uri BaseUri = new(
         Environment.GetEnvironmentVariable("GAIFULINLAB_E2E_BASE_URL") ?? "http://localhost:5172");
-
-    public override BrowserNewContextOptions ContextOptions() => new() { Locale = "en-US" };
 
     public override async Task InitializeAsync()
     {

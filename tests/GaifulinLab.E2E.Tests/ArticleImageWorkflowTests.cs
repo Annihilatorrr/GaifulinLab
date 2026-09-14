@@ -5,7 +5,7 @@ using Microsoft.Playwright.Xunit;
 namespace GaifulinLab.E2E.Tests;
 
 [Collection(E2ECollection.Name)]
-public sealed class ArticleImageWorkflowTests : PageTest
+public sealed class ArticleImageWorkflowTests : E2EPageTest
 {
     private static readonly byte[] OnePixelPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
@@ -52,7 +52,11 @@ public sealed class ArticleImageWorkflowTests : PageTest
 
         var previewImage = Page.Locator("article.article-preview img");
         await Expect(previewImage).ToBeVisibleAsync();
-        await Expect(previewImage).ToHaveAttributeAsync("src", new Regex("^/media/[0-9a-f-]{36}$"));
+        var previewImageSource = await previewImage.GetAttributeAsync("src");
+        Assert.NotNull(previewImageSource);
+        var previewImageUri = new Uri(previewImageSource);
+        Assert.Equal(_environment.ApiBaseUri.GetLeftPart(UriPartial.Authority), previewImageUri.GetLeftPart(UriPartial.Authority));
+        Assert.Matches(new Regex("^/media/[0-9a-f-]{36}$"), previewImageUri.AbsolutePath);
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
@@ -60,9 +64,9 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await Page.GetByLabel("More article actions").ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article" })).ToBeVisibleAsync();
 
+        await ExportPdfAndAssertDownloadAsync(slug);
         await AssertPublicImageLoadsAsync(Page, new Uri(_environment.BaseUri, publicPath));
-        await AssertPdfDownloadsAsync(Page, slug);
-        await AssertPdfButtonIsHiddenForAnonymousAndRegularUserAsync(publicPath);
+        await AssertPublicPdfAccessAsync(publicPath, slug);
     }
 
     private static async Task AssertPublicImageLoadsAsync(IPage page, Uri publicArticleUri)
@@ -77,38 +81,27 @@ public sealed class ArticleImageWorkflowTests : PageTest
         Assert.True(width > 0, "The public article image was rendered but could not be loaded.");
     }
 
-    private static async Task AssertPdfDownloadsAsync(IPage page, string slug)
+    private async Task ExportPdfAndAssertDownloadAsync(string slug)
     {
-        var queuedResponseTask = page.WaitForResponseAsync(response =>
+        var queuedResponseTask = Page.WaitForResponseAsync(response =>
             response.Request.Method == "POST"
             && response.Url.Contains("/api/admin/articles/", StringComparison.Ordinal)
             && response.Url.Contains("/pdf-exports", StringComparison.Ordinal));
-        var responseTask = page.WaitForResponseAsync(response =>
+        var responseTask = Page.WaitForResponseAsync(response =>
             response.Request.Method == "GET"
             && response.Url.Contains("/api/admin/pdf-exports/", StringComparison.Ordinal)
             && response.Url.Contains("/download", StringComparison.Ordinal));
-        var downloadTask = page.WaitForDownloadAsync();
-        await page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" }).ClickAsync();
+        var downloadTask = Page.WaitForDownloadAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Export PDF" }).ClickAsync();
         var queuedResponse = await queuedResponseTask;
         var response = await responseTask;
         var download = await downloadTask;
 
         Assert.Equal(202, queuedResponse.Status);
-        Assert.StartsWith(
-            "application/pdf",
-            response.Headers["content-type"],
-            StringComparison.OrdinalIgnoreCase);
-        var content = await response.BodyAsync();
-        Assert.True(content.AsSpan().StartsWith("%PDF-"u8));
-        Assert.Equal($"{slug}.pdf", download.SuggestedFilename);
-        Assert.Null(await download.FailureAsync());
-        await using var downloadedContent = await download.CreateReadStreamAsync();
-        var header = new byte[5];
-        Assert.Equal(header.Length, await downloadedContent.ReadAsync(header));
-        Assert.Equal("%PDF-"u8.ToArray(), header);
+        await AssertPdfDownloadAsync(response, download, slug);
     }
 
-    private async Task AssertPdfButtonIsHiddenForAnonymousAndRegularUserAsync(string publicPath)
+    private async Task AssertPublicPdfAccessAsync(string publicPath, string slug)
     {
         await Page.EvaluateAsync("sessionStorage.clear()");
         await Page.ReloadAsync();
@@ -121,7 +114,7 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await Page.GetByLabel("Email").FillAsync(login);
         await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password);
         await Page.GetByLabel("Confirm password").FillAsync(password);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
 
         await Page.GotoAsync(new Uri(_environment.BaseUri, "/admin/login").ToString());
         await Page.Locator("#admin-login").FillAsync(login);
@@ -129,6 +122,32 @@ public sealed class ArticleImageWorkflowTests : PageTest
         await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
 
         await Page.GotoAsync(new Uri(_environment.BaseUri, publicPath).ToString());
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" })).ToHaveCountAsync(0);
+        var button = Page.GetByRole(AriaRole.Button, new() { Name = "Download PDF" });
+        await Expect(button).ToBeVisibleAsync();
+        var responseTask = Page.WaitForResponseAsync(response =>
+            response.Request.Method == "GET"
+            && response.Url.Contains($"/api/public/articles/en/{slug}/pdf", StringComparison.Ordinal));
+        var downloadTask = Page.WaitForDownloadAsync();
+        await button.ClickAsync();
+        var response = await responseTask;
+        var download = await downloadTask;
+
+        await AssertPdfDownloadAsync(response, download, slug);
+    }
+
+    private static async Task AssertPdfDownloadAsync(IResponse response, IDownload download, string slug)
+    {
+        Assert.StartsWith(
+            "application/pdf",
+            response.Headers["content-type"],
+            StringComparison.OrdinalIgnoreCase);
+        var content = await response.BodyAsync();
+        Assert.True(content.AsSpan().StartsWith("%PDF-"u8));
+        Assert.Equal($"{slug}.pdf", download.SuggestedFilename);
+        Assert.Null(await download.FailureAsync());
+        await using var downloadedContent = await download.CreateReadStreamAsync();
+        var header = new byte[5];
+        Assert.Equal(header.Length, await downloadedContent.ReadAsync(header));
+        Assert.Equal("%PDF-"u8.ToArray(), header);
     }
 }

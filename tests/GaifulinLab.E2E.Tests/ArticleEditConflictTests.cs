@@ -4,7 +4,7 @@ using Microsoft.Playwright.Xunit;
 namespace GaifulinLab.E2E.Tests;
 
 [Collection(E2ECollection.Name)]
-public sealed class ArticleEditConflictTests(E2EEnvironment environment) : PageTest
+public sealed class ArticleEditConflictTests(E2EEnvironment environment) : E2EPageTest
 {
     [Fact]
     public async Task StaleEditorSave_PreservesTheDraftAndRequiresAnExplicitResolution()

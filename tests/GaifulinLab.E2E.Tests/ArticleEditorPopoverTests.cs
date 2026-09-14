@@ -4,7 +4,7 @@ using Microsoft.Playwright.Xunit;
 namespace GaifulinLab.E2E.Tests;
 
 [Collection(E2ECollection.Name)]
-public sealed class ArticleEditorPopoverTests : PageTest
+public sealed class ArticleEditorPopoverTests : E2EPageTest
 {
     private readonly E2EEnvironment _environment;
 

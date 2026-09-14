@@ -22,7 +22,8 @@
     <ProjectReference Include="..\..\src\GaifulinLab.Api\GaifulinLab.Api.csproj"
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\GaifulinLab.Web\GaifulinLab.Web.csproj"
-                      ReferenceOutputAssembly="false" />
+                      ReferenceOutputAssembly="false"
+                      AdditionalProperties="WasmApplicationEnvironmentName=E2E" />
     <ProjectReference Include="..\..\src\GaifulinLab.Infrastructure\GaifulinLab.Infrastructure.csproj" />
   </ItemGroup>
 

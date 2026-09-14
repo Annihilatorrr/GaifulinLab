@@ -5,7 +5,7 @@ using Microsoft.Playwright.Xunit;
 namespace GaifulinLab.E2E.Tests;
 
 [Collection(E2ECollection.Name)]
-public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
+public sealed class RegistrationTests(E2EEnvironment environment) : E2EPageTest
 {
     [Fact]
     public async Task Registration_ValidatesFieldsAndRecoversFromRateLimitAndNetworkFailure()
@@ -15,7 +15,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         const string password = "Strong-password-1!";
         await Page.GotoAsync(new Uri(environment.BaseUri, "/register").ToString());
 
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
         await Expect(Page.Locator(".validation-message")).ToHaveCountAsync(4);
 
         await Page.GetByLabel("Display name").FillAsync(new string('a', 101));
@@ -25,28 +25,67 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         Assert.False(await Page.Locator("#registration-email").EvaluateAsync<bool>("input => input.validity.valid"));
         Assert.NotEmpty(await Page.Locator("#registration-email").EvaluateAsync<string>("input => input.validationMessage"));
         await Page.GetByLabel("Email").FillAsync(email);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
         await Expect(Page.GetByText("Display name must be between 2 and 100 characters.")).ToBeVisibleAsync();
         await Expect(Page.GetByText("Passwords do not match.")).ToBeVisibleAsync();
 
         await Page.GetByLabel("Display name").FillAsync(displayName);
         await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password);
         await Page.GetByLabel("Confirm password").FillAsync(password);
-        await Page.RouteAsync("**/api/auth/register", route => route.FulfillAsync(new() { Status = 429 }));
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Too many registration attempts");
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Create account" })).ToBeEnabledAsync();
+        // InputText binds on change; blur commits the last edited field before validating the form.
+        await Page.GetByLabel("Confirm password").BlurAsync();
+        // The E2E Web client calls the separate API origin, so the mocked response must pass CORS.
+        var origin = environment.BaseUri.GetLeftPart(UriPartial.Authority);
+        await Page.RouteAsync("**/api/auth/register", async route =>
+        {
+            if (route.Request.Method == "OPTIONS")
+            {
+                await route.FulfillAsync(new()
+                {
+                    Status = 204,
+                    Headers = new Dictionary<string, string>
+                    {
+                        ["Access-Control-Allow-Origin"] = origin,
+                        ["Access-Control-Allow-Methods"] = "POST",
+                        ["Access-Control-Allow-Headers"] = "content-type"
+                    }
+                });
+                return;
+            }
+
+            await route.FulfillAsync(new()
+            {
+                Status = 429,
+                ContentType = "application/json",
+                Headers = new Dictionary<string, string>
+                {
+                    ["Access-Control-Allow-Origin"] = origin
+                },
+                Body = "{\"code\":\"rate_limited\",\"message\":\"Too many attempts. Please try again later.\"}"
+            });
+        });
+        var rateLimitResponseTask = Page.WaitForResponseAsync(response =>
+            response.Request.Method == "POST"
+            && response.Url.Contains("/api/auth/register", StringComparison.Ordinal));
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
+        var rateLimitResponse = await rateLimitResponseTask;
+        Assert.Equal(429, rateLimitResponse.Status);
+        Assert.Equal(
+            environment.ApiBaseUri.GetLeftPart(UriPartial.Authority),
+            new Uri(rateLimitResponse.Url).GetLeftPart(UriPartial.Authority));
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Too many attempts. Please try again later.");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" })).ToBeEnabledAsync();
         await Page.UnrouteAsync("**/api/auth/register");
 
         await Page.RouteAsync("**/api/auth/register", route => route.AbortAsync());
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Unable to reach the server");
         await Expect(Page.GetByLabel("Display name")).ToHaveValueAsync(displayName);
         await Expect(Page.GetByLabel("Email")).ToHaveValueAsync(email);
         await Expect(Page.GetByLabel("Password", new() { Exact = true })).ToHaveValueAsync(password);
         await Page.UnrouteAsync("**/api/auth/register");
 
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = $"Welcome, {displayName}" })).ToBeVisibleAsync();
     }
 
@@ -59,19 +98,19 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/register").ToString());
         await FillRegistrationAsync(duplicateEmail, "Second Account", password);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("already in use");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Create an account" })).ToBeVisibleAsync();
 
         var weakEmail = $"weak-{Guid.NewGuid():N}@example.com";
         await Page.GotoAsync(new Uri(environment.BaseUri, "/register").ToString());
         await FillRegistrationAsync(weakEmail, "Weak Password", "alllowercase1!");
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToBeVisibleAsync();
         await Expect(Page.GetByLabel("Email")).ToHaveValueAsync(weakEmail);
         await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password);
         await Page.GetByLabel("Confirm password").FillAsync(password);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Welcome, Weak Password" })).ToBeVisibleAsync();
     }
 
@@ -283,7 +322,9 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/articles/{slug}").ToString());
         await Expect(Page.GetByText($"By {updatedName}")).ToBeVisibleAsync();
         await Page.GotoAsync(new Uri(environment.BaseUri, "/articles").ToString());
-        await Expect(Page.Locator(".content-byline")).ToContainTextAsync(updatedName);
+        var publicArticleCard = Page.GetByRole(AriaRole.Link, new() { Name = articleTitle })
+            .Locator("xpath=ancestor::article");
+        await Expect(publicArticleCard.Locator(".content-byline")).ToContainTextAsync(updatedName);
         await Page.GotoAsync(environment.BaseUri.ToString());
         await Expect(Page.Locator(".overview-column").First).ToContainTextAsync(updatedName);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/series/{series.Slug}").ToString());
@@ -311,7 +352,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Page.GetByLabel("Email").FillAsync(login);
         await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password);
         await Page.GetByLabel("Confirm password").FillAsync(password);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
 
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = $"Welcome, {displayName}" }))
             .ToBeVisibleAsync();
@@ -342,7 +383,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
         await Expect(Page.GetByText($"By {displayName}", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.GetByText(summary, new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.Locator("article.article-body")).ToContainTextAsync(body);
-        await Expect(Page.Locator(".article-views")).ToContainTextAsync("1 views");
+        await Expect(Page.Locator(".article-views")).ToContainTextAsync("1 view");
         await Expect(Page.GetByText(new Regex("^Last edited "))).ToBeVisibleAsync();
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/topics").ToString());
@@ -393,7 +434,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : PageTest
     {
         await Page.GotoAsync(new Uri(environment.BaseUri, "/register").ToString());
         await FillRegistrationAsync(email, displayName, password);
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Create account" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = $"Welcome, {displayName}" })).ToBeVisibleAsync();
     }
 

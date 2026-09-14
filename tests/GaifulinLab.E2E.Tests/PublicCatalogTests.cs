@@ -5,7 +5,7 @@ using Microsoft.Playwright.Xunit;
 namespace GaifulinLab.E2E.Tests;
 
 [Collection(E2ECollection.Name)]
-public sealed class PublicCatalogTests(E2EEnvironment environment) : PageTest
+public sealed class PublicCatalogTests(E2EEnvironment environment) : E2EPageTest
 {
     [Fact]
     public async Task ArticlesAndArchive_ShowOnlyPublishedItemsInOrderAndOpenTheSelectedArticle()
@@ -146,14 +146,14 @@ public sealed class PublicCatalogTests(E2EEnvironment environment) : PageTest
         Assert.Equal(["Tag match", "Series match"], await TitlesAsync());
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/topics").ToString());
-        await Expect(Page.Locator(".taxonomy-card")).ToContainTextAsync("2 article(s)");
+        await Expect(Page.Locator(".taxonomy-card")).ToContainTextAsync("2 articles");
         await Page.GetByRole(AriaRole.Link, new() { Name = "Topic A" }).ClickAsync();
         await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("topic=topic-a"));
         await Expect(Page.Locator(".content-item")).ToHaveCountAsync(2);
         Assert.Equal(["Topic match", "Tag match"], await TitlesAsync());
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/series").ToString());
-        await Expect(Page.Locator(".taxonomy-card")).ToContainTextAsync("2 article(s)");
+        await Expect(Page.Locator(".taxonomy-card")).ToContainTextAsync("2 articles");
         await Page.GetByRole(AriaRole.Link, new() { Name = "Series A" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Series A" })).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Link, new() { Name = "Series match" }).ClickAsync();
