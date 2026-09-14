@@ -662,6 +662,20 @@
             return;
         }
 
+        // An edit that is reverted still marks the editor dirty. Do not turn that stale UI state
+        // into a save operation: there is nothing to persist or reload for an existing article.
+        if (ArticleId is not null
+            && !_taxonomyDirty
+            && !_localizations.Values.Any(localization => localization.HasChanges))
+        {
+            CancelAutosaveDelay();
+            _autosavePending = false;
+            _isDirty = false;
+            _saveFailed = false;
+            _exportRequiresManualSave = false;
+            return;
+        }
+
         var saveVersion = _changeVersion;
         if (!isAutomaticSave)
         {

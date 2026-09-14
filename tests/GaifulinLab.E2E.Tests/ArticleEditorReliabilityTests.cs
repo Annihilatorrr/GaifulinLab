@@ -371,6 +371,49 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     }
 
     [Fact]
+    public async Task ManualSaveAfterRevertingLocalizationChanges_DoesNotPersistOrReload()
+    {
+        Page.SetDefaultTimeout(5_000);
+        var article = MultiArticle.WithEnglishAndRussian();
+        var articleGets = 0;
+        var localizationPuts = 0;
+        Page.Request += (_, request) =>
+        {
+            var path = new Uri(request.Url).AbsolutePath;
+            if (request.Method == "GET" && path == $"/api/admin/articles/{article.Id}")
+            {
+                articleGets++;
+            }
+            else if (request.Method == "PUT" && path.StartsWith($"/api/admin/articles/{article.Id}/localizations/", StringComparison.Ordinal))
+            {
+                localizationPuts++;
+            }
+        };
+
+        await AuthenticateAsync();
+        await RouteMultiEditorAsync(Page, article);
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+
+        // Reverting the English text must settle the manual save without a localization request or reload.
+        var englishHtml = article.Localizations["en"].Html;
+        await Page.GetByLabel("Article Html").FillAsync($"{englishHtml}x");
+        await Page.GetByLabel("Article Html").FillAsync(englishHtml);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true })).ToBeDisabledAsync();
+
+        // The same stale dirty state occurs after switching to an existing Russian localization.
+        await Page.GetByLabel("Article language").SelectOptionAsync("ru");
+        var russianHtml = article.Localizations["ru"].Html;
+        await Page.GetByLabel("Article Html").FillAsync($"{russianHtml}x");
+        await Page.GetByLabel("Article Html").FillAsync(russianHtml);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true })).ToBeDisabledAsync();
+
+        Assert.Equal(1, articleGets);
+        Assert.Equal(0, localizationPuts);
+    }
+
+    [Fact]
     public async Task SwitchingLanguagesDuringDelayedPreview_DoesNotCrashOrPublishAStalePreview()
     {
         Page.SetDefaultTimeout(5_000);
