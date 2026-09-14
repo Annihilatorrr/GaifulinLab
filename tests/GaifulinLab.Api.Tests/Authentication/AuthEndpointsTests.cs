@@ -139,13 +139,79 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
         var login = await response.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(login);
         Assert.NotEmpty(login.AccessToken);
+        Assert.NotEmpty(login.RefreshToken);
         Assert.True(login.ExpiresAt > DateTimeOffset.UtcNow);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var storedRefreshToken = await scope.ServiceProvider.GetRequiredService<AppDbContext>()
+                .RefreshTokens.OrderByDescending(token => token.CreatedAtUtc).FirstAsync();
+            Assert.NotEqual(login.RefreshToken, storedRefreshToken.TokenHash);
+            Assert.Equal(64, storedRefreshToken.TokenHash.Length);
+        }
 
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", login.AccessToken);
         var sessionResponse = await client.GetAsync("/api/auth/session");
 
         Assert.Equal(HttpStatusCode.NoContent, sessionResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refresh_RotatesSessionAndRejectsTheConsumedCredential()
+    {
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = isolatedFactory.CreateClient();
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(AuthWebApplicationFactory.AdminLogin, AuthWebApplicationFactory.AdminPassword));
+        var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(login);
+
+        var secondLoginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(AuthWebApplicationFactory.AdminLogin, AuthWebApplicationFactory.AdminPassword));
+        var secondSession = await secondLoginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(secondSession);
+
+        var refreshResponse = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenRequest(login.RefreshToken));
+        Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
+        var rotated = await refreshResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(rotated);
+        Assert.NotEqual(login.RefreshToken, rotated.RefreshToken);
+
+        var thirdResponse = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenRequest(rotated.RefreshToken));
+        Assert.Equal(HttpStatusCode.OK, thirdResponse.StatusCode);
+        var third = await thirdResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(third);
+
+        var laterReplayResponse = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenRequest(login.RefreshToken));
+        Assert.Equal(HttpStatusCode.Unauthorized, laterReplayResponse.StatusCode);
+        Assert.Equal("invalid_refresh_token", (await laterReplayResponse.Content.ReadFromJsonAsync<ApiErrorResponse>())?.Code);
+
+        var successorResponse = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenRequest(third.RefreshToken));
+        Assert.Equal(HttpStatusCode.Unauthorized, successorResponse.StatusCode);
+
+        var otherSessionResponse = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenRequest(secondSession.RefreshToken));
+        Assert.Equal(HttpStatusCode.OK, otherSessionResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Logout_RevokesTheSubmittedRefreshSession()
+    {
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = isolatedFactory.CreateClient();
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new LoginRequest(AuthWebApplicationFactory.AdminLogin, AuthWebApplicationFactory.AdminPassword));
+        var login = await loginResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(login);
+
+        var logoutResponse = await client.PostAsJsonAsync("/api/auth/logout", new LogoutRequest(login.RefreshToken));
+        Assert.Equal(HttpStatusCode.NoContent, logoutResponse.StatusCode);
+
+        var refreshResponse = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenRequest(login.RefreshToken));
+        Assert.Equal(HttpStatusCode.Unauthorized, refreshResponse.StatusCode);
     }
 
     [Fact]
@@ -334,6 +400,12 @@ public sealed class AuthEndpointsTests(AuthWebApplicationFactory factory)
     private sealed class ConflictingProfileAuthenticationService : IUserAuthenticationService
     {
         public Task<IssuedAccessToken?> AuthenticateAsync(string login, string password) =>
+            throw new NotSupportedException();
+
+        public Task<IssuedAccessToken?> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task LogoutAsync(string? refreshToken, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<UserRegistrationResult> RegisterAsync(string login, string displayName, string password) =>

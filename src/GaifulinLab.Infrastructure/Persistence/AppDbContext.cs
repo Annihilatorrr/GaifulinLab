@@ -43,6 +43,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<PdfDownloadUsage> PdfDownloadUsages => Set<PdfDownloadUsage>();
 
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         PrepareSearchText();

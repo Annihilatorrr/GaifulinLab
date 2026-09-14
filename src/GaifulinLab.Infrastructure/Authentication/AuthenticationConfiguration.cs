@@ -14,6 +14,7 @@ namespace GaifulinLab.Infrastructure.Authentication;
 internal static class AuthenticationConfiguration
 {
     private const int DefaultTokenLifetimeMinutes = 30;
+    private const int DefaultRefreshTokenLifetimeDays = 7;
     private const int MinimumSigningKeyBytes = 32;
 
     public static IServiceCollection AddIdentityAuthentication(
@@ -89,11 +90,22 @@ internal static class AuthenticationConfiguration
             throw new InvalidOperationException("JWT lifetime must be between 1 and 1440 minutes.");
         }
 
+        var refreshLifetimeValue = configuration["JWT_REFRESH_LIFETIME_DAYS"]
+            ?? configuration["Jwt:RefreshLifetimeDays"];
+        var refreshLifetimeDays = DefaultRefreshTokenLifetimeDays;
+        if (refreshLifetimeValue is not null
+            && (!int.TryParse(refreshLifetimeValue, NumberStyles.None, CultureInfo.InvariantCulture, out refreshLifetimeDays)
+                || refreshLifetimeDays is < 1 or > 90))
+        {
+            throw new InvalidOperationException("JWT refresh lifetime must be between 1 and 90 days.");
+        }
+
         return new JwtAuthenticationSettings(
             issuer,
             audience,
             signingKey,
-            TimeSpan.FromMinutes(lifetimeMinutes));
+            TimeSpan.FromMinutes(lifetimeMinutes),
+            TimeSpan.FromDays(refreshLifetimeDays));
     }
 
     private static string ReadRequired(

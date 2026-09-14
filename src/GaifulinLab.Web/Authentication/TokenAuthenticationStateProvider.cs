@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace GaifulinLab.Web.Authentication;
 
-public sealed class TokenAuthenticationStateProvider(AccessTokenStore tokenStore)
+public sealed class TokenAuthenticationStateProvider(
+    AccessTokenStore tokenStore,
+    AccessTokenRefreshCoordinator? refreshCoordinator = null)
     : AuthenticationStateProvider
 {
     private static readonly ClaimsPrincipal AnonymousUser = new(new ClaimsIdentity());
@@ -15,9 +17,18 @@ public sealed class TokenAuthenticationStateProvider(AccessTokenStore tokenStore
     {
         var accessToken = await tokenStore.GetAsync();
         var principal = CreatePrincipal(accessToken);
+        if (principal.Identity?.IsAuthenticated != true
+            && !string.IsNullOrWhiteSpace(accessToken)
+            && refreshCoordinator is not null)
+        {
+            var refresh = await refreshCoordinator.GetTokenForRequestAsync();
+            accessToken = refresh.AccessToken;
+            principal = CreatePrincipal(accessToken);
+        }
+
         IsLoggedIn = principal.Identity?.IsAuthenticated == true;
 
-        if (!IsLoggedIn && accessToken is not null)
+        if (!IsLoggedIn && accessToken is not null && string.IsNullOrWhiteSpace(await tokenStore.GetRefreshTokenAsync()))
         {
             await tokenStore.ClearAsync();
         }
@@ -25,13 +36,20 @@ public sealed class TokenAuthenticationStateProvider(AccessTokenStore tokenStore
         return new AuthenticationState(principal);
     }
 
-    public async Task SetTokenAsync(string accessToken)
+    public async Task SetSessionAsync(string accessToken, string refreshToken)
     {
-        await tokenStore.SetAsync(accessToken);
+        await tokenStore.SetSessionAsync(accessToken, refreshToken);
         var state = new AuthenticationState(CreatePrincipal(accessToken));
         IsLoggedIn = state.User.Identity?.IsAuthenticated == true;
         NotifyAuthenticationStateChanged(
             Task.FromResult(state));
+    }
+
+    public async Task NotifySessionChangedAsync()
+    {
+        var state = new AuthenticationState(CreatePrincipal(await tokenStore.GetAsync()));
+        IsLoggedIn = state.User.Identity?.IsAuthenticated == true;
+        NotifyAuthenticationStateChanged(Task.FromResult(state));
     }
 
     public async Task ClearTokenAsync()

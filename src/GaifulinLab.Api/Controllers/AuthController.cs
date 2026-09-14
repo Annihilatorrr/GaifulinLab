@@ -37,7 +37,30 @@ public sealed class AuthController(IUserAuthenticationService authenticationServ
         var token = await authenticationService.AuthenticateAsync(request.Login, request.Password);
         return token is null
             ? InvalidCredentials()
-            : Ok(new LoginResponse(token.Value, token.ExpiresAt));
+            : Ok(new LoginResponse(token.Value, token.ExpiresAt, token.RefreshToken));
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<LoginResponse>> Refresh(RefreshTokenRequest request, CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store";
+        var token = await authenticationService.RefreshAsync(request.RefreshToken, cancellationToken);
+        return token is null
+            ? Unauthorized(new ApiErrorResponse("invalid_refresh_token", "The session is no longer valid."))
+            : Ok(new LoginResponse(token.Value, token.ExpiresAt, token.RefreshToken));
+    }
+
+    [HttpPost("logout")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Logout(LogoutRequest request, CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store";
+        await authenticationService.LogoutAsync(request.RefreshToken, cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("register")]

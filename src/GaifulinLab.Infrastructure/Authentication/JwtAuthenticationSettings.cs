@@ -4,4 +4,5 @@ internal sealed record JwtAuthenticationSettings(
     string Issuer,
     string Audience,
     string SigningKey,
-    TimeSpan TokenLifetime);
+    TimeSpan TokenLifetime,
+    TimeSpan RefreshTokenLifetime);

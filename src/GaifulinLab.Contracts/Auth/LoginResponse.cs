@@ -1,3 +1,3 @@
 namespace GaifulinLab.Contracts.Auth;
 
-public sealed record LoginResponse(string AccessToken, DateTimeOffset ExpiresAt);
+public sealed record LoginResponse(string AccessToken, DateTimeOffset ExpiresAt, string RefreshToken);

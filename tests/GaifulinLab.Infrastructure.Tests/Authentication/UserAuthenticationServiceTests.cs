@@ -19,7 +19,8 @@ public sealed class UserAuthenticationServiceTests
                 "GaifulinLab.Tests",
                 "GaifulinLab.Tests.Client",
                 "test-signing-key-that-is-at-least-32-bytes-long",
-                TimeSpan.FromMinutes(5)),
+                TimeSpan.FromMinutes(5),
+                TimeSpan.FromDays(7)),
             scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(),
             serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             scope.ServiceProvider.GetRequiredService<ILogger<UserAuthenticationService>>());
@@ -45,7 +46,8 @@ public sealed class UserAuthenticationServiceTests
                 "GaifulinLab.Tests",
                 "GaifulinLab.Tests.Client",
                 "test-signing-key-that-is-at-least-32-bytes-long",
-                TimeSpan.FromMinutes(5)),
+                TimeSpan.FromMinutes(5),
+                TimeSpan.FromDays(7)),
             scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(),
             serviceProvider.GetRequiredService<IServiceScopeFactory>(),
             scope.ServiceProvider.GetRequiredService<ILogger<UserAuthenticationService>>());

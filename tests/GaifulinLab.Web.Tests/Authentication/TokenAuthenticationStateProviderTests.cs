@@ -38,7 +38,7 @@ public sealed class TokenAuthenticationStateProviderTests
         Assert.False(state.User.Identity?.IsAuthenticated);
         Assert.False(provider.IsLoggedIn);
         Assert.Null(js.Token);
-        Assert.Equal(1, js.ClearCount);
+        Assert.Equal(2, js.ClearCount);
     }
 
     private static string CreateToken(IReadOnlyDictionary<string, object?> payload) =>
@@ -65,7 +65,8 @@ public sealed class TokenAuthenticationStateProviderTests
         {
             if (identifier == "sessionStorage.getItem")
             {
-                return new((TValue)(object?)Token!);
+                var key = (string?)args?.Single();
+                return new((TValue)(object?)(key == "gaifulinlab.admin.access_token" ? Token : null)!);
             }
 
             if (identifier == "sessionStorage.removeItem")

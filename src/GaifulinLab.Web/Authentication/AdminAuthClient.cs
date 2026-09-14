@@ -6,7 +6,9 @@ namespace GaifulinLab.Web.Authentication;
 
 public sealed class AdminAuthClient(
     HttpClient httpClient,
-    TokenAuthenticationStateProvider authenticationStateProvider)
+    TokenAuthenticationStateProvider authenticationStateProvider,
+    AccessTokenStore tokenStore,
+    SessionRefreshClient refreshClient)
 {
     public async Task<LoginAttemptResult> LoginAsync(
         string login,
@@ -36,7 +38,12 @@ public sealed class AdminAuthClient(
                 return LoginAttemptResult.Failure("The server returned an invalid response.");
             }
 
-            await authenticationStateProvider.SetTokenAsync(result.AccessToken);
+            if (string.IsNullOrWhiteSpace(result.RefreshToken))
+            {
+                return LoginAttemptResult.Failure("The server returned an invalid response.");
+            }
+
+            await authenticationStateProvider.SetSessionAsync(result.AccessToken, result.RefreshToken);
             return LoginAttemptResult.Success;
         }
         catch (HttpRequestException)
@@ -45,7 +52,25 @@ public sealed class AdminAuthClient(
         }
     }
 
-    public Task LogoutAsync() => authenticationStateProvider.ClearTokenAsync();
+    public async Task LogoutAsync(CancellationToken cancellationToken = default)
+    {
+        // Server revocation is best effort; local browser state must always be cleared for explicit sign-out.
+        var refreshToken = await tokenStore.GetRefreshTokenAsync();
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(refreshToken))
+            {
+                await refreshClient.LogoutAsync(refreshToken, cancellationToken);
+            }
+        }
+        catch (HttpRequestException)
+        {
+        }
+        finally
+        {
+            await authenticationStateProvider.ClearTokenAsync();
+        }
+    }
 }
 
 public sealed record LoginAttemptResult(bool Succeeded, string? ErrorMessage)

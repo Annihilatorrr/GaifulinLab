@@ -24,7 +24,11 @@ builder.Services.AddScoped(serviceProvider => new LocalizationService(
     serviceProvider.GetRequiredService<IJSRuntime>(),
     new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) }));
 builder.Services.AddScoped<AccessTokenStore>();
-builder.Services.AddScoped<TokenAuthenticationStateProvider>();
+builder.Services.AddScoped(_ => new SessionRefreshClient(new HttpClient { BaseAddress = apiBaseAddress }));
+builder.Services.AddScoped<AccessTokenRefreshCoordinator>();
+builder.Services.AddScoped(serviceProvider => new TokenAuthenticationStateProvider(
+    serviceProvider.GetRequiredService<AccessTokenStore>(),
+    serviceProvider.GetRequiredService<AccessTokenRefreshCoordinator>()));
 builder.Services.AddScoped<AuthenticationStateProvider>(serviceProvider =>
     serviceProvider.GetRequiredService<TokenAuthenticationStateProvider>());
 builder.Services.AddScoped(serviceProvider =>
@@ -32,7 +36,8 @@ builder.Services.AddScoped(serviceProvider =>
     var handler = new AdminAuthorizationHandler(
         serviceProvider.GetRequiredService<AccessTokenStore>(),
         serviceProvider.GetRequiredService<TokenAuthenticationStateProvider>(),
-        serviceProvider.GetRequiredService<NavigationManager>())
+        serviceProvider.GetRequiredService<NavigationManager>(),
+        serviceProvider.GetRequiredService<AccessTokenRefreshCoordinator>())
     {
         InnerHandler = new HttpClientHandler()
     };
