@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -9,6 +9,7 @@
             src="https://analytics.ineytools.ru/script.js"
             data-website-id="9862a312-960d-4043-8b9f-336716371845"
             data-domains="gaifulinlab.com,www.gaifulinlab.com"></script>
+    <script src="js/uiCulture.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/typography.js"></script>
     <script src="js/editor-splitter.js"></script>
@@ -22,7 +23,7 @@
 </head>
 <body>
     <div id="app">
-        <div class="app-preloader" role="status" aria-live="polite" aria-label="Loading Gaifulin Lab">
+        <div class="app-preloader" role="status" aria-live="polite" aria-label="Loading Gaifulin Lab" data-i18n-aria-label="app.loadingAria">
             <div class="app-preloader__wave" aria-hidden="true">
                 <div class="app-preloader__bars">
                     <span style="--bar-height: 12%; --bar-delay: -0.08s"></span>
@@ -48,13 +49,13 @@
                     <span style="--bar-height: 12%; --bar-delay: -1.68s"></span>
                 </div>
             </div>
-            <p class="app-preloader__label">Loading the lab<span aria-hidden="true">...</span></p>
+            <p class="app-preloader__label"><span data-i18n="app.loading">app.loading</span><span aria-hidden="true">...</span></p>
         </div>
     </div>
 
     <div id="blazor-error-ui" data-nosnippet>
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
+        <span data-i18n="app.unhandled">app.unhandled</span>
+        <a href="." class="reload" data-i18n="app.reload">app.reload</a>
         <span class="dismiss">🗙</span>
     </div>
 

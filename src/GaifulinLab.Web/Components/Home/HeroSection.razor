@@ -1,18 +1,17 @@
 <section class="hero" aria-labelledby="hero-title">
     <div class="site-container hero-layout">
         <div class="hero-copy">
-            <h1 id="hero-title">Engineering notes, experiments and deep dives.</h1>
+            <h1 id="hero-title">@L["home.hero.title"]</h1>
             <p>
-                Practical writing about software, digital signal processing,
-                embedded systems and everything interesting around them.
+                @L["home.hero.description"]
             </p>
 
             <div class="hero-actions">
                 <a class="button button-primary" href="/topics">
-                    Explore topics
+                    @L["home.hero.explore"]
                     <span aria-hidden="true">&rarr;</span>
                 </a>
-                <a class="button button-secondary" href="/articles">Browse latest articles</a>
+                <a class="button button-secondary" href="/articles">@L["home.hero.latest"]</a>
             </div>
         </div>
 
@@ -43,13 +42,13 @@
 
                 <g class="lab-waveform">
                     <path d="M64 160h16l9-25 12 53 14-87 15 119 13-73 12 31h28" />
-                    <text x="64" y="118">SAMPLE IN</text>
+                    <text x="64" y="118">@L["home.diagram.sample"]</text>
                 </g>
 
                 <g class="lab-code">
                     <rect x="548" y="75" width="148" height="106" rx="12" />
                     <path d="M574 112h42M574 154h82" />
-                    <text x="572" y="97">DSP LOOP</text>
+                    <text x="572" y="97">@L["home.diagram.loop"]</text>
                     <text x="572" y="130" class="code-line">for (auto s : x)</text>
                     <text x="572" y="146" class="code-line">y += fir(s);</text>
                 </g>
@@ -69,7 +68,7 @@
                     <rect x="560" y="304" width="126" height="94" rx="12" />
                     <path d="M575 380v-54M575 380h93" />
                     <path d="M581 367l13-13 13 6 14-27 14 16 16-35" />
-                    <text x="574" y="319">MEASURE</text>
+                    <text x="574" y="319">@L["home.diagram.measure"]</text>
                 </g>
 
                 <g class="lab-system">
@@ -79,10 +78,10 @@
                     <circle cx="586" cy="428" r="18" />
                     <path d="M113 428h45M194 428h168M398 439h170" />
                     <path d="m148 424 8 4-8 4M352 435l8 4-8 4M558 424l8 4-8 4" />
-                    <text x="72" y="462">INPUT</text>
-                    <text x="151" y="462">NODE</text>
-                    <text x="355" y="472">SYSTEM</text>
-                    <text x="559" y="462">OUTPUT</text>
+                    <text x="72" y="462">@L["home.diagram.input"]</text>
+                    <text x="151" y="462">@L["home.diagram.node"]</text>
+                    <text x="355" y="472">@L["home.diagram.system"]</text>
+                    <text x="559" y="462">@L["home.diagram.output"]</text>
                 </g>
             </svg>
         </div>

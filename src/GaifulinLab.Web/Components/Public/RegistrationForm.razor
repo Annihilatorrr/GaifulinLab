@@ -7,36 +7,36 @@
         {
             <div class="registration-success" role="status">
                 <span class="success-mark" aria-hidden="true">✓</span>
-                <span class="eyebrow">Account created</span>
-                <h1 id="registration-title">Welcome, @_registeredDisplayName</h1>
-                <p>Your account is ready. Sign in to create and manage your own articles.</p>
-                <a class="button button-primary" href="@LoginUrl">Sign in</a>
+                <span class="eyebrow">@L["auth.accountCreated"]</span>
+                <h1 id="registration-title">@L.Format("auth.welcome", _registeredDisplayName)</h1>
+                <p>@L["auth.accountReady"]</p>
+                <a class="button button-primary" href="@LoginUrl">@L["auth.signIn"]</a>
             </div>
         }
         else
         {
-            <span class="eyebrow">Gaifulin Lab account</span>
-            <h1 id="registration-title">Create an account</h1>
-            <p>Enter your email address and choose a strong password. You can then create and manage your own articles.</p>
+            <span class="eyebrow">@L["auth.accountEyebrow"]</span>
+            <h1 id="registration-title">@L["auth.createAccount"]</h1>
+            <p>@L["auth.createDescription"]</p>
 
             <EditForm Model="_registration" OnValidSubmit="RegisterAsync" class="registration-form">
                 <DataAnnotationsValidator />
 
                 <div class="field">
-                    <label for="registration-display-name">Display name</label>
+                    <label for="registration-display-name">@L["profile.displayName"]</label>
                     <InputText id="registration-display-name"
                                autocomplete="name"
                                aria-describedby="registration-display-name-hint"
                                disabled="@_isSubmitting"
                                @bind-Value="_registration.DisplayName" />
                     <span id="registration-display-name-hint" class="field-hint">
-                        This name will appear publicly on your articles.
+                        @L["auth.displayNameHint"]
                     </span>
                     <ValidationMessage For="() => _registration.DisplayName" />
                 </div>
 
                 <div class="field">
-                    <label for="registration-email">Email</label>
+                    <label for="registration-email">@L["auth.email"]</label>
                     <InputText id="registration-email"
                                type="email"
                                autocomplete="email"
@@ -45,13 +45,13 @@
                                disabled="@_isSubmitting"
                                @bind-Value="_registration.Login" />
                     <span id="registration-email-hint" class="field-hint">
-                        Enter the email address you want to use for your account.
+                        @L["auth.emailHint"]
                     </span>
                     <ValidationMessage For="() => _registration.Login" />
                 </div>
 
                 <div class="field">
-                    <label for="registration-password">Password</label>
+                    <label for="registration-password">@L["auth.password"]</label>
                     <InputText id="registration-password"
                                type="password"
                                autocomplete="new-password"
@@ -59,13 +59,13 @@
                                disabled="@_isSubmitting"
                                @bind-Value="_registration.Password" />
                     <span id="registration-password-hint" class="field-hint">
-                        At least 8 characters with upper- and lowercase letters, a number, and a symbol.
+                        @L["auth.passwordHint"]
                     </span>
                     <ValidationMessage For="() => _registration.Password" />
                 </div>
 
                 <div class="field">
-                    <label for="registration-confirm-password">Confirm password</label>
+                    <label for="registration-confirm-password">@L["auth.confirmPassword"]</label>
                     <InputText id="registration-confirm-password"
                                type="password"
                                autocomplete="new-password"
@@ -82,7 +82,7 @@
                 <button class="button button-primary registration-submit"
                         type="submit"
                         disabled="@_isSubmitting">
-                    @(_isSubmitting ? "Creating account…" : "Create account")
+                    @(_isSubmitting ? L["auth.creatingAccount"] : L["auth.createAccount"])
                 </button>
             </EditForm>
         }
@@ -91,7 +91,7 @@
 
 @code {
     [Parameter] public string? ReturnUrl { get; set; }
-    private readonly RegistrationModel _registration = new();
+    private RegistrationModel _registration = null!;
     private string? _registeredDisplayName;
     private string? _errorMessage;
     private bool _isSubmitting;
@@ -99,6 +99,8 @@
     private string LoginUrl => IsSafeLocalReturnUrl(ReturnUrl)
         ? $"/admin/login?returnUrl={Uri.EscapeDataString(ReturnUrl!)}"
         : "/admin/login";
+
+    protected override void OnInitialized() => _registration = new RegistrationModel(L);
 
     private async Task RegisterAsync()
     {
@@ -119,27 +121,31 @@
             return;
         }
 
-        _errorMessage = result.ErrorMessage;
+        _errorMessage = L.ApiError(result.ErrorCode, "errors.registrationUnavailable");
     }
 
-    private sealed class RegistrationModel
+    private sealed class RegistrationModel(LocalizationService localizer) : IValidatableObject
     {
-        [Required(ErrorMessage = "Display name is required.")]
-        [StringLength(100, MinimumLength = 2, ErrorMessage = "Display name must be between 2 and 100 characters.")]
         public string DisplayName { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Email is required.")]
-        [StringLength(254, ErrorMessage = "Email must not exceed 254 characters.")]
-        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
         public string Login { get; set; } = string.Empty;
 
-        [Required]
-        [StringLength(128, MinimumLength = 8)]
         public string Password { get; set; } = string.Empty;
 
-        [Required]
-        [Compare(nameof(Password), ErrorMessage = "Passwords do not match.")]
         public string ConfirmPassword { get; set; } = string.Empty;
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (string.IsNullOrWhiteSpace(DisplayName)) yield return new(localizer["validation.displayNameRequired"], [nameof(DisplayName)]);
+            else if (DisplayName.Length is < 2 or > 100) yield return new(localizer["validation.displayNameLength"], [nameof(DisplayName)]);
+            if (string.IsNullOrWhiteSpace(Login)) yield return new(localizer["validation.emailRequired"], [nameof(Login)]);
+            else if (Login.Length > 254) yield return new(localizer["validation.emailLength"], [nameof(Login)]);
+            else if (!new EmailAddressAttribute().IsValid(Login)) yield return new(localizer["validation.emailInvalid"], [nameof(Login)]);
+            if (string.IsNullOrEmpty(Password)) yield return new(localizer["validation.passwordRequired"], [nameof(Password)]);
+            else if (Password.Length is < 8 or > 128) yield return new(localizer["validation.passwordLength"], [nameof(Password)]);
+            if (string.IsNullOrEmpty(ConfirmPassword)) yield return new(localizer["validation.confirmPasswordRequired"], [nameof(ConfirmPassword)]);
+            else if (!string.Equals(Password, ConfirmPassword, StringComparison.Ordinal)) yield return new(localizer["validation.passwordsMismatch"], [nameof(ConfirmPassword)]);
+        }
     }
 
     private static bool IsSafeLocalReturnUrl(string? returnUrl) =>

@@ -4,61 +4,60 @@
 @inject NavigationManager Navigation
 @using System.Globalization
 
-<PageTitle>Search · Gaifulin Lab</PageTitle>
+<PageTitle>@L["search.pageTitle"] · Gaifulin Lab</PageTitle>
 <main id="main-content" class="search-page">
     <section class="search-hero" aria-labelledby="search-title">
         <div class="site-container">
-            <span class="eyebrow">Explore the lab</span>
-            <h1 id="search-title">Find your next idea.</h1>
-            <p>Search topics, tags, titles and the articles themselves.</p>
+            <span class="eyebrow">@L["search.eyebrow"]</span>
+            <h1 id="search-title">@L["search.title"]</h1>
+            <p>@L["search.description"]</p>
             <form class="search-bar" @onsubmit="Submit" @onsubmit:preventDefault role="search">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-                <label for="article-search" class="visually-hidden">Search articles</label>
-                <input id="article-search" type="search" placeholder="Enter keywords…" maxlength="200" autocomplete="off" @bind="_text" @bind:event="oninput" />
-                <button type="submit">Search <span aria-hidden="true">→</span></button>
+                <label for="article-search" class="visually-hidden">@L["search.articles"]</label>
+                <input id="article-search" type="search" placeholder="@L["search.placeholder"]" maxlength="200" autocomplete="off" @bind="_text" @bind:event="oninput" />
+                <button type="submit">@L["nav.search"] <span aria-hidden="true">→</span></button>
             </form>
-            <div class="search-filters" aria-label="Search filters">
-                <label><span class="visually-hidden">Topic</span><select aria-label="Topic" @bind="_request.Topic" @bind:after="Apply">
-                    <option value="">All topics</option>
+            <div class="search-filters" aria-label="@L["search.filters"]">
+                <label><span class="visually-hidden">@L["search.topic"]</span><select aria-label="@L["search.topic"]" @bind="_request.Topic" @bind:after="Apply">
+                    <option value="">@L["search.allTopics"]</option>
                     @foreach (var topic in _topics) { <option value="@topic.Slug">@topic.Name</option> }
                 </select></label>
                 <details class="tag-picker" data-dismiss-on-outside-click>
-                    <summary>Tags @(_request.Tag.Length > 0 ? $"({_request.Tag.Length})" : "") <span aria-hidden="true">⌄</span></summary>
+                    <summary>@L["nav.tags"] @(_request.Tag.Length > 0 ? $"({_request.Tag.Length})" : "") <span aria-hidden="true">⌄</span></summary>
                     <div class="tag-options">
-                        <p class="tag-hint">Match any selected tag · up to 20</p>
-                        <label class="visually-hidden" for="tag-filter">Find a tag</label>
-                        <input id="tag-filter" type="search" placeholder="Find a tag…" @bind="_tagFilter" @bind:event="oninput" />
+                        <p class="tag-hint">@L["search.tagHint"]</p>
+                        <label class="visually-hidden" for="tag-filter">@L["search.findTag"]</label>
+                        <input id="tag-filter" type="search" placeholder="@L["search.findTagPlaceholder"]" @bind="_tagFilter" @bind:event="oninput" />
                         @foreach (var tag in _tags.Where(t => t.Name.Contains(_tagFilter, StringComparison.OrdinalIgnoreCase)))
                         {
                             <label><input type="checkbox" checked="@_request.Tag.Contains(tag.Name)" disabled="@(_request.Tag.Length >= 20 && !_request.Tag.Contains(tag.Name))" @onchange="() => ToggleTag(tag.Name)" /> #@tag.Name <small>@tag.ArticleCount</small></label>
                         }
-                        @if (_tags.Count == 0) { <p>No tags yet.</p> }
+                        @if (_tags.Count == 0) { <p>@L["catalog.tags.emptyTitle"]</p> }
                     </div>
                 </details>
-                <label><span class="visually-hidden">Search in</span><select aria-label="Search in" @bind="_request.Scope" @bind:after="Apply">
-                    <option value="all">Everywhere</option><option value="title">Titles only</option><option value="content">Content only</option><option value="topics">Topics only</option><option value="tags">Tags only</option>
+                <label><span class="visually-hidden">@L["search.searchIn"]</span><select aria-label="@L["search.searchIn"]" @bind="_request.Scope" @bind:after="Apply">
+                    <option value="all">@L["search.scope.all"]</option><option value="title">@L["search.scope.title"]</option><option value="content">@L["search.scope.content"]</option><option value="topics">@L["search.scope.topics"]</option><option value="tags">@L["search.scope.tags"]</option>
                 </select></label>
-                <label><span class="visually-hidden">Published</span><select aria-label="Published" @bind="_request.Period" @bind:after="Apply">
-                    <option value="all">All time</option><option value="week">Past week</option><option value="month">Past month</option><option value="year">Past year</option>
+                <label><span class="visually-hidden">@L["search.published"]</span><select aria-label="@L["search.published"]" @bind="_request.Period" @bind:after="Apply">
+                    <option value="all">@L["search.period.all"]</option><option value="week">@L["search.period.week"]</option><option value="month">@L["search.period.month"]</option><option value="year">@L["search.period.year"]</option>
                 </select></label>
-                <label><span class="visually-hidden">Language</span><select aria-label="Language" @bind="_request.LanguageCode" @bind:after="ChangeLanguage"><option value="en">English</option><option value="ru">Русский</option></select></label>
             </div>
         </div>
     </section>
-    <section class="site-container search-results" aria-label="Search results" aria-busy="@_loading.ToString().ToLowerInvariant()">
+    <section class="site-container search-results" aria-label="@L["search.results"]" aria-busy="@_loading.ToString().ToLowerInvariant()">
         @if (HasFilters)
         {
-            <div class="active-filters" aria-label="Active filters">
-                @if (!string.IsNullOrEmpty(_request.Topic)) { <button @onclick="ClearTopic">@(_topics.FirstOrDefault(t => t.Slug == _request.Topic)?.Name ?? _request.Topic) ×<span class="visually-hidden"> Remove topic</span></button> }
-                @foreach (var tag in _request.Tag) { <button @onclick="() => ToggleTag(tag)">#@tag ×<span class="visually-hidden"> Remove tag</span></button> }
-                @if (_request.Scope != "all") { <button @onclick="ClearScope">@ScopeLabel ×<span class="visually-hidden"> Remove scope</span></button> }
-                @if (_request.Period != "all") { <button @onclick="ClearPeriod">Past @_request.Period ×<span class="visually-hidden"> Remove period</span></button> }
-                <button class="reset-filters" @onclick="ResetFilters">Reset filters</button>
+            <div class="active-filters" aria-label="@L["search.activeFilters"]">
+                @if (!string.IsNullOrEmpty(_request.Topic)) { <button @onclick="ClearTopic">@(_topics.FirstOrDefault(t => t.Slug == _request.Topic)?.Name ?? _request.Topic) ×<span class="visually-hidden"> @L["search.removeTopic"]</span></button> }
+                @foreach (var tag in _request.Tag) { <button @onclick="() => ToggleTag(tag)">#@tag ×<span class="visually-hidden"> @L["search.removeTag"]</span></button> }
+                @if (_request.Scope != "all") { <button @onclick="ClearScope">@ScopeLabel ×<span class="visually-hidden"> @L["search.removeScope"]</span></button> }
+                @if (_request.Period != "all") { <button @onclick="ClearPeriod">@PeriodLabel ×<span class="visually-hidden"> @L["search.removePeriod"]</span></button> }
+                <button class="reset-filters" @onclick="ResetFilters">@L["search.reset"]</button>
             </div>
         }
         <div class="results-toolbar">
-            <p role="status" aria-live="polite">@(_loading ? "Searching…" : _error ? "Search unavailable" : $"{_result.TotalCount:N0} {(_result.TotalCount == 1 ? "article" : "articles")} found")</p>
-            <label>Sort by <select aria-label="Sort by" @bind="_request.Sort" @bind:after="Apply"><option value="relevance">Relevance</option><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+            <p role="status" aria-live="polite">@(_loading ? L["search.searching"] : _error ? L["search.unavailable"] : L.Format("search.found", L.FormatArticleCount(_result.TotalCount)))</p>
+            <label>@L["search.sortBy"] <select aria-label="@L["search.sortBy"]" @bind="_request.Sort" @bind:after="Apply"><option value="relevance">@L["search.sort.relevance"]</option><option value="newest">@L["search.sort.newest"]</option><option value="oldest">@L["search.sort.oldest"]</option></select></label>
         </div>
         @if (_loading)
         {
@@ -66,11 +65,11 @@
         }
         else if (_error)
         {
-            <div class="search-state" role="alert"><h2>Search is temporarily unavailable</h2><p>Please try again in a moment.</p><button class="button button-primary" @onclick="LoadAsync">Try again</button></div>
+            <div class="search-state" role="alert"><h2>@L["search.temporarilyUnavailable"]</h2><p>@L["search.tryMoment"]</p><button class="button button-primary" @onclick="LoadAsync">@L["common.tryAgain"]</button></div>
         }
         else if (_result.Items.Count == 0)
         {
-            <div class="search-state"><span class="state-icon" aria-hidden="true">⌕</span><h2>No articles found</h2><p>Try different keywords or broaden your filters.</p><button class="button button-secondary" @onclick="ClearSearch">Clear search</button></div>
+            <div class="search-state"><span class="state-icon" aria-hidden="true">⌕</span><h2>@L["search.none"]</h2><p>@L["search.noneDescription"]</p><button class="button button-secondary" @onclick="ClearSearch">@L["search.clear"]</button></div>
         }
         else
         {
@@ -84,7 +83,7 @@
                             <div class="article-topics">@foreach (var topic in article.Topics) { <a href="@TopicUrl(topic.Slug)"><SearchHighlight Text="@topic.DisplayName" Query="@_request.Query" /></a> }</div>
                             <h2><a href="@ArticleUrl(article)"><SearchHighlight Text="@(article.SearchTitle ?? article.Title)" Query="@_request.Query" /></a></h2>
                             <p class="search-excerpt"><SearchHighlight Text="@(article.SearchSnippet ?? article.Summary ?? "")" Query="@_request.Query" /></p>
-                            <div class="article-meta"><span>@article.AuthorDisplayName</span><span aria-hidden="true">·</span><time datetime="@article.PublishedAt.ToString("O")">@article.PublishedAt.ToString("d MMM yyyy", CultureInfo.GetCultureInfo(article.LanguageCode))</time><span aria-hidden="true">·</span><span>@article.ReadingMinutes min read</span></div>
+                            <div class="article-meta"><span>@article.AuthorDisplayName</span><span aria-hidden="true">·</span><time datetime="@article.PublishedAt.ToString("O")">@L.FormatDate(article.PublishedAt)</time><span aria-hidden="true">·</span><span>@L.Format("article.minutesRead", article.ReadingMinutes)</span></div>
                             <div class="article-tags">@foreach (var tag in article.Tags) { <a href="@TagUrl(tag)">#<SearchHighlight Text="@tag" Query="@_request.Query" /></a> }</div>
                         </div>
                     </article>
@@ -92,16 +91,16 @@
             </div>
             @if (_result.TotalPages > 1)
             {
-                <nav class="search-pagination" aria-label="Search pages">
-                    @if (_result.Page > 1) { <a href="@PageUrl(_result.Page - 1)" rel="prev" aria-label="Previous page">← <span>Previous</span></a> } else { <span class="disabled">← <span>Previous</span></span> }
+                <nav class="search-pagination" aria-label="@L["search.pages"]">
+                    @if (_result.Page > 1) { <a href="@PageUrl(_result.Page - 1)" rel="prev" aria-label="@L["common.previousPage"]">← <span>@L["common.previous"]</span></a> } else { <span class="disabled">← <span>@L["common.previous"]</span></span> }
                     @foreach (var page in PageNumbers())
                     {
                         if (page == 0) { <span class="ellipsis">…</span> }
-                        else { <a class="@(page == _result.Page ? "current" : null)" href="@PageUrl(page)" aria-label="@($"Page {page}")" aria-current="@(page == _result.Page ? "page" : null)">@(page)</a> }
+                        else { <a class="@(page == _result.Page ? "current" : null)" href="@PageUrl(page)" aria-label="@L.Format("common.page", page)" aria-current="@(page == _result.Page ? "page" : null)">@(page)</a> }
                     }
-                    @if (_result.Page < _result.TotalPages) { <a href="@PageUrl(_result.Page + 1)" rel="next" aria-label="Next page"><span>Next</span> →</a> } else { <span class="disabled"><span>Next</span> →</span> }
+                    @if (_result.Page < _result.TotalPages) { <a href="@PageUrl(_result.Page + 1)" rel="next" aria-label="@L["common.nextPage"]"><span>@L["common.next"]</span> →</a> } else { <span class="disabled"><span>@L["common.next"]</span> →</span> }
                 </nav>
-                <p class="page-summary">Page @_result.Page of @_result.TotalPages</p>
+                <p class="page-summary">@L.Format("common.pageOf", _result.Page, _result.TotalPages)</p>
             }
         }
     </section>
@@ -109,7 +108,6 @@
 
 @code {
     [SupplyParameterFromQuery(Name = "q")] public string? Query { get; set; }
-    [SupplyParameterFromQuery(Name = "languageCode")] public string? Language { get; set; }
     [SupplyParameterFromQuery(Name = "scope")] public string? Scope { get; set; }
     [SupplyParameterFromQuery(Name = "topic")] public string? Topic { get; set; }
     [SupplyParameterFromQuery(Name = "tag")] public string[]? Tags { get; set; }
@@ -124,12 +122,13 @@
     private bool _loading = true, _error;
     private CancellationTokenSource? _cancellation;
     private bool HasFilters => !string.IsNullOrEmpty(_request.Topic) || _request.Tag.Length > 0 || _request.Scope != "all" || _request.Period != "all";
-    private string ScopeLabel => _request.Scope switch { "title" => "Titles only", "content" => "Content only", "topics" => "Topics only", _ => "Tags only" };
+    private string ScopeLabel => L[$"search.scope.{_request.Scope}"];
+    private string PeriodLabel => L[$"search.period.{_request.Period}"];
 
     protected override Task OnParametersSetAsync()
     {
         _text = (Query ?? "")[..Math.Min(Query?.Length ?? 0, 200)];
-        _request = new() { Query = _text, LanguageCode = Language == "ru" ? "ru" : "en",
+        _request = new() { Query = _text, LanguageCode = L.CurrentCode,
             Scope = Scope is "title" or "content" or "topics" or "tags" ? Scope : "all", Topic = Topic,
             Tag = (Tags ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase).Take(20).ToArray(),
             Period = Period is "week" or "month" or "year" ? Period : "all",
@@ -162,7 +161,6 @@
 
     private void Submit() { _request.Query = _text.Trim(); Apply(); }
     private void Apply() { _request.Page = 1; Navigation.NavigateTo(PageUrl(1)); }
-    private void ChangeLanguage() { _request.Topic = null; _request.Tag = []; Apply(); }
     private void ToggleTag(string tag) { _request.Tag = _request.Tag.Contains(tag) ? _request.Tag.Where(t => t != tag).ToArray() : _request.Tag.Append(tag).Take(20).ToArray(); Apply(); }
     private void ClearTopic() { _request.Topic = null; Apply(); }
     private void ClearScope() { _request.Scope = "all"; Apply(); }

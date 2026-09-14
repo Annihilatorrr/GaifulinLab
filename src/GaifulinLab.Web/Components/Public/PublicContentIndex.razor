@@ -8,11 +8,11 @@
 
         @if (_loading)
         {
-            <div class="public-state surface" role="status">Loading…</div>
+            <div class="public-state surface" role="status">@L["common.loading"]</div>
         }
         else if (_error)
         {
-            <div class="public-state surface" role="alert"><h2>Content is unavailable</h2><p>Please try again later.</p></div>
+            <div class="public-state surface" role="alert"><h2>@L["errors.contentUnavailable"]</h2><p>@L["errors.tryLater"]</p></div>
         }
         else if (!HasItems)
         {
@@ -25,8 +25,8 @@
                 {
                     <article class="content-item">
                         <div class="content-byline">
-                            <span>By @article.AuthorDisplayName</span>
-                            <time datetime="@article.PublishedAt.ToString("O")">@article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                            <span>@L.Format("common.byAuthor", article.AuthorDisplayName)</span>
+                            <time datetime="@article.PublishedAt.ToString("O")">@L.FormatDate(article.PublishedAt)</time>
                         </div>
                         <h2><a href="@($"/{article.LanguageCode}/articles/{article.Slug}")">@article.Title</a></h2>
                         @if (!string.IsNullOrWhiteSpace(article.Summary)) { <p>@article.Summary</p> }
@@ -37,7 +37,7 @@
             @if (_hasMoreArticles)
             {
                 <button class="button button-secondary" type="button" disabled="@_loadingMoreArticles" @onclick="LoadMoreArticlesAsync">
-                    @(_loadingMoreArticles ? "Loading…" : "Load more")
+                    @(_loadingMoreArticles ? L["common.loading"] : L["common.loadMore"])
                 </button>
             }
         }
@@ -47,7 +47,7 @@
                 @foreach (var topic in _topics)
                 {
                     <a class="taxonomy-card surface" href="@($"/articles?topic={Uri.EscapeDataString(topic.Slug)}")">
-                        <h2>@topic.Name</h2><p>@topic.Description</p><span>@topic.ArticleCount article(s)</span>
+                        <h2>@topic.Name</h2><p>@topic.Description</p><span>@L.FormatArticleCount(topic.ArticleCount)</span>
                     </a>
                 }
             </div>
@@ -58,7 +58,7 @@
                 @foreach (var series in _series)
                 {
                     <a class="taxonomy-card surface" href="@($"/{series.LanguageCode}/series/{series.Slug}")">
-                        <h2>@series.Title</h2><p>@series.Description</p><span>@series.ArticleCount article(s)</span>
+                        <h2>@series.Title</h2><p>@series.Description</p><span>@L.FormatArticleCount(series.ArticleCount)</span>
                     </a>
                 }
             </div>
@@ -77,7 +77,7 @@
 
 @code {
     [Parameter, EditorRequired] public string Kind { get; set; } = "articles";
-    [Parameter] public string LanguageCode { get; set; } = "en";
+    [Parameter] public string LanguageCode { get; set; } = "ru";
     [Parameter, EditorRequired] public string Eyebrow { get; set; } = "Writing";
     [Parameter, EditorRequired] public string Title { get; set; } = "Articles";
     [Parameter, EditorRequired] public string Description { get; set; } = "";

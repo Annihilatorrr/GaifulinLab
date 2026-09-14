@@ -1,8 +1,26 @@
-<CascadingAuthenticationState>
-    <Router AppAssembly="@typeof(App).Assembly" NotFoundPage="@typeof(Pages.NotFound)">
-        <Found Context="routeData">
-            <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
-            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-        </Found>
-    </Router>
-</CascadingAuthenticationState>
+@if (_initialized)
+{
+    <CascadingAuthenticationState>
+        <Router AppAssembly="@typeof(App).Assembly" NotFoundPage="@typeof(Pages.NotFound)">
+            <Found Context="routeData">
+                <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </Found>
+        </Router>
+    </CascadingAuthenticationState>
+}
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
+    private bool _initialized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await L.InitializeAsync();
+        var firstSegment = Navigation.ToBaseRelativePath(Navigation.Uri)
+            .Split(['/', '?', '#'], StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault();
+        await L.SynchronizeRouteCultureAsync(firstSegment);
+        _initialized = true;
+    }
+}

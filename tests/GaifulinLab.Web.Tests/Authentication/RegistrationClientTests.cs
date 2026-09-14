@@ -50,6 +50,7 @@ public sealed class RegistrationClientTests
 
         Assert.False(result.Succeeded);
         Assert.Equal("Password needs a symbol.", result.ErrorMessage);
+        Assert.Equal("invalid_registration", result.ErrorCode);
     }
 
     [Fact]
@@ -66,6 +67,7 @@ public sealed class RegistrationClientTests
 
         Assert.False(result.Succeeded);
         Assert.Contains("Too many", result.ErrorMessage);
+        Assert.Equal("rate_limited", result.ErrorCode);
     }
 
     private static HttpResponseMessage JsonResponse<T>(T value, HttpStatusCode statusCode) =>

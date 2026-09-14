@@ -4,10 +4,12 @@ using GaifulinLab.Web.Authentication;
 using GaifulinLab.Web.Components;
 using GaifulinLab.Web.Content;
 using GaifulinLab.Web.Media;
+using GaifulinLab.Web.Localization;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.JSInterop;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 var apiBaseAddress = new Uri(
@@ -18,6 +20,9 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddAuthorizationCore();
+builder.Services.AddScoped(serviceProvider => new LocalizationService(
+    serviceProvider.GetRequiredService<IJSRuntime>(),
+    new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) }));
 builder.Services.AddScoped<AccessTokenStore>();
 builder.Services.AddScoped<TokenAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(serviceProvider =>

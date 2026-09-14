@@ -21,7 +21,7 @@
 @code {
     private bool _isDark;
 
-    private string ThemeLabel => _isDark ? "Switch to light theme" : "Switch to dark theme";
+    private string ThemeLabel => L[_isDark ? "nav.lightTheme" : "nav.darkTheme"];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

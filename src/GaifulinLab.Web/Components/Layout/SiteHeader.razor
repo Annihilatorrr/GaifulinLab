@@ -7,7 +7,7 @@
 
 <header class="site-header">
     <div class="site-container header-content">
-        <a class="brand" href="/" aria-label="Gaifulin Lab home">
+        <a class="brand" href="/" aria-label="@L["nav.homeAria"]">
             <span class="brand-mark" aria-hidden="true">
                 <span class="brand-g">G</span>
                 <span class="brand-l">L</span>
@@ -15,68 +15,69 @@
 
             <span class="brand-copy">
                 <span class="brand-name">GAIFULIN LAB</span>
-                <span class="brand-tagline">Software · DSP · Embedded · Systems · Experiments</span>
+                <span class="brand-tagline">@L["nav.tagline"]</span>
             </span>
         </a>
 
-        <nav class="desktop-nav" aria-label="Primary navigation">
+        <nav class="desktop-nav" aria-label="@L["nav.primary"]">
             <a href="/topics">
-                Topics
+                @L["nav.topics"]
                 <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
             </a>
-            <a href="/series">Series</a>
-            <a href="/tags">Tags</a>
-            <a href="/archive">Archive</a>
-            <a href="/about">About</a>
+            <a href="/series">@L["nav.series"]</a>
+            <a href="/tags">@L["nav.tags"]</a>
+            <a href="/archive">@L["nav.archive"]</a>
+            <a href="/about">@L["nav.about"]</a>
             @if (_isLoggedIn)
             {
-                <a href="/admin/articles">My articles</a>
+                <a href="/admin/articles">@L["nav.myArticles"]</a>
             }
             else
             {
                 @if (ShowSignInLink)
                 {
-                    <a href="/admin/login">Sign in</a>
+                    <a href="/admin/login">@L["nav.signIn"]</a>
                 }
                 @if (ShowRegistrationLink)
                 {
-                    <a href="/register">Register</a>
+                    <a href="/register">@L["nav.register"]</a>
                 }
             }
         </nav>
 
         <div class="header-actions">
-            <a class="search-link" href="/search" aria-label="Search">
+            <a class="search-link" href="/search" aria-label="@L["nav.search"]">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <circle cx="11" cy="11" r="6.5" />
                     <path d="m16 16 4.5 4.5" />
                 </svg>
             </a>
+            <LanguageSwitcher />
             <ThemeToggle />
 
             <details class="mobile-menu">
-                <summary aria-label="Open navigation">
+                <summary aria-label="@L["nav.open"]">
                     <span></span><span></span><span></span>
                 </summary>
-                <nav aria-label="Mobile navigation">
-                    <a href="/topics">Topics</a>
-                    <a href="/series">Series</a>
-                    <a href="/tags">Tags</a>
-                    <a href="/archive">Archive</a>
-                    <a href="/about">About</a>
+                <nav aria-label="@L["nav.mobile"]">
+                    <a href="/topics">@L["nav.topics"]</a>
+                    <a href="/series">@L["nav.series"]</a>
+                    <a href="/tags">@L["nav.tags"]</a>
+                    <a href="/archive">@L["nav.archive"]</a>
+                    <a href="/about">@L["nav.about"]</a>
                     @if (_isLoggedIn)
                     {
-                        <a href="/admin/articles">My articles</a>
+                        <a href="/admin/articles">@L["nav.myArticles"]</a>
                     }
                     else
                     {
                         @if (ShowSignInLink)
                         {
-                            <a href="/admin/login">Sign in</a>
+                            <a href="/admin/login">@L["nav.signIn"]</a>
                         }
                         @if (ShowRegistrationLink)
                         {
-                            <a href="/register">Register</a>
+                            <a href="/register">@L["nav.register"]</a>
                         }
                     }
                 </nav>

@@ -24,25 +24,30 @@ public sealed class RegistrationClient(HttpClient httpClient)
             {
                 var result = await response.Content.ReadFromJsonAsync<RegisterResponse>(cancellationToken);
                 return result is null || string.IsNullOrWhiteSpace(result.Login)
-                    ? RegistrationAttemptResult.Failure("The server returned an invalid response.")
+                    ? RegistrationAttemptResult.Failure("The server returned an invalid response.", "invalid_response")
                     : RegistrationAttemptResult.Success(result.Login);
             }
 
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 return RegistrationAttemptResult.Failure(
-                    "Too many registration attempts. Please try again later.");
+                    "Too many registration attempts. Please try again later.", "rate_limited");
             }
 
             var error = await TryReadErrorAsync(response, cancellationToken);
             return RegistrationAttemptResult.Failure(
                 error?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault()
                     ?? error?.Message
-                    ?? "Registration is temporarily unavailable.");
+                    ?? "Registration is temporarily unavailable.",
+                error?.Code);
         }
         catch (HttpRequestException)
         {
-            return RegistrationAttemptResult.Failure("Unable to reach the server.");
+            return RegistrationAttemptResult.Failure("Unable to reach the server.", "network_unavailable");
+        }
+        catch (Exception exception) when (exception is NotSupportedException or System.Text.Json.JsonException)
+        {
+            return RegistrationAttemptResult.Failure("The server returned an invalid response.", "invalid_response");
         }
     }
 
@@ -65,9 +70,10 @@ public sealed class RegistrationClient(HttpClient httpClient)
 public sealed record RegistrationAttemptResult(
     bool Succeeded,
     string? Login,
-    string? ErrorMessage)
+    string? ErrorMessage,
+    string? ErrorCode)
 {
-    public static RegistrationAttemptResult Success(string login) => new(true, login, null);
+    public static RegistrationAttemptResult Success(string login) => new(true, login, null, null);
 
-    public static RegistrationAttemptResult Failure(string message) => new(false, null, message);
+    public static RegistrationAttemptResult Failure(string message, string? code = null) => new(false, null, message, code);
 }

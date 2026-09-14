@@ -1,0 +1,14 @@
+<details class="language-switcher" data-testid="language-switcher" data-dismiss-on-outside-click>
+    <summary data-testid="language-toggle" aria-label="@L["nav.language"]">
+        <span data-testid="language-current">@L.CurrentCode.ToUpperInvariant()</span>
+        <span class="language-chevron" aria-hidden="true">⌄</span>
+    </summary>
+    <div class="language-menu" role="group" aria-label="@L["nav.language"]">
+        <button type="button" class="@(L.CurrentCulture == UiCulture.Ru ? "active" : null)"
+                aria-pressed="@(L.CurrentCulture == UiCulture.Ru)" data-testid="language-ru"
+                @onclick="() => L.SetCultureAsync(UiCulture.Ru)">RU</button>
+        <button type="button" class="@(L.CurrentCulture == UiCulture.En ? "active" : null)"
+                aria-pressed="@(L.CurrentCulture == UiCulture.En)" data-testid="language-en"
+                @onclick="() => L.SetCultureAsync(UiCulture.En)">EN</button>
+    </div>
+</details>

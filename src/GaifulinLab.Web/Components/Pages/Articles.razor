@@ -1,10 +1,10 @@
 @page "/articles"
 
-<PageTitle>Articles · Gaifulin Lab</PageTitle>
+<PageTitle>@L["catalog.articles.title"] · Gaifulin Lab</PageTitle>
 
-<PublicContentIndex Kind="articles" LanguageCode="en" Eyebrow="Writing" Title="Articles"
-                    Description="Engineering notes, experiments and technical deep dives."
-                    EmptyTitle="No articles yet" EmptyDescription="The first published article will appear here."
+<PublicContentIndex Kind="articles" LanguageCode="@L.CurrentCode" Eyebrow="@L["catalog.articles.eyebrow"]" Title="@L["catalog.articles.title"]"
+                    Description="@L["catalog.articles.description"]"
+                    EmptyTitle="@L["catalog.articles.emptyTitle"]" EmptyDescription="@L["catalog.articles.emptyDescription"]"
                     Topic="@Topic" SeriesFilter="@SeriesFilter" Tag="@Tag" />
 
 @code {

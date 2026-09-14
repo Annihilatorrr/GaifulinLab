@@ -7,33 +7,33 @@
       class="site-main article-page"
       style="@TypographyStyle">
     <div class="site-container article-layout">
-        @if (_loading) { <div role="status">Loading article…</div> }
-        else if (_article is null) { <div class="not-found surface"><h1>Article not found</h1><p>This localization is not published or does not exist.</p><a href="/articles">Back to articles</a></div> }
+        @if (_loading) { <div role="status">@L["article.loading"]</div> }
+        else if (_article is null) { <div class="not-found surface"><h1>@L["article.notFound"]</h1><p>@L["article.notFoundDescription"]</p><a href="/articles">@L["article.back"]</a></div> }
         else
         {
             <header class="article-header">
                 <div class="article-meta">
                     <div class="article-meta-info">
-                        <span class="article-author">By @_article.AuthorDisplayName</span>
-                        <time datetime="@_article.PublishedAt.ToString("O")">@_article.PublishedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                        <span class="article-author">@L.Format("common.byAuthor", _article.AuthorDisplayName)</span>
+                        <time datetime="@_article.PublishedAt.ToString("O")">@L.FormatDate(_article.PublishedAt)</time>
                         <span class="article-views">
                             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Zm9.5 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /></svg>
-                            <span>@_article.ViewCount @ViewCountLabel</span>
+                            <span>@L.FormatViewCount(_article.ViewCount)</span>
                         </span>
-                        <time datetime="@_article.LastEditedAt.ToString("O")">Last edited @_article.LastEditedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                        <time datetime="@_article.LastEditedAt.ToString("O")">@L.Format("article.lastEdited", L.FormatDate(_article.LastEditedAt))</time>
                     </div>
                     @if (PublicPdfDownloadEnabled)
                     {
                         <AuthorizeView>
                             <Authorized>
-                                <button class="article-download" @onclick="DownloadReaderPdfAsync" disabled="@_readerPdfDownloadInProgress">Download PDF</button>
+                                <button class="article-download" @onclick="DownloadReaderPdfAsync" disabled="@_readerPdfDownloadInProgress">@(_readerPdfDownloadInProgress ? L["article.preparingPdf"] : L["article.downloadPdf"])</button>
                                 @if (_readerPdfDownloadError is not null)
                                 {
                                     <p class="article-download-error" role="alert">@_readerPdfDownloadError</p>
                                 }
                             </Authorized>
                             <NotAuthorized>
-                                <span><a href="@SignInForPdfUrl">Sign in</a> or <a href="@RegisterForPdfUrl">register</a> to download PDF.</span>
+                                <span><a href="@SignInForPdfUrl">@L["nav.signIn"]</a> @L["article.or"] <a href="@RegisterForPdfUrl">@L["nav.registerLower"]</a> @L["article.toDownloadPdf"]</span>
                             </NotAuthorized>
                         </AuthorizeView>
                     }
@@ -42,8 +42,8 @@
                 @if (!string.IsNullOrWhiteSpace(_article.Summary)) { <p>@_article.Summary</p> }
                 @if (_article.AvailableLocalizations.Count > 1)
                 {
-                    <nav aria-label="Available localizations">
-                        @foreach (var localization in _article.AvailableLocalizations) { <a href="@localization.Url">@localization.LanguageCode.ToUpperInvariant()</a> }
+                    <nav aria-label="@L["article.availableLocalizations"]">
+                        @foreach (var localization in _article.AvailableLocalizations) { <a href="@localization.Url" data-article-localization-language="@localization.LanguageCode">@localization.LanguageCode.ToUpperInvariant()</a> }
                     </nav>
                 }
             </header>
@@ -72,25 +72,12 @@
         $"--article-line-height: {_typography.LineHeight.ToString(CultureInfo.InvariantCulture)}; --article-block-spacing: {_typography.BlockSpacing.ToString(CultureInfo.InvariantCulture)}rem;";
 
     private bool PublicPdfDownloadEnabled => Configuration.GetValue<bool>("Features:PublicPdfDownloadEnabled");
-    private string SignInForPdfUrl => $"/admin/login?returnUrl={Uri.EscapeDataString($"/articles/{LanguageCode}/{Slug}")}";
-    private string RegisterForPdfUrl => $"/register?returnUrl={Uri.EscapeDataString($"/articles/{LanguageCode}/{Slug}")}";
-
-    private string PdfDownloadLabel =>
-        false
-            ? string.Equals(LanguageCode, "ru", StringComparison.OrdinalIgnoreCase)
-                ? "Готовим PDF…"
-                : "Preparing PDF…"
-            : string.Equals(LanguageCode, "ru", StringComparison.OrdinalIgnoreCase)
-            ? "Скачать PDF"
-            : "Download PDF";
-
-    private string ViewCountLabel =>
-        string.Equals(_article?.LanguageCode, "ru", StringComparison.OrdinalIgnoreCase)
-            ? "просмотров"
-            : "views";
+    private string SignInForPdfUrl => $"/admin/login?returnUrl={Uri.EscapeDataString($"/{LanguageCode}/articles/{Slug}")}";
+    private string RegisterForPdfUrl => $"/register?returnUrl={Uri.EscapeDataString($"/{LanguageCode}/articles/{Slug}")}";
 
     protected override async Task OnParametersSetAsync()
     {
+        await L.SynchronizeRouteCultureAsync(LanguageCode);
         await ClearArticleMathAsync();
         _articleElementReady = false;
         _articleAssetsPrepared = false;
@@ -213,11 +200,11 @@
         }
         catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
         {
-            _readerPdfDownloadError = "Your monthly PDF download limit has been reached.";
+            _readerPdfDownloadError = L["article.pdfLimit"];
         }
         catch (HttpRequestException)
         {
-            _readerPdfDownloadError = "The PDF is not available right now.";
+            _readerPdfDownloadError = L["article.pdfUnavailable"];
         }
         finally
         {

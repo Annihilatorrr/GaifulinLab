@@ -1,0 +1,9 @@
+.language-switcher { position: relative; }
+.language-switcher summary { width: 2.75rem; height: 2.75rem; display: flex; align-items: center; justify-content: center; gap: .2rem; border: 1px solid var(--color-border); border-radius: 50%; background: var(--color-surface); color: var(--color-text); cursor: pointer; font-size: var(--text-xs); font-weight: 750; list-style: none; }
+.language-switcher summary::-webkit-details-marker { display: none; }
+.language-chevron { font-size: .85rem; transition: transform .15s ease; }
+.language-switcher[open] .language-chevron { transform: rotate(180deg); }
+.language-menu { position: absolute; z-index: 30; top: calc(100% + var(--space-2)); right: 0; min-width: 5rem; display: grid; gap: var(--space-1); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2); background: var(--color-surface); box-shadow: var(--shadow-md); }
+.language-menu button { border: 0; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); background: transparent; color: var(--color-text); cursor: pointer; font: inherit; font-size: var(--text-sm); }
+.language-menu button:hover, .language-menu button.active { background: var(--color-surface-accent); color: var(--color-accent); }
+.language-menu button.active { font-weight: 750; }
