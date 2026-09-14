@@ -56,13 +56,13 @@
 }
 
 .article-content h2 {
-    margin-block: 1.05rem .35rem;
+    margin-block: 1.05rem .5rem;
     font-size: clamp(1.28rem, 2.4vw, 1.55rem);
     letter-spacing: -.015em;
 }
 
 .article-content h3 {
-    margin-block: .75rem .25rem;
+    margin-block: .75rem .5rem;
     font-size: 1rem;
     line-height: 1.25;
 }
@@ -70,7 +70,7 @@
 .article-content h4,
 .article-content h5,
 .article-content h6 {
-    margin-block: .65rem .25rem;
+    margin-block: .65rem .5rem;
 }
 
 /*
@@ -247,7 +247,7 @@
 }
 
 .article-content .article-formula {
-    margin-block: .18em;
+    margin-block: .625rem;
     text-align: center;
 }
 
@@ -259,7 +259,7 @@
 }
 
 .article-content mjx-container[display="true"] {
-    margin-block: .18em !important;
+    margin-block: .625rem !important;
     padding-block: 0;
 }
 
