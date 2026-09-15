@@ -18,6 +18,36 @@ public sealed class LocalizationTests : E2EPageTest
     }
 
     [Fact]
+    public async Task LanguageSwitcher_UsesHorizontalPillBetweenSearchAndThemeToggle()
+    {
+        await Page.SetViewportSizeAsync(1280, 800);
+        await Page.RouteAsync("**/api/public/**", route => route.FulfillAsync(new()
+        {
+            Status = 200,
+            ContentType = "application/json",
+            Body = "[]"
+        }));
+        await Page.GotoAsync(BaseUri.ToString());
+
+        // The desktop header keeps the search action, language selector, and theme toggle in that order.
+        var search = await Page.Locator(".search-link").BoundingBoxAsync()
+            ?? throw new InvalidOperationException("The desktop search action was not rendered.");
+        var language = await Page.GetByTestId("language-switcher").BoundingBoxAsync()
+            ?? throw new InvalidOperationException("The language selector was not rendered.");
+        var theme = await Page.Locator(".theme-toggle").BoundingBoxAsync()
+            ?? throw new InvalidOperationException("The theme toggle was not rendered.");
+
+        Assert.True(search.X < language.X);
+        Assert.True(language.X < theme.X);
+
+        // The selector is a pill aligned with the adjacent theme control rather than a round icon button.
+        Assert.True(language.Width > language.Height);
+        Assert.InRange(language.Width, 68, 76);
+        Assert.InRange(Math.Abs(language.Height - theme.Height), 0, 1);
+        await Expect(Page.GetByTestId("language-toggle").Locator("svg")).ToBeVisibleAsync();
+    }
+
+    [Fact]
     public async Task SearchForm_UsesCompactRussianCopyAndAccessibleLabels()
     {
         await Page.RouteAsync("**/api/public/**", route => route.FulfillAsync(new()

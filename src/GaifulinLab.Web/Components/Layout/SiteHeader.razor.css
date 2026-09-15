@@ -247,7 +247,7 @@
     }
 }
 
-@media (max-width: 22rem) {
+@media (max-width: 25rem) {
     .header-content {
         gap: var(--space-3);
     }
