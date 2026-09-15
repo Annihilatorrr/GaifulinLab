@@ -14,6 +14,58 @@
                 // A typo in a language class must leave the original code readable.
             }
         });
+
+        prepareTableOfContents(root);
+    };
+
+    const prepareTableOfContents = (root) => {
+        const links = root.querySelectorAll('.article-toc > ol > li > a[href^="#"]');
+        if (!links.length) {
+            return;
+        }
+
+        const pathWithSearch = `${window.location.pathname}${window.location.search}`;
+        links.forEach((link) => {
+            const rawFragment = link.getAttribute("href");
+            if (!rawFragment || rawFragment.length === 1) {
+                return;
+            }
+
+            const targetId = rawFragment.slice(1);
+            const fragment = `#${encodeURIComponent(targetId)}`;
+            link.setAttribute("href", `${pathWithSearch}${fragment}`);
+            link.addEventListener("click", (event) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                    return;
+                }
+
+                const target = root.querySelector(`#${CSS.escape(targetId)}`);
+                if (!target) {
+                    return;
+                }
+
+                event.preventDefault();
+                window.history.pushState(null, "", `${pathWithSearch}${fragment}`);
+                target.scrollIntoView({ block: "start" });
+            });
+        });
+
+        const rawInitialTargetId = window.location.hash.slice(1);
+        if (!rawInitialTargetId) {
+            return;
+        }
+
+        let initialTargetId;
+        try {
+            initialTargetId = decodeURIComponent(rawInitialTargetId);
+        } catch {
+            return;
+        }
+
+        const initialTarget = root.querySelector(`#${CSS.escape(initialTargetId)}`);
+        if (initialTarget) {
+            requestAnimationFrame(() => initialTarget.scrollIntoView({ block: "start" }));
+        }
     };
 
     const download = (content, fileName) => {

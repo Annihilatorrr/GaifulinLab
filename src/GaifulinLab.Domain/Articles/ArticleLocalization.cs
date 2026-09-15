@@ -107,7 +107,12 @@ public sealed class ArticleLocalization
 
         var timestamp = DomainRules.AsUtc(publishedAt);
         Status = PublicationStatus.Published;
-        PublishedAt ??= timestamp;
+        if (PublishedAt is null)
+        {
+            PublishedAt = timestamp;
+            LastEditedAt = timestamp;
+        }
+
         UpdatedAt = timestamp;
     }
 

@@ -53,7 +53,7 @@
                             @string.Join(" · ", article.Localizations.Select(x => $"{x.LanguageCode.ToUpperInvariant()} — {x.Status}"))
                         </span>
                     </a>
-                    <time datetime="@article.UpdatedAt.ToString("O")">Updated @article.UpdatedAt.ToLocalTime().ToString("d MMM yyyy")</time>
+                    <time datetime="@article.UpdatedAt.ToString("O")">Updated @article.UpdatedAt.ToLocalTime().ToString("d MMM yyyy, HH:mm")</time>
                     <button class="delete-button" type="button" disabled="@(_deleting == article.Id)" @onclick="() => DeleteAsync(article.Id)">
                         @(_deleting == article.Id ? "Deleting…" : "Delete")
                     </button>

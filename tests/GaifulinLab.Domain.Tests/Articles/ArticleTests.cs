@@ -125,14 +125,14 @@ public sealed class ArticleTests
     }
 
     [Fact]
-    public void UpdateLocalization_TracksLastContentEditSeparatelyFromPublicationChanges()
+    public void UpdateLocalization_TracksLastContentEditAfterInitialPublication()
     {
         var article = Article.Create("test-owner", "en", CreatedAt, "Title", html: "Content", slug: "article");
         var localization = article.FindLocalization("en")!;
         Assert.Equal(CreatedAt, localization.LastEditedAt);
 
         article.PublishLocalization("en", CreatedAt.AddDays(1));
-        Assert.Equal(CreatedAt, localization.LastEditedAt);
+        Assert.Equal(CreatedAt.AddDays(1), localization.LastEditedAt);
 
         article.UpdateLocalization("en", "Updated", null, "Updated content", "updated", CreatedAt.AddDays(2));
         Assert.Equal(CreatedAt.AddDays(2), localization.LastEditedAt);

@@ -20,6 +20,6 @@ internal sealed class RenderHtmlQueryHandler(IArticleHtmlSanitizer sanitizer)
                 nameof(request.Html));
         }
 
-        return Task.FromResult(new HtmlPreviewResponse(sanitizer.Sanitize(request.Html)));
+        return Task.FromResult(new HtmlPreviewResponse(sanitizer.RenderForDisplay(request.Html)));
     }
 }

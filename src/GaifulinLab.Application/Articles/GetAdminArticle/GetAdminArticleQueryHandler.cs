@@ -1,4 +1,5 @@
 using GaifulinLab.Application.Common;
+using GaifulinLab.Application.Content;
 using GaifulinLab.Application.Persistence;
 using GaifulinLab.Contracts.Articles;
 using MediatR;
@@ -6,7 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GaifulinLab.Application.Articles.GetAdminArticle;
 
-internal sealed class GetAdminArticleQueryHandler(IAppDbContext dbContext)
+internal sealed class GetAdminArticleQueryHandler(
+    IAppDbContext dbContext,
+    IArticleHtmlSanitizer htmlSanitizer)
     : IRequestHandler<GetAdminArticleQuery, AdminArticleDetailsDto>
 {
     public async Task<AdminArticleDetailsDto> Handle(
@@ -46,7 +49,7 @@ internal sealed class GetAdminArticleQueryHandler(IAppDbContext dbContext)
             article.UpdatedAt,
             article.Localizations
                 .OrderBy(localization => localization.LanguageCode)
-                .Select(localization => localization.ToDetails())
+                .Select(localization => localization.ToDetails() with { Html = htmlSanitizer.Sanitize(localization.Html) })
                 .ToArray(),
             article.Topics.Select(link => link.TopicId).Order().ToArray(),
             series,

@@ -147,7 +147,11 @@ public sealed class LocalizationServiceTests
         Assert.Equal("1 статья", service.FormatArticleCount(1));
         Assert.Equal("2 статьи", service.FormatArticleCount(2));
         Assert.Equal("11 статей", service.FormatArticleCount(11));
-        Assert.Equal("02.01.2026", service.FormatDate(new DateTimeOffset(2026, 1, 2, 12, 0, 0, TimeSpan.Zero)));
+        var timestamp = new DateTimeOffset(2026, 1, 2, 12, 0, 0, TimeSpan.Zero);
+        Assert.Equal("02.01.2026", service.FormatDate(timestamp));
+        Assert.Equal(
+            $"{service.FormatDate(timestamp)}, {timestamp.ToLocalTime():HH:mm}",
+            service.FormatDateTime(timestamp));
     }
 
     [Fact]

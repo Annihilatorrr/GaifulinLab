@@ -14,13 +14,12 @@
             <header class="article-header">
                 <div class="article-meta">
                     <div class="article-meta-info">
-                        <span class="article-author">@L.Format("common.byAuthor", _article.AuthorDisplayName)</span>
-                        <time datetime="@_article.PublishedAt.ToString("O")">@L.FormatDate(_article.PublishedAt)</time>
+                        <time datetime="@_article.PublishedAt.ToString("O")">@L.Format("article.published", L.FormatDateTime(_article.PublishedAt))</time>
                         <span class="article-views">
                             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Zm9.5 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /></svg>
                             <span>@L.FormatViewCount(_article.ViewCount)</span>
                         </span>
-                        <time datetime="@_article.LastEditedAt.ToString("O")">@L.Format("article.lastEdited", L.FormatDate(_article.LastEditedAt))</time>
+                        <time datetime="@_article.LastEditedAt.ToString("O")">@L.Format("article.lastEdited", L.FormatDateTime(_article.LastEditedAt))</time>
                     </div>
                     @if (PublicPdfDownloadEnabled)
                     {

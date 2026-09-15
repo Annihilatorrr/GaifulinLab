@@ -5,7 +5,7 @@
         <section class="overview-column">
             <header class="overview-heading"><h2>@L["home.latest.title"]</h2><a href="/articles">@L["common.viewAll"] →</a></header>
             @if (_articles.Count == 0) { <div class="overview-empty"><h3>@L["catalog.articles.emptyTitle"]</h3><p>@L["home.latest.empty"]</p></div> }
-            else { @foreach (var article in _articles.Take(3)) { <a class="overview-link surface" href="@($"/{article.LanguageCode}/articles/{article.Slug}")"><strong>@article.Title</strong><span>@L.Format("common.byAuthorDate", article.AuthorDisplayName, L.FormatDate(article.PublishedAt))</span></a> } }
+            else { @foreach (var article in _articles.Take(3)) { <a class="overview-link surface" href="@($"/{article.LanguageCode}/articles/{article.Slug}")"><strong>@article.Title</strong><span>@L.Format("common.byAuthorDate", article.AuthorDisplayName, L.FormatDateTime(article.PublishedAt))</span></a> } }
         </section>
         <section class="overview-column">
             <header class="overview-heading"><h2>@L["home.topics.title"]</h2><a href="/topics">@L["home.topics.all"] →</a></header>

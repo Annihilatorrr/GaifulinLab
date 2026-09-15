@@ -83,7 +83,7 @@
                             <div class="article-topics">@foreach (var topic in article.Topics) { <a href="@TopicUrl(topic.Slug)"><SearchHighlight Text="@topic.DisplayName" Query="@_request.Query" /></a> }</div>
                             <h2><a href="@ArticleUrl(article)"><SearchHighlight Text="@(article.SearchTitle ?? article.Title)" Query="@_request.Query" /></a></h2>
                             <p class="search-excerpt"><SearchHighlight Text="@(article.SearchSnippet ?? article.Summary ?? "")" Query="@_request.Query" /></p>
-                            <div class="article-meta"><span>@article.AuthorDisplayName</span><span aria-hidden="true">·</span><time datetime="@article.PublishedAt.ToString("O")">@L.FormatDate(article.PublishedAt)</time><span aria-hidden="true">·</span><span>@L.Format("article.minutesRead", article.ReadingMinutes)</span></div>
+                            <div class="article-meta"><span>@article.AuthorDisplayName</span><span aria-hidden="true">·</span><time datetime="@article.PublishedAt.ToString("O")">@L.FormatDateTime(article.PublishedAt)</time><span aria-hidden="true">·</span><span>@L.Format("article.minutesRead", article.ReadingMinutes)</span></div>
                             <div class="article-tags">@foreach (var tag in article.Tags) { <a href="@TagUrl(tag)">#<SearchHighlight Text="@tag" Query="@_request.Query" /></a> }</div>
                         </div>
                     </article>

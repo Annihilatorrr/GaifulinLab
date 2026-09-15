@@ -380,11 +380,17 @@ public sealed class RegistrationTests(E2EEnvironment environment) : E2EPageTest
 
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/articles/{slug}").ToString());
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = title })).ToBeVisibleAsync();
-        await Expect(Page.GetByText($"By {displayName}", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByText($"By {displayName}", new() { Exact = true })).ToHaveCountAsync(0);
+        await Expect(Page.GetByText(new Regex("^Published "))).ToBeVisibleAsync();
         await Expect(Page.GetByText(summary, new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Page.Locator("article.article-body")).ToContainTextAsync(body);
         await Expect(Page.Locator(".article-views")).ToContainTextAsync("1 view");
         await Expect(Page.GetByText(new Regex("^Last edited "))).ToBeVisibleAsync();
+        var metadataDates = Page.Locator(".article-meta-info time");
+        await Expect(metadataDates).ToHaveCountAsync(2);
+        Assert.Equal(
+            await metadataDates.Nth(0).GetAttributeAsync("datetime"),
+            await metadataDates.Nth(1).GetAttributeAsync("datetime"));
 
         await Page.GotoAsync(new Uri(environment.BaseUri, "/topics").ToString());
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = topicName })).ToBeVisibleAsync();

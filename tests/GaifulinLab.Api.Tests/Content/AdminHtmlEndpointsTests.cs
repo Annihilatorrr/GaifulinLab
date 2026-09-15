@@ -39,6 +39,28 @@ public sealed class AdminHtmlEndpointsTests(AuthWebApplicationFactory factory)
         Assert.DoesNotContain("<script", preview.Html, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Preview_BuildsDisplayOnlyTableOfContents()
+    {
+        const string source = """
+            <div class="article-toc"><h2>Contents</h2></div>
+            <section><h2>First topic</h2></section>
+            <section><h2>Second topic</h2></section>
+            """;
+        using var client = await CreateAuthenticatedClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/admin/html/preview",
+            new HtmlPreviewRequest(source));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var preview = await response.Content.ReadFromJsonAsync<HtmlPreviewResponse>();
+        Assert.NotNull(preview);
+        Assert.Contains("<ol>", preview.Html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("href=\"#article-section-1\"", preview.Html, StringComparison.Ordinal);
+        Assert.Contains("<section id=\"article-section-1\">", preview.Html, StringComparison.Ordinal);
+    }
+
     private async Task<HttpClient> CreateAuthenticatedClient()
     {
         var client = factory.CreateClient();

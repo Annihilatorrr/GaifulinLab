@@ -140,4 +140,123 @@ public sealed class ArticleHtmlSanitizerTests
         Assert.Equal(4, document.QuerySelectorAll("strong").Length);
         Assert.Contains("Careful", sanitized);
     }
+
+    [Fact]
+    public void Sanitize_NormalizesTableOfContentsToAPlaceholderAndPreservesSectionIds()
+    {
+        const string html = """
+            <div class="article-toc"><h2 id="toc-title"><strong>Contents</strong></h2><ol><li><a href="#outdated">Outdated</a></li></ol><p>Stale content</p></div>
+            <p id="article-section-1">An authored non-section target</p>
+            <section id="article-section-2"><h2>First topic</h2><p>Text</p></section>
+            <section id="chapter one"><h2>Second topic</h2><p>Text</p></section>
+            """;
+
+        var document = Parse(_sanitizer.Sanitize(html));
+        var tableOfContents = Assert.Single(document.QuerySelectorAll(".article-toc"));
+        var sections = document.QuerySelectorAll("section");
+
+        var title = Assert.Single(tableOfContents.Children, element => element.LocalName == "h2");
+        Assert.Equal("Contents", title.TextContent);
+        Assert.Empty(title.Attributes);
+        Assert.Empty(tableOfContents.QuerySelectorAll("ol"));
+        Assert.DoesNotContain("Stale content", tableOfContents.TextContent);
+        Assert.Equal("article-section-1", document.QuerySelector("p")!.Id);
+        Assert.Equal("article-section-2", sections[0].Id);
+        Assert.Equal("chapter one", sections[1].Id);
+    }
+
+    [Fact]
+    public void RenderForDisplay_BuildsTableOfContentsAndGeneratesTransientSectionTargets()
+    {
+        const string html = """
+            <div class="article-toc"><h2>Contents</h2></div>
+            <section><h2>First topic</h2><p>Text</p></section>
+            <section><h2>Second topic</h2><p>Text</p></section>
+            """;
+
+        var source = _sanitizer.Sanitize(html);
+        var document = Parse(_sanitizer.RenderForDisplay(html));
+        var sections = document.QuerySelectorAll("section");
+        var links = GetTableOfContentsLinks(document);
+
+        Assert.DoesNotContain("<ol", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("article-section-", source, StringComparison.Ordinal);
+        Assert.Equal(["article-section-1", "article-section-2"], sections.Select(section => section.Id));
+        Assert.Equal(["#article-section-1", "#article-section-2"], links.Select(link => link.GetAttribute("href")));
+        Assert.Equal(["First topic", "Second topic"], links.Select(link => link.TextContent.Trim()));
+    }
+
+    [Fact]
+    public void RenderForDisplay_RebuildsStaleEntriesAndExcludesUtilityHeadings()
+    {
+        const string html = """
+            <div class="article-toc">
+                <h2 id="toc-title">Contents</h2>
+                <section><h2>Must not appear</h2></section>
+                <ol><li><a href="#old">Old title</a></li><li><a href="#also-old">Also old</a></li></ol>
+            </div>
+            <section class="article-next"><h2>Next topic</h2></section>
+            <section><h2>Renamed topic</h2></section>
+            """;
+
+        var document = Parse(_sanitizer.RenderForDisplay(html));
+        var links = GetTableOfContentsLinks(document);
+
+        // Only article-section headings participate; ToC and next-topic content never reference themselves.
+        var link = Assert.Single(links);
+        Assert.Equal("Renamed topic", link.TextContent.Trim());
+        Assert.DoesNotContain("Old title", document.Body!.TextContent);
+        Assert.DoesNotContain("Must not appear", links.Select(item => item.TextContent));
+        Assert.DoesNotContain("Next topic", links.Select(item => item.TextContent));
+        Assert.DoesNotContain("#old", links.Select(item => item.GetAttribute("href")));
+    }
+
+    [Fact]
+    public void RenderForDisplay_PreservesUniqueAuthoredTargetsAndGeneratesCollisionSafeTargets()
+    {
+        const string html = """
+            <div class="article-toc"><h2>Contents</h2></div>
+            <p id="article-section-1">Existing target</p>
+            <section id="chapter-one"><h2>First</h2></section>
+            <section id="duplicate"><h2>Second</h2></section>
+            <section id="duplicate"><h2>Third</h2></section>
+            <section id=" "><h2>Fourth</h2></section>
+            <section><h2>Fifth</h2></section>
+            """;
+
+        var document = Parse(_sanitizer.RenderForDisplay(html));
+        var sections = document.QuerySelectorAll("section");
+        var sectionIds = sections.Select(section => section.Id).ToArray();
+        var links = GetTableOfContentsLinks(document);
+
+        Assert.Equal("chapter-one", sectionIds[0]);
+        Assert.Equal(sectionIds.Length, sectionIds.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(sectionIds, id => Assert.False(string.IsNullOrWhiteSpace(id)));
+        Assert.All(links, link => Assert.Contains(link.GetAttribute("href")![1..], sectionIds));
+        Assert.DoesNotContain("#duplicate", links.Select(link => link.GetAttribute("href")));
+        Assert.DoesNotContain("#article-section-1", links.Select(link => link.GetAttribute("href")));
+    }
+
+    [Fact]
+    public void RenderForDisplay_IsIdempotent()
+    {
+        const string html = """
+            <div class="article-toc"><h2>Contents</h2></div>
+            <section><h2>Topic</h2></section>
+            """;
+
+        var rendered = _sanitizer.RenderForDisplay(html);
+
+        Assert.Equal(rendered, _sanitizer.RenderForDisplay(rendered));
+    }
+
+    private static IDocument Parse(string html) =>
+        new HtmlParser().ParseDocument(html);
+
+    private static IElement[] GetTableOfContentsLinks(IDocument document)
+    {
+        var tableOfContents = Assert.Single(document.QuerySelectorAll(".article-toc"));
+        var list = Assert.Single(tableOfContents.Children, element => element.LocalName == "ol");
+        return list.QuerySelectorAll("li > a").ToArray();
+    }
 }

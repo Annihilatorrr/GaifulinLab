@@ -240,7 +240,7 @@ internal sealed class PlaywrightArticlePdfRenderer(
         ArticleTypography typography,
         CancellationToken cancellationToken)
     {
-        var articleHtml = htmlSanitizer.Sanitize(document.Html);
+        var articleHtml = htmlSanitizer.RenderForDisplay(document.Html);
         articleHtml = ForceDisplayIntegralLimits(articleHtml);
         articleHtml = await EmbedInternalMediaAsync(articleHtml, cancellationToken);
         var articleStylesPath = Path.GetFullPath(settings.ArticleStylesPath);

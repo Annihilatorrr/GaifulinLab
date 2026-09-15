@@ -7,4 +7,10 @@ namespace GaifulinLab.Application.Content;
 public interface IArticleHtmlSanitizer
 {
     string Sanitize(string html);
+
+    /// <summary>
+    /// Produces a safe transient article fragment for a reader-facing surface.
+    /// The result may include display-only generated markup and must not be persisted.
+    /// </summary>
+    string RenderForDisplay(string html);
 }

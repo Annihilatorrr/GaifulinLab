@@ -215,6 +215,42 @@ public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPa
     }
 
     [Fact]
+    public async Task TableOfContents_StaysOutOfSourceHtmlAndUsesCurrentPageFragments()
+    {
+        const string source = """
+            <div class="article-toc"><h2>Contents</h2></div>
+            <section><h2>First topic</h2></section>
+            <section id="éclair"><h2>Second topic</h2></section>
+            """;
+        var padding = string.Concat(Enumerable.Repeat("<p>Padding before the second section.</p>", 40));
+        var rendered = $"""
+            <div class="article-toc"><h2>Contents</h2><ol><li><a href="#article-section-1">First topic</a></li><li><a href="#éclair">Second topic</a></li></ol></div>
+            <section id="article-section-1"><h2>First topic</h2>{padding}</section>
+            <section id="éclair"><h2>Second topic</h2></section>
+            """;
+        await AuthenticateAsync();
+        await RouteHtmlEditorAndPublicAsync(rendered);
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
+        var html = Page.GetByLabel("Article Html");
+        await html.FillAsync(source);
+        await Expect(html).ToHaveValueAsync(source);
+        var previewLink = Page.Locator("article.article-preview .article-toc > ol > li > a").Nth(1);
+        await Expect(previewLink).ToHaveAttributeAsync("href", "/admin/articles/new#%C3%A9clair");
+        await previewLink.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/new#%C3%A9clair$"));
+        await Expect(Page.Locator("article.article-preview #éclair")).ToBeInViewportAsync();
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/en/articles/advanced-document#%C3%A9clair").ToString());
+        var publicLink = Page.Locator("article.article-body .article-toc > ol > li > a").Nth(1);
+        await Expect(publicLink).ToHaveAttributeAsync("href", "/en/articles/advanced-document#%C3%A9clair");
+        await Expect(Page.Locator("article.article-body #éclair")).ToBeInViewportAsync();
+        await publicLink.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/en/articles/advanced-document#%C3%A9clair$"));
+        await Expect(Page.Locator("article.article-body #éclair")).ToBeInViewportAsync();
+    }
+
+    [Fact]
     public async Task PublicArticle_RemainsReadableWhenMathJaxCdnIsUnavailable()
     {
         await Page.RouteAsync("https://cdn.jsdelivr.net/**", route => route.AbortAsync("failed"));

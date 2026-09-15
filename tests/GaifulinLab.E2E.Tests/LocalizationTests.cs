@@ -48,6 +48,67 @@ public sealed class LocalizationTests : E2EPageTest
     }
 
     [Fact]
+    public async Task AdminLanguageSwitcher_RemainsAvailableAcrossAuthenticationThemeAndMobileLayouts()
+    {
+        await Page.AddInitScriptAsync(
+            "if (!localStorage.getItem('gaifulinlab-theme')) localStorage.setItem('gaifulinlab-theme', 'light');");
+        await Page.SetViewportSizeAsync(390, 844);
+        await Page.GotoAsync(new Uri(BaseUri, "/admin/login").ToString());
+
+        // The unauthenticated admin route keeps the global controls in the compact header.
+        var language = Page.GetByTestId("language-switcher");
+        var theme = Page.Locator(".theme-toggle");
+        await Expect(language).ToBeVisibleAsync();
+        await Expect(theme).ToBeVisibleAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-theme", "light");
+        Assert.False(await Page.EvaluateAsync<bool>(
+            "document.documentElement.scrollWidth > document.documentElement.clientWidth"));
+
+        var languageBounds = await language.BoundingBoxAsync()
+            ?? throw new InvalidOperationException("The admin language selector was not rendered.");
+        var themeBounds = await theme.BoundingBoxAsync()
+            ?? throw new InvalidOperationException("The admin theme toggle was not rendered.");
+        Assert.True(languageBounds.X < themeBounds.X);
+
+        await theme.ClickAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-theme", "dark");
+
+        // Changing culture from admin preserves its route and persists through the reload it triggers.
+        await Page.GetByTestId("language-toggle").ClickAsync();
+        await Page.GetByTestId("language-ru").ClickAsync();
+        await Expect(Page.GetByTestId("language-current")).ToHaveTextAsync("RU");
+        await Page.WaitForFunctionAsync(
+            "localStorage.getItem('GaifulinLab.Web.UiCulture') === 'ru'");
+        Assert.Equal("/admin/login", new Uri(Page.Url).AbsolutePath);
+        Assert.Equal("ru", await Page.EvaluateAsync<string>(
+            "localStorage.getItem('GaifulinLab.Web.UiCulture')"));
+        await Page.ReloadAsync();
+        await Expect(Page.GetByTestId("language-current")).ToHaveTextAsync("RU");
+
+        var tokenPayload = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                $"{{\"sub\":\"localization-admin\",\"role\":\"Admin\",\"exp\":{DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()}}}"))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        await Page.AddInitScriptAsync($"sessionStorage.setItem('gaifulinlab.admin.access_token', 'header.{tokenPayload}.signature');");
+        await Page.RouteAsync("**/api/admin/articles", route => route.FulfillAsync(new()
+        {
+            Status = 200,
+            ContentType = "application/json",
+            Body = "[]"
+        }));
+        await Page.GotoAsync(new Uri(BaseUri, "/admin/articles").ToString());
+
+        // Authenticated article management uses the same layout and keeps the controls in dark mode.
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "My articles", Exact = true })).ToBeVisibleAsync();
+        await Expect(language).ToBeVisibleAsync();
+        await Expect(theme).ToBeVisibleAsync();
+        await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-theme", "dark");
+        Assert.False(await Page.EvaluateAsync<bool>(
+            "document.documentElement.scrollWidth > document.documentElement.clientWidth"));
+    }
+
+    [Fact]
     public async Task SearchForm_UsesCompactRussianCopyAndAccessibleLabels()
     {
         await Page.RouteAsync("**/api/public/**", route => route.FulfillAsync(new()

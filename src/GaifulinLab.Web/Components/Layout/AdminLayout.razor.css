@@ -112,4 +112,8 @@
     .view-site {
         display: none;
     }
+
+    .admin-header-actions {
+        gap: var(--space-2);
+    }
 }

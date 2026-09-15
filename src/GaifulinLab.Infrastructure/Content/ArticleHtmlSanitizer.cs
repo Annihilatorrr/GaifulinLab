@@ -1,4 +1,5 @@
 using AngleSharp.Dom;
+using AngleSharp.Html.Parser;
 using GaifulinLab.Application.Content;
 using Ganss.Xss;
 
@@ -17,6 +18,14 @@ public sealed class ArticleHtmlSanitizer : IArticleHtmlSanitizer
     {
         ArgumentNullException.ThrowIfNull(html);
         return _sanitizer.Sanitize(html);
+    }
+
+    public string RenderForDisplay(string html)
+    {
+        var sanitized = Sanitize(html);
+        var document = new HtmlParser().ParseDocument(sanitized);
+        RebuildTableOfContents(document);
+        return document.Body?.InnerHtml ?? string.Empty;
     }
 
     private static HtmlSanitizer CreateSanitizer()
@@ -67,6 +76,8 @@ public sealed class ArticleHtmlSanitizer : IArticleHtmlSanitizer
         // Add a system-only marker after class filtering, so authored markup cannot hide unrelated bold text.
         sanitizer.PostProcessDom += (_, args) =>
         {
+            NormalizeTableOfContents(args.Document);
+
             foreach (var strong in args.Document.QuerySelectorAll(
                 "p > strong, aside.article-callout--important > strong, aside.article-callout--warning > strong"))
             {
@@ -79,6 +90,132 @@ public sealed class ArticleHtmlSanitizer : IArticleHtmlSanitizer
 
         return sanitizer;
     }
+
+    private static void NormalizeTableOfContents(IDocument document)
+    {
+        var tableOfContents = document.QuerySelectorAll(".article-toc");
+        if (tableOfContents.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var tableOfContentsElement in tableOfContents)
+        {
+            var title = tableOfContentsElement.Children.FirstOrDefault(
+                element => string.Equals(element.LocalName, "h2", StringComparison.OrdinalIgnoreCase));
+            var titleText = title?.TextContent;
+
+            foreach (var child in tableOfContentsElement.ChildNodes.ToArray())
+            {
+                tableOfContentsElement.RemoveChild(child);
+            }
+
+            if (titleText is not null)
+            {
+                var normalizedTitle = document.CreateElement("h2");
+                normalizedTitle.TextContent = titleText;
+                tableOfContentsElement.AppendChild(normalizedTitle);
+            }
+        }
+    }
+
+    private static void RebuildTableOfContents(IDocument document)
+    {
+        var tableOfContents = document.QuerySelectorAll(".article-toc");
+        if (tableOfContents.Length == 0)
+        {
+            return;
+        }
+
+        var idCounts = document.QuerySelectorAll("[id]")
+            .Select(element => element.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .GroupBy(id => id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        var occupiedIds = new HashSet<string>(idCounts.Keys, StringComparer.Ordinal);
+        var generatedIdNumber = 1;
+        var headings = GetTableOfContentsHeadings(document);
+
+        // An id must identify exactly one section and be safe to interpolate into a raw fragment link.
+        foreach (var heading in headings)
+        {
+            var section = heading.ParentElement!;
+            var id = section.Id;
+            if (IsValidArticleFragmentId(id)
+                && (!idCounts.TryGetValue(id!, out var count) || count == 1))
+            {
+                continue;
+            }
+
+            string generatedId;
+            do
+            {
+                generatedId = $"article-section-{generatedIdNumber++}";
+            }
+            while (!occupiedIds.Add(generatedId));
+
+            section.Id = generatedId;
+        }
+
+        foreach (var tableOfContentsElement in tableOfContents)
+        {
+            var lists = tableOfContentsElement.Children
+                .Where(element => string.Equals(element.LocalName, "ol", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            var list = lists.FirstOrDefault() ?? document.CreateElement("ol");
+
+            foreach (var extraList in lists.Skip(1))
+            {
+                extraList.Remove();
+            }
+
+            foreach (var child in list.ChildNodes.ToArray())
+            {
+                list.RemoveChild(child);
+            }
+            if (lists.Length == 0)
+            {
+                tableOfContentsElement.AppendChild(list);
+            }
+
+            foreach (var heading in headings)
+            {
+                var item = document.CreateElement("li");
+                var link = document.CreateElement("a");
+                link.SetAttribute("href", $"#{heading.ParentElement!.Id}");
+                link.TextContent = heading.TextContent.Trim();
+                item.AppendChild(link);
+                list.AppendChild(item);
+            }
+        }
+    }
+
+    private static IElement[] GetTableOfContentsHeadings(IDocument document) =>
+        document.QuerySelectorAll("section > h2")
+            .Where(heading => !IsInsideExcludedArticleContent(heading))
+            .ToArray();
+
+    private static bool IsInsideExcludedArticleContent(IElement element)
+    {
+        for (var ancestor = element.ParentElement; ancestor is not null; ancestor = ancestor.ParentElement)
+        {
+            if (ancestor.ClassList.Contains("article-toc")
+                || ancestor.ClassList.Contains("article-next")
+                || ancestor.ClassList.Contains("article-callout")
+                || ancestor.ClassList.Contains("article-example")
+                || ancestor.ClassList.Contains("article-summary"))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsValidArticleFragmentId(string? id) =>
+        !string.IsNullOrWhiteSpace(id)
+        && !id.Any(character => character is ' ' or '\t' or '\n' or '\r' or '\f');
 
     private static bool IsLeadingImportanceLabel(IElement strong)
     {

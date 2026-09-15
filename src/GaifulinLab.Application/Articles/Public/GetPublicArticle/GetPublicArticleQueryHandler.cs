@@ -49,7 +49,7 @@ internal sealed class GetPublicArticleQueryHandler(
             localization.Slug!,
             localization.Title,
             localization.Summary,
-            htmlSanitizer.Sanitize(localization.Html),
+            htmlSanitizer.RenderForDisplay(localization.Html),
             localization.PublishedAt!.Value,
             localization.UpdatedAt,
             localization.LastEditedAt,

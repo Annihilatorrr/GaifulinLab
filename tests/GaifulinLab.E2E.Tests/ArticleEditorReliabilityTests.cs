@@ -164,6 +164,63 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         Assert.Equal(0, creates);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AutosaveRendersBusyAndCompletedStatusWithoutAnotherEditorEvent(bool failSave)
+    {
+        Page.SetDefaultTimeout(5_000);
+        var article = new MockArticle();
+        var autosaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseAutosave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await AuthenticateAsync();
+        await RouteEditorAsync(article);
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/en", async route =>
+        {
+            if (route.Request.Method != "PUT") { await route.FallbackAsync(); return; }
+            autosaveStarted.TrySetResult();
+            await releaseAutosave.Task;
+            if (failSave)
+            {
+                await ErrorAsync(route, 500, "save_failed", "The article could not be saved.");
+                return;
+            }
+            await route.FallbackAsync();
+        });
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+        await Page.GetByLabel("Article Html").FillAsync("Background save snapshot");
+        var saveButton = Page.Locator(".save-action button");
+        try
+        {
+            await autosaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            // The delayed response keeps autosave in progress, so the toolbar must show its busy state.
+            await Expect(saveButton).ToHaveTextAsync("Saving…");
+            await Expect(saveButton).ToBeDisabledAsync();
+        }
+        finally
+        {
+            releaseAutosave.TrySetResult();
+        }
+
+        // After the response, background completion must render without another input or navigation.
+        if (failSave)
+        {
+            await Expect(saveButton).ToHaveTextAsync("Retry");
+            await Expect(saveButton).ToBeEnabledAsync();
+            await Expect(Page.Locator(".save-action [role=alert]")).ToHaveTextAsync("The article could not be saved.");
+            Assert.Equal("Original body", article.Html);
+        }
+        else
+        {
+            // Autosave retains the manual-save requirement for PDF export even after content persists.
+            await Expect(saveButton).ToHaveTextAsync("Save changes");
+            await Expect(saveButton).ToBeEnabledAsync();
+            Assert.Equal("Background save snapshot", article.Html);
+        }
+    }
+
     [Fact]
     public async Task FailedSaveKeepsTheDraftAndRetryPersistsIt()
     {
@@ -518,7 +575,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             && new Uri(response.Url).AbsolutePath == $"/api/admin/articles/{article.Id}/localizations/ru");
         releaseEnglishSave.TrySetResult();
 
-        // Background autosave does not itself render the status; use its response as the persistence signal.
+        // The response confirms persistence while the toolbar can settle after the post-save reload.
         Assert.Equal(200, (await russianSaveResponse).Status);
         // The pending autosave must preserve both drafts after a language event adds a localization.
         await Expect(Page.Locator(".editor-conflict")).ToHaveCountAsync(0);

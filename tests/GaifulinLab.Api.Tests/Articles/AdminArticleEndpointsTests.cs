@@ -435,6 +435,41 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
     }
 
     [Fact]
+    public async Task ArticleHtml_TableOfContentsIsSavedAndReturnedAsAnAuthoredPlaceholder()
+    {
+        const string html = """
+            <div class="article-toc"><h2>Contents</h2><ol><li><a href="#article-section-1">Old topic</a></li></ol></div>
+            <section id="article-section-1"><h2>Topic</h2></section>
+            """;
+        using var client = await CreateAuthenticatedClient();
+        var slug = $"toc-placeholder-{Guid.NewGuid():N}";
+
+        var create = await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest("en", "Contents", null, html, slug));
+        var created = await create.Content.ReadFromJsonAsync<CreateArticleResponse>();
+
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        Assert.NotNull(created);
+        var saved = await client.GetFromJsonAsync<AdminArticleDetailsDto>(
+            $"/api/admin/articles/{created!.ArticleId}");
+        var savedHtml = Assert.Single(saved!.Localizations).Html;
+
+        Assert.Contains("<div class=\"article-toc\"><h2>Contents</h2></div>", savedHtml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ol", savedHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<section id=\"article-section-1\">", savedHtml, StringComparison.Ordinal);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PostAsync(
+            $"/api/admin/articles/{created.ArticleId}/localizations/en/publish", null)).StatusCode);
+        var published = await client.GetFromJsonAsync<PublicArticleDetailsDto>(
+            $"/api/public/articles/en/{slug}");
+
+        Assert.NotNull(published);
+        Assert.Contains("<ol>", published.Html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("href=\"#article-section-1\"", published.Html, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task TaxonomyCreationAndLocalizationEditing_UseLanguageScopedUniqueSlugs()
     {
         using var client = await CreateAuthenticatedClient();

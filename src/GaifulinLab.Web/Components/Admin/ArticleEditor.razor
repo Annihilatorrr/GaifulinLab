@@ -670,6 +670,11 @@
         ClearMessage();
         _hasError = false;
         _saveFailed = false;
+        // The timer starts autosave outside a Blazor event, so its busy and settled states need explicit renders.
+        if (isAutomaticSave)
+        {
+            StateHasChanged();
+        }
         try
         {
             var wasNew = ArticleId is null;
@@ -738,6 +743,10 @@
             if (!_saveFailed && _autosavePending && _isDirty && ArticleId is not null)
             {
                 QueueAutosave();
+            }
+            if (isAutomaticSave)
+            {
+                StateHasChanged();
             }
         }
     }
