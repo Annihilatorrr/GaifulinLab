@@ -78,7 +78,8 @@ internal sealed class GetPublicArticlesQueryHandler(
                 localization.Summary,
                 localization.CoverMediaAssetId,
                 localization.ReadingMinutes,
-                PublishedAt = localization.PublishedAt!.Value
+                PublishedAt = localization.PublishedAt!.Value,
+                localization.LastEditedAt
             })
             .ToListAsync(cancellationToken);
         var taxonomy = await PublicArticleTaxonomyLoader.Load(
@@ -102,7 +103,8 @@ internal sealed class GetPublicArticlesQueryHandler(
                 taxonomy.SeriesFor(article.ArticleId),
                 taxonomy.TagsFor(article.ArticleId),
                 article.CoverMediaAssetId,
-                article.ReadingMinutes))
+                article.ReadingMinutes,
+                LastEditedAt: article.LastEditedAt))
             .ToArray();
     }
 }

@@ -340,6 +340,57 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex($"/en/articles/{htmlSlug}$"));
     }
 
+    [Fact]
+    public async Task Browser_SearchCardUsesLastContentEditAndOmitsAuthor()
+    {
+        await using var services = CreateServices();
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Users.Select(user => user.Id).FirstAsync();
+        var token = "searchedited" + Guid.NewGuid().ToString("N");
+        var publishedAt = new DateTimeOffset(2024, 5, 20, 10, 0, 0, TimeSpan.Zero);
+        var editedAt = publishedAt.AddDays(32).AddHours(2);
+        var article = Article.Create(owner, "en", publishedAt, token, "Original summary", "Original body", token);
+        var tag = Tag.Create(token);
+        article.AssignTag(tag, publishedAt);
+        article.PublishLocalization("en", publishedAt);
+        article.UpdateLocalization("en", token, "Updated summary", "Updated body", token, editedAt);
+        article.AddLocalization("ru", publishedAt, token, "Исходное описание", "Исходный текст", token);
+        article.PublishLocalization("ru", publishedAt);
+        article.UpdateLocalization("ru", token, "Обновлённое описание", "Обновлённый текст", token, editedAt);
+        db.Tags.Add(tag);
+        db.Articles.Add(article);
+        await db.SaveChangesAsync();
+
+        // The API must carry the edit time separately from the original publication time.
+        using var api = new HttpClient { BaseAddress = environment.ApiBaseUri };
+        var search = await api.GetFromJsonAsync<ArticleSearchResponse>($"/api/public/search?q={token}");
+        var result = Assert.Single(search!.Items);
+        Assert.Equal(publishedAt, result.PublishedAt);
+        Assert.Equal(editedAt, result.LastEditedAt);
+        var publicList = await api.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>($"/api/public/articles?languageCode=en&tag={token}");
+        Assert.Equal(editedAt, Assert.Single(publicList!).LastEditedAt);
+
+        // The found-article card labels that timestamp as an update and has no author metadata.
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/search?q=" + token).ToString());
+        var card = Page.Locator(".search-card");
+        await Expect(card).ToHaveCountAsync(1);
+        var metadata = card.Locator(".article-meta");
+        await Expect(metadata.Locator("time")).ToHaveAttributeAsync("datetime", editedAt.ToString("O"));
+        await Expect(metadata).ToContainTextAsync("Updated");
+        await Expect(metadata).ToContainTextAsync("1 min read");
+        Assert.DoesNotContain(result.AuthorDisplayName, await metadata.InnerTextAsync());
+        Assert.DoesNotContain("Published", await metadata.InnerTextAsync());
+
+        // Switching the UI language must keep the update meaning explicit in Russian.
+        await Page.GetByTestId("language-toggle").ClickAsync();
+        await Page.GetByTestId("language-ru").ClickAsync();
+        await Expect(card).ToHaveCountAsync(1);
+        await Expect(metadata.Locator("time")).ToHaveAttributeAsync("datetime", editedAt.ToString("O"));
+        await Expect(metadata).ToContainTextAsync("Обновлено");
+        Assert.DoesNotContain(result.AuthorDisplayName, await metadata.InnerTextAsync());
+    }
+
     private static ServiceProvider CreateServices()
     {
         var connection = Environment.GetEnvironmentVariable("GAIFULINLAB_E2E_CONNECTION_STRING")!;

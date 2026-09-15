@@ -13,4 +13,5 @@ public sealed record PublicArticleListItemDto(
     Guid? CoverMediaAssetId = null,
     int ReadingMinutes = 1,
     string? SearchSnippet = null,
-    string? SearchTitle = null);
+    string? SearchTitle = null,
+    DateTimeOffset? LastEditedAt = null);

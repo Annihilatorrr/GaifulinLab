@@ -173,6 +173,7 @@
   "search.topic": "Тема",
   "search.tryMoment": "Попробуйте снова через несколько секунд.",
   "search.unavailable": "Поиск недоступен",
+  "search.updated": "Обновлено {0}",
   "series.loading": "Загрузка серии…",
   "series.notFound": "Серия не найдена",
   "series.notFoundDescription": "У этой серии нет опубликованной локализации.",

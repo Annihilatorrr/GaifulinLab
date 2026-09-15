@@ -19,6 +19,8 @@ use the content language associated with the current UI culture.
   localization ID provide deterministic final ordering.
 - Only published localizations of nondeleted articles appear, including in the
   total count. Periods use the original publication date, in UTC.
+- Search cards show the last content edit time as "Updated" and omit the author.
+  Publication date still controls period filtering and chronological sorting.
 - Ten items per page in the UI. URL parameters preserve filters, language, sort
   and page through reload, direct links and browser history. Out-of-range pages
   normalize to the last available page (or page 1 for an empty result).
@@ -32,8 +34,9 @@ GET /api/public/search?languageCode=en&q=python&scope=all&topic=programming&tag=
 ```
 
 Returns `items`, `totalCount`, `page`, `pageSize`, `totalPages`. The existing
-`PublicArticleListItemDto` adds optional cover, reading-time and search-headline
-fields. `/api/public/articles` keeps its existing list response and parameters.
+`PublicArticleListItemDto` adds optional cover, reading-time, last-edit time and
+search-headline fields. `/api/public/articles` keeps its existing parameters and
+also includes last-edit time in each returned article.
 
 No new domain entities or search tables are introduced. `ArticleLocalization`
 stores optional `CoverMediaAssetId`, derived `SearchText` and `ReadingMinutes`.

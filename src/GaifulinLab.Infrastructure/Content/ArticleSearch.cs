@@ -114,6 +114,7 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
             row.Localization.Title,
             row.Localization.Summary,
             row.Localization.PublishedAt,
+            row.Localization.LastEditedAt,
             row.Localization.CoverMediaAssetId,
             row.Localization.ReadingMinutes,
             Snippet = !hasText
@@ -150,7 +151,7 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
         return new(rows.Select(row => new PublicArticleListItemDto(request.LanguageCode, row.Slug!, row.Title,
             row.Summary, row.PublishedAt!.Value, names.GetValueOrDefault(row.OwnerUserId, "Author"),
             taxonomy.TopicsFor(row.ArticleId), taxonomy.SeriesFor(row.ArticleId), taxonomy.TagsFor(row.ArticleId),
-            row.CoverMediaAssetId, row.ReadingMinutes, row.Snippet, row.Headline)).ToArray(),
+            row.CoverMediaAssetId, row.ReadingMinutes, row.Snippet, row.Headline, row.LastEditedAt)).ToArray(),
             count, page, request.PageSize, totalPages);
     }
 

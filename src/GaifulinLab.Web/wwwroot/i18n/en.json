@@ -173,6 +173,7 @@
   "search.topic": "Topic",
   "search.tryMoment": "Please try again in a moment.",
   "search.unavailable": "Search unavailable",
+  "search.updated": "Updated {0}",
   "series.loading": "Loading series…",
   "series.notFound": "Series not found",
   "series.notFoundDescription": "This series has no published localization.",
