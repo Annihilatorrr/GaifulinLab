@@ -11,20 +11,22 @@ namespace GaifulinLab.Infrastructure.Content;
 
 internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup authors, TimeProvider clock) : IArticleSearch
 {
+    private const string SnippetOptions = "StartSel=\uE000, StopSel=\uE001, MaxWords=42, MinWords=16, MaxFragments=1";
+    private const string TitleOptions = "StartSel=\uE000, StopSel=\uE001, HighlightAll=true";
+
     public async Task<ArticleSearchResponse> SearchAsync(ArticleSearchRequest request, CancellationToken cancellationToken)
     {
-        var errors = new List<ValidationResult>();
-        if (!Validator.TryValidateObject(request, new ValidationContext(request), errors, true)
-            || request.Tag.Any(tag => string.IsNullOrWhiteSpace(tag) || tag.Length > GaifulinLab.Domain.Common.ContentLimits.TagName))
-            throw new ArgumentException("Invalid search parameters.");
+        ValidateRequest(request);
 
         var text = request.Query?.Trim() ?? "";
+        var hasText = text.Length > 0;
         var normalizedText = ArticleSearchText.NormalizeQuery(text);
         var prefixQuery = ArticleSearchText.ToPrefixTsQuery(normalizedText);
-        var config = request.LanguageCode switch { "ru" => "russian", "en" => "english", _ => "simple" };
-        var tagVector = request.LanguageCode switch
+        var (config, tagVector) = request.LanguageCode switch
         {
-            "ru" => "RussianSearchVector", "en" => "EnglishSearchVector", _ => "SimpleSearchVector"
+            "ru" => ("russian", "RussianSearchVector"),
+            "en" => ("english", "EnglishSearchVector"),
+            _ => ("simple", "SimpleSearchVector")
         };
         var tags = request.Tag.Select(tag => tag.Trim().ToLowerInvariant()).Distinct().ToArray();
         var topic = request.Topic?.Trim().ToLowerInvariant();
@@ -47,10 +49,10 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
             articles = articles.Where(localization => db.ArticleTags.Any(link => link.ArticleId == localization.ArticleId
                 && db.Tags.Any(tag => tag.Id == link.TagId && tags.Contains(tag.NormalizedName))));
 
-        var searchTitle = text.Length > 0 && request.Scope is "all" or "title";
-        var searchContent = text.Length > 0 && request.Scope is "all" or "content";
-        var searchTopics = text.Length > 0 && request.Scope is "all" or "topics";
-        var searchTags = text.Length > 0 && request.Scope is "all" or "tags";
+        var searchTitle = hasText && request.Scope is "all" or "title";
+        var searchContent = hasText && request.Scope is "all" or "content";
+        var searchTopics = hasText && request.Scope is "all" or "topics";
+        var searchTags = hasText && request.Scope is "all" or "tags";
         // Npgsql translates these full-text methods into PostgreSQL operations. The
         // stored vectors and GIN indexes are maintained by the database, including renames.
         var matches = articles.Select(localization => new
@@ -70,7 +72,7 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
                 && db.Tags.Any(tag => tag.Id == link.TagId && EF.Property<NpgsqlTsVector>(tag, tagVector)
                     .Matches(EF.Functions.ToTsQuery(config, prefixQuery))))
         });
-        if (text.Length > 0) matches = matches.Where(row => row.Title || row.Summary || row.Body || row.Topic || row.Tag);
+        if (hasText) matches = matches.Where(row => row.Title || row.Summary || row.Body || row.Topic || row.Tag);
 
         // Count separately so an out-of-range page can be clamped to the last page.
         // Both queries share the same filters; sorting and pagination stay in PostgreSQL.
@@ -94,12 +96,16 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
                             .Concat(EF.Property<NpgsqlTsVector>(row.Localization, "BodySearchVector")))
                     .Rank(EF.Functions.ToTsQuery(config, prefixQuery), NpgsqlTsRankingNormalization.DivideByItselfPlusOne) : 0)
         });
-        var ordered = request.Sort == "oldest"
-            ? ranked.OrderBy(row => row.Localization.PublishedAt).ThenBy(row => row.Localization.Id)
-            : request.Sort == "relevance" && text.Length > 0
-                ? ranked.OrderByDescending(row => row.Score).ThenByDescending(row => row.Localization.PublishedAt)
-                    .ThenByDescending(row => row.Localization.Id)
-                : ranked.OrderByDescending(row => row.Localization.PublishedAt).ThenByDescending(row => row.Localization.Id);
+        var ordered = request.Sort switch
+        {
+            "oldest" => ranked.OrderBy(row => row.Localization.PublishedAt)
+                .ThenBy(row => row.Localization.Id),
+            "relevance" when hasText => ranked.OrderByDescending(row => row.Score)
+                .ThenByDescending(row => row.Localization.PublishedAt)
+                .ThenByDescending(row => row.Localization.Id),
+            _ => ranked.OrderByDescending(row => row.Localization.PublishedAt)
+                .ThenByDescending(row => row.Localization.Id)
+        };
         var rows = await ordered.Skip(checked((page - 1) * request.PageSize)).Take(request.PageSize).Select(row => new
         {
             row.Localization.ArticleId,
@@ -110,7 +116,7 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
             row.Localization.PublishedAt,
             row.Localization.CoverMediaAssetId,
             row.Localization.ReadingMinutes,
-            Snippet = text.Length == 0
+            Snippet = !hasText
                 ? (row.Localization.Summary == null || row.Localization.Summary == ""
                     ? row.Localization.SearchText ?? "" : row.Localization.Summary).Substring(0, 260)
                 : EF.Functions.ToTsQuery(config, prefixQuery).GetResultHeadline(config: config,
@@ -122,9 +128,9 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
                         .Replace(".NeT", "gldotnet").Replace(".Net", "gldotnet")
                         .Replace(".nET", "gldotnet").Replace(".nEt", "gldotnet")
                         .Replace(".neT", "gldotnet").Replace(".net", "gldotnet"),
-                    options: "StartSel=\uE000, StopSel=\uE001, MaxWords=42, MinWords=16, MaxFragments=1")
+                    options: SnippetOptions)
                     .Replace("glcpp", "C++").Replace("glcsharp", "C#").Replace("gldotnet", ".NET"),
-            Headline = text.Length == 0 ? row.Localization.Title
+            Headline = !hasText ? row.Localization.Title
                 : EF.Functions.ToTsQuery(config, prefixQuery).GetResultHeadline(config: config,
                     document: row.Localization.Title.Replace("\uE000", "").Replace("\uE001", "")
                         .Replace("C++", "glcpp").Replace("c++", "glcpp")
@@ -133,7 +139,7 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
                         .Replace(".NeT", "gldotnet").Replace(".Net", "gldotnet")
                         .Replace(".nET", "gldotnet").Replace(".nEt", "gldotnet")
                         .Replace(".neT", "gldotnet").Replace(".net", "gldotnet"),
-                    options: "StartSel=\uE000, StopSel=\uE001, HighlightAll=true")
+                    options: TitleOptions)
                     .Replace("glcpp", "C++").Replace("glcsharp", "C#").Replace("gldotnet", ".NET")
         }).ToListAsync(cancellationToken);
 
@@ -146,5 +152,13 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
             taxonomy.TopicsFor(row.ArticleId), taxonomy.SeriesFor(row.ArticleId), taxonomy.TagsFor(row.ArticleId),
             row.CoverMediaAssetId, row.ReadingMinutes, row.Snippet, row.Headline)).ToArray(),
             count, page, request.PageSize, totalPages);
+    }
+
+    private static void ValidateRequest(ArticleSearchRequest request)
+    {
+        var errors = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(request, new ValidationContext(request), errors, true)
+            || request.Tag.Any(tag => string.IsNullOrWhiteSpace(tag) || tag.Length > GaifulinLab.Domain.Common.ContentLimits.TagName))
+            throw new ArgumentException("Invalid search parameters.");
     }
 }

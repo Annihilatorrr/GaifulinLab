@@ -79,6 +79,30 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         var newestSecondRun = await search.SearchAsync(newest, default);
         Assert.Equal(first.Items.Select(x => x.Slug), newestFirstRun.Items.Select(x => x.Slug));
         Assert.Equal(newestFirstRun.Items.Select(x => x.Slug), newestSecondRun.Items.Select(x => x.Slug));
+
+        // Reuse the populated, marker-isolated search to exercise normalization in PostgreSQL.
+        foreach (var emptyTopic in new string?[] { null, "", "   " })
+        {
+            var withoutTopic = Request();
+            withoutTopic.Topic = emptyTopic;
+            var result = await search.SearchAsync(withoutTopic, default);
+
+            // Blank topic values must leave the result set unfiltered.
+            Assert.Equal(first.TotalCount, result.TotalCount);
+            Assert.Equal(first.Items.Select(x => x.Slug), result.Items.Select(x => x.Slug));
+        }
+        foreach (var emptyQuery in new[] { "", "   " })
+        {
+            var result = await search.SearchAsync(Request(emptyQuery), default);
+
+            // Relevance without trimmed text retains newest order, including ID tie-breaks.
+            Assert.Equal(newestFirstRun.TotalCount, result.TotalCount);
+            Assert.Equal(newestFirstRun.Items.Select(x => x.Slug), result.Items.Select(x => x.Slug));
+            // Blank text also retains the unhighlighted headline and snippet projection.
+            Assert.Equal(newestFirstRun.Items.Select(x => x.SearchTitle), result.Items.Select(x => x.SearchTitle));
+            Assert.Equal(newestFirstRun.Items.Select(x => x.SearchSnippet), result.Items.Select(x => x.SearchSnippet));
+        }
+
         var ranked = await search.SearchAsync(Request("quasar"), default);
         Assert.Equal(2, ranked.TotalCount); Assert.Equal("Quasar in the title", ranked.Items[0].Title);
         Assert.Single((await search.SearchAsync(Request("quasar", "title"), default)).Items);

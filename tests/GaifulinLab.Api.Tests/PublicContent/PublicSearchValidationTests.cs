@@ -2,13 +2,51 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using GaifulinLab.Api.Tests.Authentication;
+using GaifulinLab.Application.Articles.Public;
+using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Contracts.Common;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GaifulinLab.Api.Tests.PublicContent;
 
 public sealed class PublicSearchValidationTests(AuthWebApplicationFactory factory) : IClassFixture<AuthWebApplicationFactory>
 {
+    [Fact]
+    public async Task SearchService_RejectsInvalidRequestsWithoutControllerValidation()
+    {
+        // Resolve the production service from the existing host and bypass model binding.
+        await using var scope = factory.Services.CreateAsyncScope();
+        var search = scope.ServiceProvider.GetRequiredService<IArticleSearch>();
+        ArticleSearchRequest[] invalidRequests =
+        [
+            new() { Query = new string('a', 201) },
+            new() { Page = 0 },
+            new() { PageSize = 101 },
+            new() { Scope = "unknown" },
+            new() { Sort = "unknown" },
+            new() { Period = "unknown" },
+            new() { LanguageCode = "invalid" },
+            new() { Topic = new string('a', 201) },
+            new() { Tag = Enumerable.Repeat("tag", 21).ToArray() },
+            new() { Tag = [""] },
+            new() { Tag = ["   "] },
+            new() { Tag = [new string('a', 101)] }
+        ];
+        foreach (var request in invalidRequests)
+        {
+            var error = await Assert.ThrowsAsync<ArgumentException>(() => search.SearchAsync(request, default));
+
+            // Direct callers retain the same exception contract for annotations and tag checks.
+            Assert.Equal("Invalid search parameters.", error.Message);
+        }
+
+        // Required validation must short-circuit before enumerating a null tag array.
+        var nullTagsError = await Assert.ThrowsAsync<ArgumentException>(() =>
+            search.SearchAsync(new ArticleSearchRequest { Tag = null! }, default));
+        Assert.Equal("Invalid search parameters.", nullTagsError.Message);
+    }
+
     [Fact]
     public async Task Search_ValidatesAnOverlongQueryWithAUsefulError()
     {
