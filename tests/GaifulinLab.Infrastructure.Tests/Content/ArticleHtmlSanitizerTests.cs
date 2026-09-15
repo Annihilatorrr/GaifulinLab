@@ -1,3 +1,5 @@
+using AngleSharp.Dom;
+using AngleSharp.Html.Parser;
 using GaifulinLab.Infrastructure.Content;
 using System.Xml.Linq;
 
@@ -97,5 +99,45 @@ public sealed class ArticleHtmlSanitizerTests
 
         Assert.Contains("\\(X\\)", sanitized);
         Assert.Contains("\\[Y\\]", sanitized);
+    }
+
+    [Fact]
+    public void Sanitize_MarksLeadingImportanceLabelsInParagraphsAndCallouts()
+    {
+        const string html = """
+            <p> <strong>Важно:</strong> Прочитайте текст.</p>
+            <p><strong>Important:</strong> Read the text.</p>
+            <aside class="article-callout article-callout--warning"><strong>Warning</strong><p>Read this.</p></aside>
+            <aside class="article-callout article-callout--important"><strong>Важно:</strong><p>Прочитайте это.</p></aside>
+            """;
+
+        // Sanitization marks only the known leading labels, leaving their text in the document.
+        var sanitized = _sanitizer.Sanitize(html);
+        var document = new HtmlParser().ParseDocument(sanitized);
+        var labels = document.QuerySelectorAll("strong.article-importance-label");
+        Assert.Equal(4, labels.Length);
+        Assert.Equal(["Важно:", "Important:", "Warning", "Важно:"], labels.Select(label => label.TextContent.Trim()));
+
+        // Repeated sanitization still produces the same system marker after authored classes are filtered.
+        var repeated = new HtmlParser().ParseDocument(_sanitizer.Sanitize(sanitized));
+        Assert.Equal(4, repeated.QuerySelectorAll("strong.article-importance-label").Length);
+    }
+
+    [Fact]
+    public void Sanitize_DoesNotMarkUnrelatedBoldTextOrForgedMarkers()
+    {
+        const string html = """
+            <p>Read <strong>Важно:</strong> later.</p>
+            <p><strong>Важная причина:</strong> Details.</p>
+            <p><strong class="article-importance-label">Other text</strong> Details.</p>
+            <aside class="article-callout article-callout--warning"><strong>Careful</strong><p>Details.</p></aside>
+            """;
+
+        // These bold spans convey article content, so none may acquire the visual replacement marker.
+        var sanitized = _sanitizer.Sanitize(html);
+        var document = new HtmlParser().ParseDocument(sanitized);
+        Assert.Empty(document.QuerySelectorAll(".article-importance-label"));
+        Assert.Equal(4, document.QuerySelectorAll("strong").Length);
+        Assert.Contains("Careful", sanitized);
     }
 }

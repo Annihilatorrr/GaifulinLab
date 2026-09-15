@@ -33,10 +33,6 @@
         <div class="editor-actions" aria-label="Article actions">
             <div class="save-action">
                 <button class="button button-primary" type="button" disabled="@(!CanSave)" @onclick="SaveAsync">@SaveButtonLabel</button>
-                @if (_saving || _isDirty || _saveFailed || _exportRequiresManualSave)
-                {
-                    <span class="save-status @SaveStatusClass" role="status">@SaveStatusText</span>
-                }
                 @if (_message is not null)
                 {
                     <span class="toolbar-message @(_hasError ? "message-error" : null)"
@@ -359,7 +355,6 @@
     private CancellationTokenSource? _pdfExportCancellation;
     private DotNetObjectReference<ArticleEditor>? _splitterReference;
     private ArticleTypography _typography = ArticleTypography.Default;
-    private DateTimeOffset? _savedAt;
     private LocalizationModel Current => _localizations[_activeLanguage];
     private bool IsBusy => _loading || _saving || _coverUploading || _pdfExportInProgress || _taxonomyCreating;
     private bool CanSave => !IsBusy
@@ -383,18 +378,6 @@
         _ => "is-draft"
     };
     private string SaveButtonLabel => _saving ? "Saving…" : _saveFailed ? "Retry" : _isDirty || _exportRequiresManualSave ? "Save changes" : "Save";
-    private string SaveStatusClass => _saving ? "is-saving" : _saveFailed ? "is-error" : _isDirty || _exportRequiresManualSave ? "is-dirty" : "is-saved";
-    private string SaveStatusText => _saving
-        ? "Saving…"
-        : _saveFailed
-            ? "Save failed"
-        : _isDirty
-            ? "Unsaved changes"
-            : _exportRequiresManualSave
-                ? "Save changes before exporting PDF"
-            : _savedAt is { } savedAt
-                    ? $"Saved {savedAt.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)}"
-                    : ArticleId is null ? "Not saved" : "All changes saved";
     private string PdfExportButtonLabel => _pdfExportInProgress ? "Preparing PDF…" : "Export PDF";
     private string PdfExportStatusText => _pdfExportError ?? "Preparing PDF…";
     private string TypographyStyle =>
@@ -734,7 +717,6 @@
                 await ReloadLocalizationsAsync(saveVersion);
             }
             RecalculateDirty();
-            _savedAt = DateTimeOffset.Now;
             if (wasNew && navigateAfterCreate) Navigation.NavigateTo($"/admin/articles/{ArticleId}", replace: true);
         }
         catch (Exception exception) when (exception is AdminApiException or HttpRequestException)

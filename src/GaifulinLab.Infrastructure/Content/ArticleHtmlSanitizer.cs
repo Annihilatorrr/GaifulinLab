@@ -1,3 +1,4 @@
+using AngleSharp.Dom;
 using GaifulinLab.Application.Content;
 using Ganss.Xss;
 
@@ -63,6 +64,43 @@ public sealed class ArticleHtmlSanitizer : IArticleHtmlSanitizer
         sanitizer.AllowDataAttributes = false;
         sanitizer.KeepChildNodes = true;
 
+        // Add a system-only marker after class filtering, so authored markup cannot hide unrelated bold text.
+        sanitizer.PostProcessDom += (_, args) =>
+        {
+            foreach (var strong in args.Document.QuerySelectorAll(
+                "p > strong, aside.article-callout--important > strong, aside.article-callout--warning > strong"))
+            {
+                if (IsLeadingImportanceLabel(strong))
+                {
+                    strong.ClassList.Add("article-importance-label");
+                }
+            }
+        };
+
         return sanitizer;
     }
+
+    private static bool IsLeadingImportanceLabel(IElement strong)
+    {
+        if (strong.Children.Length != 0 || !IsImportanceLabel(strong.TextContent?.Trim()))
+        {
+            return false;
+        }
+
+        for (var previous = strong.PreviousSibling; previous is not null; previous = previous.PreviousSibling)
+        {
+            if (previous.NodeType != NodeType.Text || !string.IsNullOrWhiteSpace(previous.TextContent))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsImportanceLabel(string? text) =>
+        string.Equals(text, "Важно:", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(text, "Important:", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(text, "Warning:", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(text, "Warning", StringComparison.OrdinalIgnoreCase);
 }
