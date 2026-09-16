@@ -3,7 +3,7 @@
 name: gaifulinlab-local
 
 services:
-  pdf-worker:
+  pdf-dev:
     build:
       context: .
       dockerfile: deployment/Dockerfile.pdf-worker
@@ -27,7 +27,7 @@ services:
       # API and worker use the same files for uploaded images and generated PDFs.
       - ./runtime/media:/app/media
 
-  pdf-worker-e2e:
+  pdf-e2e:
     build:
       context: .
       dockerfile: deployment/Dockerfile.pdf-worker

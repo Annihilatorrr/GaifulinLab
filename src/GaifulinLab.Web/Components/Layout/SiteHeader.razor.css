@@ -95,15 +95,6 @@
     color: var(--color-accent);
 }
 
-.desktop-nav svg {
-    width: 1rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.5;
-}
-
 .header-actions {
     display: flex;
     flex: 0 0 auto;

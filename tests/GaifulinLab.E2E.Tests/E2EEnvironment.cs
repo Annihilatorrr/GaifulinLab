@@ -11,7 +11,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
 {
     private const string DefaultBaseUrl = "http://localhost:5172";
     private const string DefaultApiHealthUrl = "http://localhost:5180/health/live";
-    private const string E2EPdfWorkerService = "pdf-worker-e2e";
+    private const string E2EPdfWorkerService = "pdf-e2e";
     private readonly List<Process> _startedProcesses = [];
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(2) };
     private string _repositoryRoot = null!;
@@ -135,7 +135,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
         string html,
         CancellationToken cancellationToken = default)
     {
-        var article = new SeededArticle(Guid.NewGuid(), title, slug);
+        var article = new SeededArticle(Guid.NewGuid(), Guid.NewGuid(), title, slug);
         var now = DateTimeOffset.UtcNow;
 
         await using var connection = new NpgsqlConnection(_connectionString);
@@ -166,7 +166,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
             connection,
             transaction))
         {
-            localizationCommand.Parameters.AddWithValue("localizationId", Guid.NewGuid());
+            localizationCommand.Parameters.AddWithValue("localizationId", article.LocalizationId);
             localizationCommand.Parameters.AddWithValue("articleId", article.Id);
             localizationCommand.Parameters.AddWithValue("slug", article.Slug);
             localizationCommand.Parameters.AddWithValue("title", article.Title);
@@ -196,14 +196,14 @@ public sealed class E2EEnvironment : IAsyncLifetime
             ?? throw new InvalidOperationException($"The E2E administrator '{userName}' was not found.");
     }
 
-    public async Task<long> CountArticleViewsAsync(Guid articleId, CancellationToken cancellationToken = default)
+    public async Task<long> CountArticleViewsAsync(Guid articleLocalizationId, CancellationToken cancellationToken = default)
     {
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
-            "SELECT COUNT(*) FROM article_views WHERE \"ArticleId\" = @articleId",
+            "SELECT COUNT(*) FROM article_views WHERE \"ArticleLocalizationId\" = @articleLocalizationId",
             connection);
-        command.Parameters.AddWithValue("articleId", articleId);
+        command.Parameters.AddWithValue("articleLocalizationId", articleLocalizationId);
         return (long)(await command.ExecuteScalarAsync(cancellationToken)
             ?? throw new InvalidOperationException("Article view count query returned no value."));
     }
@@ -264,7 +264,7 @@ public sealed class E2EEnvironment : IAsyncLifetime
         if (await IsPdfWorkerRunningAsync(E2EPdfWorkerService))
         {
             throw new InvalidOperationException(
-                "The dedicated E2E PDF worker is already running. Stop 'pdf-worker-e2e' before starting E2E tests.");
+                "The dedicated E2E PDF worker is already running. Stop 'pdf-e2e' before starting E2E tests.");
         }
 
         var composeFile = Path.Combine(_repositoryRoot, "docker-compose.local.yml");
@@ -705,4 +705,4 @@ public sealed class E2EEnvironment : IAsyncLifetime
 
 public sealed record SeededSeries(Guid Id, string Title, string Slug, string? Description);
 
-public sealed record SeededArticle(Guid Id, string Title, string Slug);
+public sealed record SeededArticle(Guid Id, Guid LocalizationId, string Title, string Slug);

@@ -64,13 +64,6 @@
 .article-tags a { color: var(--color-text-muted); font-size: .8rem; text-decoration: none; overflow-wrap: anywhere; }
 .article-tags a:hover { color: var(--color-accent); }
 .search-card ::deep mark { background: color-mix(in srgb, var(--color-accent) 15%, transparent); color: inherit; border-radius: .15rem; }
-.search-pagination { display: flex; justify-content: center; align-items: center; gap: .4rem; margin-top: 2rem; }
-.search-pagination a, .search-pagination > span { display: inline-flex; gap: .4rem; align-items: center; justify-content: center; min-width: 2.6rem; min-height: 2.6rem; padding: .3rem .7rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-muted); text-decoration: none; font-size: .9rem; }
-.search-pagination a:hover { border-color: var(--color-accent); color: var(--color-accent); }
-.search-pagination a.current { color: var(--color-background); background: var(--color-accent); border-color: var(--color-accent); }
-.search-pagination .disabled { opacity: .45; }
-.search-pagination .ellipsis { border: 0; padding: 0; min-width: 1.4rem; }
-.page-summary { text-align: center; color: var(--color-text-subtle); font-size: .8rem; margin-top: .75rem; }
 .search-state { text-align: center; padding: 4rem 1rem; background: var(--color-surface-subtle); border: 1px dashed var(--color-border); border-radius: var(--radius-md); }
 .search-state h2 { margin: 0; font-size: 1.4rem; }
 .search-state p { color: var(--color-text-muted); }
@@ -103,9 +96,6 @@
     .search-cover { flex-basis: auto; width: 100%; }
     .search-cover img { aspect-ratio: 2 / 1; }
     .search-card h2 { font-size: 1.1rem; }
-    .search-pagination { gap: .2rem; }
-    .search-pagination a, .search-pagination > span { min-width: 2.2rem; padding: .3rem .5rem; }
-    .search-pagination a > span, .search-pagination .disabled > span { display: none; }
     .search-skeleton > span { width: 4rem; }
 }
 @media (max-width: 26rem) {

@@ -4,8 +4,8 @@
 
 @if (_isAuthenticated)
 {
-    <a class="profile-link" href="/admin/profile">Profile</a>
-    <button class="sign-out" type="button" @onclick="SignOutAsync">Sign out</button>
+    <a class="profile-link" href="/admin/profile">@L["admin.layout.profile"]</a>
+    <button class="sign-out" type="button" @onclick="SignOutAsync">@L["admin.layout.signOut"]</button>
 }
 
 @code {

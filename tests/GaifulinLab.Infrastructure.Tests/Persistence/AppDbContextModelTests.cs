@@ -58,8 +58,14 @@ public sealed class AppDbContextModelTests
             nameof(ArticleLocalization.Slug));
         AssertPrimaryKey(
             context.Model.FindEntityType(typeof(ArticleView))!,
-            nameof(ArticleView.ArticleId),
+            nameof(ArticleView.ArticleLocalizationId),
             nameof(ArticleView.VisitorHash));
+        var articleViewType = context.Model.FindEntityType(typeof(ArticleView))!;
+        Assert.Contains(articleViewType.GetForeignKeys(), foreignKey =>
+            foreignKey.Properties.Select(property => property.Name).SequenceEqual(
+                [nameof(ArticleView.ArticleLocalizationId)])
+            && foreignKey.PrincipalEntityType.ClrType == typeof(ArticleLocalization)
+            && foreignKey.DeleteBehavior == DeleteBehavior.Cascade);
         AssertUniqueIndex(
             context.Model.FindEntityType(typeof(ArticleSeries))!,
             nameof(ArticleSeries.SeriesId),

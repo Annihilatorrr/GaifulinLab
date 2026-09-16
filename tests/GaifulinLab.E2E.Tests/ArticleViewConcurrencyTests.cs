@@ -31,7 +31,7 @@ public sealed class ArticleViewConcurrencyTests(E2EEnvironment environment)
             }
         }
 
-        Assert.Equal(1, await environment.CountArticleViewsAsync(article.Id));
+        Assert.Equal(1, await environment.CountArticleViewsAsync(article.LocalizationId));
     }
 
     private static Task<HttpResponseMessage> RecordViewAsync(

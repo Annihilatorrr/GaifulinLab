@@ -10,17 +10,17 @@ internal sealed class ArticleViewConfiguration : IEntityTypeConfiguration<Articl
     {
         builder.ToTable("article_views");
 
-        // This is the rule that makes a visitor unique for an article, including all its translations.
-        builder.HasKey(view => new { view.ArticleId, view.VisitorHash });
+        // This is the rule that makes a visitor unique for one published localization.
+        builder.HasKey(view => new { view.ArticleLocalizationId, view.VisitorHash });
 
         builder.Property(view => view.VisitorHash)
             .HasMaxLength(64)
             .IsRequired();
         builder.Property(view => view.FirstViewedAt).IsRequired();
 
-        builder.HasOne<Article>()
+        builder.HasOne<ArticleLocalization>()
             .WithMany()
-            .HasForeignKey(view => view.ArticleId)
+            .HasForeignKey(view => view.ArticleLocalizationId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -1,6 +1,11 @@
 @page "/admin/articles"
 @layout AdminLayout
 
-<PageTitle>My articles · Gaifulin Lab</PageTitle>
+<PageTitle>@L["admin.articles.pageTitle"] · Gaifulin Lab</PageTitle>
 
-<AdminArticleList />
+<AdminArticleList Page="@Page" PageSize="@PageSize" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "page")] public string? Page { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public string? PageSize { get; set; }
+}

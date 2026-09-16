@@ -13,6 +13,7 @@ using GaifulinLab.Api.Tests.Authentication;
 using GaifulinLab.Infrastructure.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Identity;
+using ArticleAggregate = GaifulinLab.Domain.Articles.Article;
 
 namespace GaifulinLab.Api.Tests.Articles;
 
@@ -96,9 +97,9 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
                 Assert.Equal(PublicationStatusDto.Draft, russian.Status);
             });
 
-        var list = await client.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>(
+        var list = await client.GetFromJsonAsync<AdminArticleListResponse>(
             "/api/admin/articles");
-        Assert.Contains(list!, item => item.Id == created.ArticleId);
+        Assert.Contains(list!.Items, item => item.Id == created.ArticleId);
 
         var deleteResponse = await client.DeleteAsync($"/api/admin/articles/{created.ArticleId}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
@@ -115,9 +116,9 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
             $"/api/admin/articles/{created.ArticleId}/localizations/en",
             new UpdateArticleLocalizationRequest("Changed", null, "# Changed", "changed"))).StatusCode);
 
-        var listAfterDelete = await client.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>(
+        var listAfterDelete = await client.GetFromJsonAsync<AdminArticleListResponse>(
             "/api/admin/articles");
-        Assert.DoesNotContain(listAfterDelete!, item => item.Id == created.ArticleId);
+        Assert.DoesNotContain(listAfterDelete!.Items, item => item.Id == created.ArticleId);
 
         await using var scope = factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -204,9 +205,9 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
             new CreateArticleRequest("en", "   ", "Rejected summary", "Rejected body", rejectedSlug));
         await AssertInvalidFieldAsync(createResponse, "Title");
 
-        var articles = await client.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>("/api/admin/articles");
+        var articles = await client.GetFromJsonAsync<AdminArticleListResponse>("/api/admin/articles");
         Assert.DoesNotContain(
-            articles!.SelectMany(article => article.Localizations),
+            articles!.Items.SelectMany(article => article.Localizations),
             localization => string.Equals(localization.Slug, rejectedSlug, StringComparison.Ordinal));
 
         var originalSlug = $"valid-title-{Guid.NewGuid():N}";
@@ -280,8 +281,8 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
             $"/api/admin/articles/{created.ArticleId}/localizations/en",
             new UpdateArticleLocalizationRequest("Updated", "Updated summary", "Updated body", slug, created.LocalizationVersion));
         Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
-        var list = await client.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>("/api/admin/articles");
-        Assert.Single(list!, item => item.Id == created.ArticleId);
+        var list = await client.GetFromJsonAsync<AdminArticleListResponse>("/api/admin/articles");
+        Assert.Single(list!.Items, item => item.Id == created.ArticleId);
         var saved = await client.GetFromJsonAsync<AdminArticleDetailsDto>($"/api/admin/articles/{created.ArticleId}");
         Assert.Equal("Updated", Assert.Single(saved!.Localizations).Title);
         Assert.Equal("Updated body", Assert.Single(saved.Localizations).Html);
@@ -427,17 +428,19 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
         Assert.NotNull(created);
 
         // The owner's workspace includes the newly saved draft and preserves its status.
-        var ownerList = await ownerClient.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>(
+        var ownerList = await ownerClient.GetFromJsonAsync<AdminArticleListResponse>(
             "/api/admin/articles");
-        var ownerListArticle = Assert.Single(ownerList!, article => article.Id == created.ArticleId);
+        var ownerListArticle = Assert.Single(ownerList!.Items, article => article.Id == created.ArticleId);
         Assert.Equal(
             PublicationStatusDto.Draft,
             Assert.Single(ownerListArticle.Localizations).Status);
 
         // A second account cannot discover or change a draft even when it knows its identifier.
-        var otherList = await otherClient.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>(
+        var otherList = await otherClient.GetFromJsonAsync<AdminArticleListResponse>(
             "/api/admin/articles");
-        Assert.DoesNotContain(otherList!, article => article.Id == created.ArticleId);
+        Assert.DoesNotContain(otherList!.Items, article => article.Id == created.ArticleId);
+        Assert.Equal((0L, 1, 10, 0),
+            (otherList.TotalCount, otherList.Page, otherList.PageSize, otherList.TotalPages));
         Assert.Equal(HttpStatusCode.NotFound, (await otherClient.GetAsync(
             $"/api/admin/articles/{created.ArticleId}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await otherClient.PutAsJsonAsync(
@@ -601,6 +604,90 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
             new CreateTopicRequest("en", "Mathematics", "mathematics", null));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Articles_ReturnPagedOwnerResultsWithStableOrderingAndMetadata()
+    {
+        await using var isolatedFactory = new AuthWebApplicationFactory();
+        using var client = await CreateAuthenticatedClient(isolatedFactory);
+        var updatedAt = DateTimeOffset.UtcNow.AddDays(-1);
+        Guid[] expectedIds;
+
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var owner = await userManager.FindByNameAsync(AuthWebApplicationFactory.AdminLogin);
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var articles = Enumerable.Range(1, 23)
+                .Select(index => ArticleAggregate.Create(
+                    owner!.Id,
+                    "en",
+                    updatedAt,
+                    $"Article {index}",
+                    html: "Content",
+                    slug: $"paged-{index}"))
+                .ToArray();
+            var deleted = ArticleAggregate.Create(
+                owner!.Id,
+                "en",
+                updatedAt,
+                "Deleted article",
+                html: "Content",
+                slug: "deleted-paged");
+            deleted.Delete(updatedAt.AddMinutes(1));
+            var anotherOwnersArticle = ArticleAggregate.Create(
+                "another-owner",
+                "en",
+                updatedAt,
+                "Another owner's article",
+                html: "Content",
+                slug: "another-owner-paged");
+            dbContext.Articles.AddRange(articles.Append(deleted).Append(anotherOwnersArticle));
+            await dbContext.SaveChangesAsync();
+            expectedIds = articles
+                .OrderByDescending(article => article.UpdatedAt)
+                .ThenByDescending(article => article.Id)
+                .Select(article => article.Id)
+                .ToArray();
+        }
+
+        var first = await client.GetFromJsonAsync<AdminArticleListResponse>(
+            "/api/admin/articles?page=1&pageSize=10");
+        var second = await client.GetFromJsonAsync<AdminArticleListResponse>(
+            "/api/admin/articles?page=2&pageSize=10");
+        var third = await client.GetFromJsonAsync<AdminArticleListResponse>(
+            "/api/admin/articles?page=3&pageSize=10");
+        var clamped = await client.GetFromJsonAsync<AdminArticleListResponse>(
+            "/api/admin/articles?page=99&pageSize=10");
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.NotNull(third);
+        Assert.NotNull(clamped);
+        Assert.Equal((23L, 1, 10, 3), (first.TotalCount, first.Page, first.PageSize, first.TotalPages));
+        Assert.Equal((23L, 2, 10, 3), (second.TotalCount, second.Page, second.PageSize, second.TotalPages));
+        Assert.Equal((23L, 3, 10, 3), (third.TotalCount, third.Page, third.PageSize, third.TotalPages));
+        Assert.Equal(10, first.Items.Count);
+        Assert.Equal(10, second.Items.Count);
+        Assert.Equal(3, third.Items.Count);
+        Assert.Equal(expectedIds, first.Items.Concat(second.Items).Concat(third.Items).Select(article => article.Id));
+        Assert.Equal(3, clamped.Page);
+        Assert.Equal(third.Items.Select(article => article.Id), clamped.Items.Select(article => article.Id));
+    }
+
+    [Theory]
+    [InlineData("/api/admin/articles?page=0&pageSize=10")]
+    [InlineData("/api/admin/articles?page=1&pageSize=0")]
+    [InlineData("/api/admin/articles?page=1&pageSize=101")]
+    public async Task Articles_RejectInvalidPagingParameters(string uri)
+    {
+        using var client = await CreateAuthenticatedClient();
+
+        var response = await client.GetAsync(uri);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("validation_failed", (await response.Content.ReadFromJsonAsync<ApiErrorResponse>())?.Code);
     }
 
     [Fact]

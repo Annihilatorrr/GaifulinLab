@@ -1,19 +1,19 @@
 @inherits LayoutComponentBase
 @inject IJSRuntime JS
 
-<a class="skip-link" href="#admin-main-content" @onclick="FocusMainAsync" @onclick:preventDefault>Skip to content</a>
+<a class="skip-link" href="#admin-main-content" @onclick="FocusMainAsync" @onclick:preventDefault>@L["common.skipToContent"]</a>
 
 <div class="admin-shell">
     <header class="admin-header">
         <div class="admin-header-inner">
-            <a class="admin-brand" href="/" aria-label="Return to Gaifulin Lab">
+            <a class="admin-brand" href="/" aria-label="@L["admin.layout.homeAria"]">
                 <span class="admin-mark" aria-hidden="true">GL</span>
                 <span class="admin-brand-name">GAIFULIN LAB</span>
-                <span class="admin-badge">Workspace</span>
+                <span class="admin-badge">@L["admin.layout.workspace"]</span>
             </a>
 
             <div class="admin-header-actions">
-                <a class="view-site" href="/">Open site <span aria-hidden="true">↗</span></a>
+                <a class="view-site" href="/">@L["admin.layout.openSite"] <span aria-hidden="true">↗</span></a>
                 <AdminSessionActions />
                 <LanguageSwitcher />
                 <ThemeToggle />

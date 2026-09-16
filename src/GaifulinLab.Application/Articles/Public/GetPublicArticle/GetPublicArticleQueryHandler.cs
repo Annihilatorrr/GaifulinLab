@@ -39,7 +39,7 @@ internal sealed class GetPublicArticleQueryHandler(
             languageCode,
             cancellationToken);
         var viewCount = await dbContext.ArticleViews
-            .LongCountAsync(view => view.ArticleId == article.Id, cancellationToken);
+            .LongCountAsync(view => view.ArticleLocalizationId == localization.Id, cancellationToken);
         var authorDisplayNames = await authorDisplayNameLookup.GetDisplayNamesAsync(
             [article.OwnerUserId],
             cancellationToken);

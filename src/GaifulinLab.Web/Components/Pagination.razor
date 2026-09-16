@@ -1,0 +1,65 @@
+@if (TotalPages > 1)
+{
+    <nav class="pagination" aria-label="@AriaLabel">
+        @if (Page > 1)
+        {
+            <a href="@PageUrl(Page - 1)" rel="prev" aria-label="@L["common.previousPage"]">← <span>@L["common.previous"]</span></a>
+        }
+        else
+        {
+            <span class="disabled">← <span>@L["common.previous"]</span></span>
+        }
+        @foreach (var page in PageNumbers())
+        {
+            if (page == 0)
+            {
+                <span class="ellipsis">…</span>
+            }
+            else
+            {
+                <a class="@(page == Page ? "current" : null)"
+                   href="@PageUrl(page)"
+                   aria-label="@L.Format("common.page", page)"
+                   aria-current="@(page == Page ? "page" : null)">@(page)</a>
+            }
+        }
+        @if (Page < TotalPages)
+        {
+            <a href="@PageUrl(Page + 1)" rel="next" aria-label="@L["common.nextPage"]"><span>@L["common.next"]</span> →</a>
+        }
+        else
+        {
+            <span class="disabled"><span>@L["common.next"]</span> →</span>
+        }
+    </nav>
+    <p class="page-summary">@L.Format("common.pageOf", Page, TotalPages)</p>
+}
+
+@code {
+    [Parameter] public int Page { get; set; }
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter, EditorRequired] public Func<int, string> PageUrl { get; set; } = default!;
+    [Parameter, EditorRequired] public string AriaLabel { get; set; } = "";
+
+    private IEnumerable<int> PageNumbers()
+    {
+        var firstAdjacentPage = Math.Max(1, Page - 1);
+        var lastAdjacentPage = Math.Min(TotalPages, Page + 1);
+        var previous = 0;
+        foreach (var page in Enumerable
+                     .Range(firstAdjacentPage, lastAdjacentPage - firstAdjacentPage + 1)
+                     .Append(1)
+                     .Append(TotalPages)
+                     .Distinct()
+                     .Order())
+        {
+            if (previous > 0 && page - previous > 1)
+            {
+                yield return 0;
+            }
+
+            yield return page;
+            previous = page;
+        }
+    }
+}

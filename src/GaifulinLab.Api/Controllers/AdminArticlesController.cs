@@ -22,10 +22,36 @@ namespace GaifulinLab.Api.Controllers;
 public sealed class AdminArticlesController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    [ProducesResponseType<IReadOnlyList<AdminArticleListItemDto>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<AdminArticleListItemDto>>> GetArticles(
-        CancellationToken cancellationToken) =>
-        Ok(await sender.Send(new GetAdminArticlesQuery(GetCurrentUserId()), cancellationToken));
+    [ProducesResponseType<AdminArticleListResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<AdminArticleListResponse>> GetArticles(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (page < 1)
+        {
+            errors[nameof(page)] = ["Page must be greater than or equal to 1."];
+        }
+
+        if (pageSize is < 1 or > 100)
+        {
+            errors[nameof(pageSize)] = ["Page size must be between 1 and 100."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return BadRequest(new ApiErrorResponse(
+                "validation_failed",
+                "One or more validation errors occurred.",
+                errors));
+        }
+
+        return Ok(await sender.Send(
+            new GetAdminArticlesQuery(GetCurrentUserId(), page, pageSize),
+            cancellationToken));
+    }
 
     [HttpPost]
     [ProducesResponseType<CreateArticleResponse>(StatusCodes.Status201Created)]

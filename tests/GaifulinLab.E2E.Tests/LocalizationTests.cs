@@ -91,16 +91,19 @@ public sealed class LocalizationTests : E2EPageTest
             .Replace('+', '-')
             .Replace('/', '_');
         await Page.AddInitScriptAsync($"sessionStorage.setItem('gaifulinlab.admin.access_token', 'header.{tokenPayload}.signature');");
-        await Page.RouteAsync("**/api/admin/articles", route => route.FulfillAsync(new()
+        await Page.RouteAsync("**/api/admin/articles?*", route => route.FulfillAsync(new()
         {
             Status = 200,
             ContentType = "application/json",
-            Body = "[]"
+            Body = "{\"items\":[],\"totalCount\":0,\"page\":1,\"pageSize\":10,\"totalPages\":0}"
         }));
         await Page.GotoAsync(new Uri(BaseUri, "/admin/articles").ToString());
 
         // Authenticated article management uses the same layout and keeps the controls in dark mode.
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "My articles", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Мои статьи", Exact = true })).ToBeVisibleAsync();
+        await Expect(Page).ToHaveTitleAsync("Мои статьи · Gaifulin Lab");
+        await Expect(Page.Locator(".admin-badge")).ToHaveTextAsync("Рабочее пространство");
+        await Expect(Page.Locator(".view-site")).ToContainTextAsync("Открыть сайт");
         await Expect(language).ToBeVisibleAsync();
         await Expect(theme).ToBeVisibleAsync();
         await Expect(Page.Locator("html")).ToHaveAttributeAsync("data-theme", "dark");

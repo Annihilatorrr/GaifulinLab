@@ -102,19 +102,7 @@
                     </article>
                 }
             </div>
-            @if (_result.TotalPages > 1)
-            {
-                <nav class="search-pagination" aria-label="@L["search.pages"]">
-                    @if (_result.Page > 1) { <a href="@PageUrl(_result.Page - 1)" rel="prev" aria-label="@L["common.previousPage"]">← <span>@L["common.previous"]</span></a> } else { <span class="disabled">← <span>@L["common.previous"]</span></span> }
-                    @foreach (var page in PageNumbers())
-                    {
-                        if (page == 0) { <span class="ellipsis">…</span> }
-                        else { <a class="@(page == _result.Page ? "current" : null)" href="@PageUrl(page)" aria-label="@L.Format("common.page", page)" aria-current="@(page == _result.Page ? "page" : null)">@(page)</a> }
-                    }
-                    @if (_result.Page < _result.TotalPages) { <a href="@PageUrl(_result.Page + 1)" rel="next" aria-label="@L["common.nextPage"]"><span>@L["common.next"]</span> →</a> } else { <span class="disabled"><span>@L["common.next"]</span> →</span> }
-                </nav>
-                <p class="page-summary">@L.Format("common.pageOf", _result.Page, _result.TotalPages)</p>
-            }
+            <Pagination Page="_result.Page" TotalPages="_result.TotalPages" PageUrl="PageUrl" AriaLabel="@L["search.pages"]" />
         }
     </section>
 </main>
@@ -188,11 +176,5 @@
     private string TopicUrl(string slug) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = _request.LanguageCode, Topic = slug });
     private string TagUrl(string tag) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = _request.LanguageCode, Tag = [tag] });
     private static string ArticleUrl(PublicArticleListItemDto article) => $"/{article.LanguageCode}/articles/{article.Slug}";
-    private IEnumerable<int> PageNumbers()
-    {
-        var previous = 0;
-        foreach (var page in Enumerable.Range(Math.Max(1, _result.Page - 1), Math.Min(_result.TotalPages, _result.Page + 1) - Math.Max(1, _result.Page - 1) + 1).Append(1).Append(_result.TotalPages).Distinct().Order())
-        { if (previous > 0 && page - previous > 1) yield return 0; yield return page; previous = page; }
-    }
     public void Dispose() { _cancellation?.Cancel(); _cancellation?.Dispose(); }
 }

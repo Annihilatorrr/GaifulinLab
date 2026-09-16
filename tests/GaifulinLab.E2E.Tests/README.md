@@ -19,7 +19,7 @@ starts the local PDF worker.
 E2E intentionally uses the normal `gaifulinlab` development database, configured through
 `GAIFULINLAB_E2E_CONNECTION_STRING` in `e2e.runsettings`. The fixture creates
 it when necessary, applies pending migrations, and then creates its Identity
-administrator. Chromium runs in the separate `pdf-worker-e2e` container, using
+administrator. Chromium runs in the separate `pdf-e2e` container, using
 the same development database and `runtime/media` folder as the API.
 
 The fixture starts the Web client with its `E2E` configuration. That config

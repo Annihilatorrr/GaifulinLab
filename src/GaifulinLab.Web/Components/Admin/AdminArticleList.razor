@@ -1,98 +1,179 @@
 @inject AdminArticlesClient ArticlesClient
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@implements IDisposable
+@using System.Globalization
 
 <section class="articles-page" aria-labelledby="articles-title">
     <header class="page-heading">
         <div>
-            <span class="eyebrow">Your workspace</span>
-            <h1 id="articles-title">My articles</h1>
-            <p>Create and manage articles that belong to your account.</p>
-            <nav class="taxonomy-links" aria-label="Workspace taxonomy">
-                <a href="/admin/topics">Manage topics</a>
-                <a href="/admin/series">Manage series</a>
+            <span class="eyebrow">@L["admin.articles.eyebrow"]</span>
+            <h1 id="articles-title">@L["admin.articles.title"]</h1>
+            <p>@L["admin.articles.description"]</p>
+            <nav class="taxonomy-links" aria-label="@L["admin.articles.taxonomyAria"]">
+                <a href="/admin/topics">@L["admin.articles.manageTopics"]</a>
+                <a href="/admin/series">@L["admin.articles.manageSeries"]</a>
             </nav>
         </div>
-        <a class="button button-primary" href="/admin/articles/new">New article</a>
+        <a class="button button-primary" href="/admin/articles/new">@L["admin.articles.new"]</a>
     </header>
 
     @if (_loading)
     {
-        <div class="state surface" role="status">Loading articles…</div>
+        <div class="state surface" role="status">@L["admin.articles.loading"]</div>
     }
     else if (_error is not null)
     {
         <div class="state surface error" role="alert">
-            <h2>Articles could not be loaded</h2>
+            <h2>@L["admin.articles.loadError"]</h2>
             <p>@_error</p>
-            <button class="button button-secondary" type="button" @onclick="LoadAsync">Try again</button>
-        </div>
-    }
-    else if (_articles.Count == 0)
-    {
-        <div class="state surface">
-            <h2>No articles yet</h2>
-            <p>The first draft will appear here after it is created.</p>
-            <a class="button button-primary" href="/admin/articles/new">Create first article</a>
+            <button class="button button-secondary" type="button" @onclick="LoadAsync">@L["common.tryAgain"]</button>
         </div>
     }
     else
     {
-        @if (_deleteError is not null)
-        {
-            <p class="state error" role="alert">@_deleteError</p>
-        }
-        <div class="article-list surface">
-            @foreach (var article in _articles)
-            {
-                var primary = article.Localizations.FirstOrDefault();
-                <article class="article-row">
-                    <a class="article-link" href="@($"/admin/articles/{article.Id}")">
-                        <strong>@(string.IsNullOrWhiteSpace(primary?.Title) ? "Untitled article" : primary.Title)</strong>
-                        <span>
-                            @string.Join(" · ", article.Localizations.Select(x => $"{x.LanguageCode.ToUpperInvariant()} — {x.Status}"))
-                        </span>
-                    </a>
-                    <time datetime="@article.UpdatedAt.ToString("O")">Updated @article.UpdatedAt.ToLocalTime().ToString("d MMM yyyy, HH:mm")</time>
-                    <button class="delete-button" type="button" disabled="@(_deleting == article.Id)" @onclick="() => DeleteAsync(article.Id)">
-                        @(_deleting == article.Id ? "Deleting…" : "Delete")
-                    </button>
-                </article>
-            }
+        <div class="list-toolbar">
+            <p role="status" aria-live="polite">@L.Format("admin.articles.total", L.FormatArticleCount(_result.TotalCount))</p>
+            <label>
+                @L["search.pageSize"]
+                <select aria-label="@L["search.pageSize"]" @bind="_pageSize" @bind:after="ChangePageSize">
+                    <option value="10">@L["search.pageSize.10"]</option>
+                    <option value="20">@L["search.pageSize.20"]</option>
+                    <option value="50">@L["search.pageSize.50"]</option>
+                </select>
+            </label>
         </div>
+
+        @if (_articles.Count == 0)
+        {
+            <div class="state surface">
+                <h2>@L["admin.articles.emptyTitle"]</h2>
+                <p>@L["admin.articles.emptyDescription"]</p>
+                <a class="button button-primary" href="/admin/articles/new">@L["admin.articles.createFirst"]</a>
+            </div>
+        }
+        else
+        {
+            @if (_deleteError is not null)
+            {
+                <p class="state error" role="alert">@_deleteError</p>
+            }
+            <div class="article-list surface">
+                @foreach (var article in _articles)
+                {
+                    var primary = GetPrimaryLocalization(article);
+                    var localizations = GetOrderedLocalizations(article);
+                    <article class="article-row">
+                        <a class="article-link" href="@($"/admin/articles/{article.Id}")">
+                            <strong>@(string.IsNullOrWhiteSpace(primary?.Title) ? L["admin.articles.untitled"] : primary.Title)</strong>
+                            <span>
+                                @string.Join(" · ", localizations.Select(x => $"{x.LanguageCode.ToUpperInvariant()} — {GetStatusText(x.Status)}"))
+                            </span>
+                        </a>
+                        <time datetime="@article.UpdatedAt.ToString("O")">@L.Format("admin.articles.updated", L.FormatDateTime(article.UpdatedAt))</time>
+                        <button class="delete-button" type="button" disabled="@(_deleting == article.Id)" @onclick="() => DeleteAsync(article.Id)">
+                            @(_deleting == article.Id ? L["admin.articles.deleting"] : L["admin.articles.delete"])
+                        </button>
+                    </article>
+                }
+            </div>
+            <Pagination Page="_result.Page" TotalPages="_result.TotalPages" PageUrl="PageUrl" AriaLabel="@L["admin.articles.pages"]" />
+        }
     }
 </section>
 
 @code {
+    [Parameter] public string? Page { get; set; }
+    [Parameter] public string? PageSize { get; set; }
+
+    private static readonly int[] PageSizes = [10, 20, 50];
     private IReadOnlyList<AdminArticleListItemDto> _articles = [];
+    private AdminArticleListResponse _result = new([], 0, 1, 10, 0);
+    private int _page = 1;
+    private int _pageSize = 10;
+    private bool _hasInvalidQuery;
     private bool _loading = true;
     private string? _error;
     private string? _deleteError;
     private Guid? _deleting;
+    private CancellationTokenSource? _cancellation;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override Task OnParametersSetAsync()
+    {
+        var hasValidPage = int.TryParse(Page, NumberStyles.None, CultureInfo.InvariantCulture, out var page)
+            && page > 0;
+        var hasValidPageSize = int.TryParse(
+                PageSize,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var pageSize)
+            && PageSizes.Contains(pageSize);
+        _hasInvalidQuery = (Page is not null && !hasValidPage)
+            || (PageSize is not null && !hasValidPageSize);
+        _page = hasValidPage
+            ? page
+            : 1;
+        _pageSize = hasValidPageSize
+            ? pageSize
+            : 10;
+        return LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
+        _cancellation?.Cancel();
+        _cancellation?.Dispose();
+        var cancellation = _cancellation = new CancellationTokenSource();
         _loading = true;
         _error = null;
         try
         {
-            _articles = await ArticlesClient.GetArticlesAsync();
+            var result = await ArticlesClient.GetArticlesAsync(_page, _pageSize, cancellation.Token);
+            if (_cancellation != cancellation)
+            {
+                return;
+            }
+
+            _result = result;
+            _articles = result.Items;
+            if (result.Page != _page || _hasInvalidQuery)
+            {
+                Navigation.NavigateTo(PageUrl(result.Page), replace: true);
+            }
         }
-        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
-            _error = exception.Message;
+        }
+        catch (AdminApiException exception)
+        {
+            if (_cancellation == cancellation)
+            {
+                _error = L.ApiError(exception.Code);
+            }
+        }
+        catch (HttpRequestException)
+        {
+            if (_cancellation == cancellation)
+            {
+                _error = L["errors.api.network_unavailable"];
+            }
         }
         finally
         {
-            _loading = false;
+            if (_cancellation == cancellation)
+            {
+                _loading = false;
+            }
         }
     }
 
+    private void ChangePageSize() => Navigation.NavigateTo(PageUrl(1));
+
+    private string PageUrl(int page) => $"/admin/articles?page={page}&pageSize={_pageSize}";
+
     private async Task DeleteAsync(Guid articleId)
     {
-        if (!await JS.InvokeAsync<bool>("confirm", "Delete this article? It will be hidden from everyone, but kept in storage."))
+        if (!await JS.InvokeAsync<bool>("confirm", L["admin.articles.deleteConfirmation"]))
         {
             return;
         }
@@ -102,15 +183,50 @@
         try
         {
             await ArticlesClient.DeleteAsync(articleId);
-            _articles = _articles.Where(article => article.Id != articleId).ToArray();
+            await LoadAsync();
         }
-        catch (Exception exception) when (exception is AdminApiException or HttpRequestException)
+        catch (AdminApiException exception)
         {
-            _deleteError = exception.Message;
+            _deleteError = L.ApiError(exception.Code);
+        }
+        catch (HttpRequestException)
+        {
+            _deleteError = L["errors.api.network_unavailable"];
         }
         finally
         {
             _deleting = null;
         }
+    }
+
+    private AdminArticleLocalizationSummaryDto? GetPrimaryLocalization(AdminArticleListItemDto article) =>
+        article.Localizations.FirstOrDefault(localization =>
+            string.Equals(localization.LanguageCode, L.CurrentCode, StringComparison.OrdinalIgnoreCase))
+        ?? article.Localizations
+            .OrderBy(localization => localization.LanguageCode, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(localization => localization.Id)
+            .FirstOrDefault();
+
+    private IReadOnlyList<AdminArticleLocalizationSummaryDto> GetOrderedLocalizations(AdminArticleListItemDto article) =>
+        article.Localizations
+            .OrderByDescending(localization =>
+                string.Equals(localization.LanguageCode, L.CurrentCode, StringComparison.OrdinalIgnoreCase))
+            .ThenBy(localization => localization.LanguageCode, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(localization => localization.Id)
+            .ToArray();
+
+    private string GetStatusText(PublicationStatusDto status) => status switch
+    {
+        PublicationStatusDto.Draft => L["admin.articles.status.draft"],
+        PublicationStatusDto.Published => L["admin.articles.status.published"],
+        PublicationStatusDto.Unpublished => L["admin.articles.status.unpublished"],
+        PublicationStatusDto.Deleted => L["admin.articles.status.deleted"],
+        _ => status.ToString()
+    };
+
+    public void Dispose()
+    {
+        _cancellation?.Cancel();
+        _cancellation?.Dispose();
     }
 }

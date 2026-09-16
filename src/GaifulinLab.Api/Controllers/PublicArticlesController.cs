@@ -71,9 +71,7 @@ public sealed class PublicArticlesController(
     {
         var normalizedLanguageCode = DomainRules.NormalizeLanguageCode(languageCode);
         var normalizedSlug = DomainRules.NormalizeSlug(slug);
-        // Resolve the requested translation, but record the view against the shared article.
-        // Switching language must not turn one reader into two unique visitors.
-        var articleId = await dbContext.ArticleLocalizations
+        var articleLocalizationId = await dbContext.ArticleLocalizations
             .AsNoTracking()
             .Where(localization =>
                 localization.LanguageCode == normalizedLanguageCode
@@ -81,7 +79,7 @@ public sealed class PublicArticlesController(
                 && localization.Status == PublicationStatus.Published
                 && dbContext.Articles.Any(article =>
                     article.Id == localization.ArticleId && article.DeletedAt == null))
-            .Select(localization => (Guid?)localization.ArticleId)
+            .Select(localization => (Guid?)localization.Id)
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new ResourceNotFoundException(
                 "Published article",
@@ -98,24 +96,24 @@ public sealed class PublicArticlesController(
                 // first would race when a page is opened in several tabs; PostgreSQL's ON CONFLICT
                 // lets the unique constraint decide which request wins and keeps the others harmless.
                 await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
-                    INSERT INTO article_views ("ArticleId", "VisitorHash", "FirstViewedAt")
-                    VALUES ({articleId}, {visitorHash}, {firstViewedAt})
-                    ON CONFLICT ("ArticleId", "VisitorHash") DO NOTHING;
+                    INSERT INTO article_views ("ArticleLocalizationId", "VisitorHash", "FirstViewedAt")
+                    VALUES ({articleLocalizationId}, {visitorHash}, {firstViewedAt})
+                    ON CONFLICT ("ArticleLocalizationId", "VisitorHash") DO NOTHING;
                     """, cancellationToken);
             }
             else if (!await dbContext.ArticleViews.AnyAsync(
-                view => view.ArticleId == articleId && view.VisitorHash == visitorHash,
+                view => view.ArticleLocalizationId == articleLocalizationId && view.VisitorHash == visitorHash,
                 cancellationToken))
             {
                 // EF's in-memory provider has no ON CONFLICT support; this keeps API tests
                 // behaviorally equivalent without changing the production path above.
-                dbContext.ArticleViews.Add(ArticleView.Create(articleId, visitorHash, firstViewedAt));
+                dbContext.ArticleViews.Add(ArticleView.Create(articleLocalizationId, visitorHash, firstViewedAt));
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
         }
 
         var viewCount = await dbContext.ArticleViews
-            .LongCountAsync(view => view.ArticleId == articleId, cancellationToken);
+            .LongCountAsync(view => view.ArticleLocalizationId == articleLocalizationId, cancellationToken);
         return Ok(new ArticleViewCountDto(viewCount));
     }
 }

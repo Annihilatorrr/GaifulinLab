@@ -8,9 +8,13 @@ namespace GaifulinLab.Web.Articles;
 
 public sealed class AdminArticlesClient(HttpClient httpClient)
 {
-    public Task<IReadOnlyList<AdminArticleListItemDto>> GetArticlesAsync(
+    public Task<AdminArticleListResponse> GetArticlesAsync(
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default) =>
-        GetAsync<IReadOnlyList<AdminArticleListItemDto>>("/api/admin/articles", cancellationToken);
+        GetAsync<AdminArticleListResponse>(
+            $"/api/admin/articles?page={page}&pageSize={pageSize}",
+            cancellationToken);
 
     public Task<AdminArticleDetailsDto> GetArticleAsync(
         Guid articleId,

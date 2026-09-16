@@ -8,26 +8,26 @@ public sealed class ArticleView
     {
     }
 
-    private ArticleView(Guid articleId, string visitorHash, DateTimeOffset firstViewedAt)
+    private ArticleView(Guid articleLocalizationId, string visitorHash, DateTimeOffset firstViewedAt)
     {
-        ArgumentOutOfRangeException.ThrowIfEqual(articleId, Guid.Empty);
+        ArgumentOutOfRangeException.ThrowIfEqual(articleLocalizationId, Guid.Empty);
 
-        ArticleId = articleId;
+        ArticleLocalizationId = articleLocalizationId;
         VisitorHash = NormalizeVisitorHash(visitorHash);
         FirstViewedAt = firstViewedAt.ToUniversalTime();
     }
 
-    public Guid ArticleId { get; private set; }
+    public Guid ArticleLocalizationId { get; private set; }
 
     public string VisitorHash { get; private set; } = string.Empty;
 
     public DateTimeOffset FirstViewedAt { get; private set; }
 
     public static ArticleView Create(
-        Guid articleId,
+        Guid articleLocalizationId,
         string visitorHash,
         DateTimeOffset firstViewedAt) =>
-        new(articleId, visitorHash, firstViewedAt);
+        new(articleLocalizationId, visitorHash, firstViewedAt);
 
     private static string NormalizeVisitorHash(string visitorHash)
     {

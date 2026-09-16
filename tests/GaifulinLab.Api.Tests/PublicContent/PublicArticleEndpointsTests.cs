@@ -60,7 +60,7 @@ public sealed class PublicArticleEndpointsTests
     }
 
     [Fact]
-    public async Task ArticleView_RecordsOnlyOneViewPerArticleAndVisitor()
+    public async Task ArticleView_RecordsOnlyOneViewPerLocalizationAndVisitor()
     {
         await using var factory = new AuthWebApplicationFactory();
         await PublicContentTestData.SeedAsync(factory.Services);
@@ -84,9 +84,12 @@ public sealed class PublicArticleEndpointsTests
         Assert.Equal(1, localizedCount?.ViewCount);
         Assert.Equal(2, differentVisitorCount?.ViewCount);
 
-        var details = await client.GetFromJsonAsync<PublicArticleDetailsDto>(
+        var englishDetails = await client.GetFromJsonAsync<PublicArticleDetailsDto>(
             "/api/public/articles/en/understanding-fft");
-        Assert.Equal(2, details?.ViewCount);
+        var russianDetails = await client.GetFromJsonAsync<PublicArticleDetailsDto>(
+            "/api/public/articles/ru/kak-rabotaet-fft");
+        Assert.Equal(2, englishDetails?.ViewCount);
+        Assert.Equal(1, russianDetails?.ViewCount);
     }
 
     [Fact]

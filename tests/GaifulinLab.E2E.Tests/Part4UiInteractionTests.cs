@@ -333,7 +333,10 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : E2EPag
         await Page.RouteAsync("**/api/public/**", route => JsonAsync(route, Array.Empty<object>()));
 
     private async Task RouteEmptyAdminApiAsync() =>
-        await Page.RouteAsync("**/api/admin/articles", route => JsonAsync(route, Array.Empty<object>()));
+        await Page.RouteAsync("**/api/admin/articles?*", route => JsonAsync(route, new
+        {
+            items = Array.Empty<object>(), totalCount = 0, page = 1, pageSize = 10, totalPages = 0
+        }));
 
     private async Task RouteEditorsAsync(params EditorArticle[] articles)
     {
