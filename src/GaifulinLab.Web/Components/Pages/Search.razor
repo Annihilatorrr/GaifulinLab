@@ -57,7 +57,10 @@
         }
         <div class="results-toolbar">
             <p role="status" aria-live="polite">@(_loading ? L["search.searching"] : _error ? L["search.unavailable"] : L.Format("search.found", L.FormatArticleCount(_result.TotalCount)))</p>
-            <label>@L["search.sortBy"] <select aria-label="@L["search.sortBy"]" @bind="_request.Sort" @bind:after="Apply"><option value="relevance">@L["search.sort.relevance"]</option><option value="newest">@L["search.sort.newest"]</option><option value="oldest">@L["search.sort.oldest"]</option></select></label>
+            <div class="results-toolbar-controls">
+                <label>@L["search.pageSize"] <select aria-label="@L["search.pageSize"]" @bind="_request.PageSize" @bind:after="Apply"><option value="10">@L["search.pageSize.10"]</option><option value="20">@L["search.pageSize.20"]</option><option value="50">@L["search.pageSize.50"]</option></select></label>
+                <label>@L["search.sortBy"] <select aria-label="@L["search.sortBy"]" @bind="_request.Sort" @bind:after="Apply"><option value="relevance">@L["search.sort.relevance"]</option><option value="newest">@L["search.sort.newest"]</option><option value="oldest">@L["search.sort.oldest"]</option></select></label>
+            </div>
         </div>
         @if (_loading)
         {
@@ -124,6 +127,8 @@
     [SupplyParameterFromQuery(Name = "period")] public string? Period { get; set; }
     [SupplyParameterFromQuery(Name = "sort")] public string? Sort { get; set; }
     [SupplyParameterFromQuery(Name = "page")] public string? Page { get; set; }
+    [SupplyParameterFromQuery(Name = "pageSize")] public string? PageSize { get; set; }
+    private static readonly int[] PageSizes = [10, 20, 50];
     private ArticleSearchRequest _request = new();
     private ArticleSearchResponse _result = new([], 0, 1, 10, 0);
     private IReadOnlyList<PublicTopicDto> _topics = [];
@@ -142,7 +147,8 @@
             Scope = Scope is "title" or "content" or "topics" or "tags" ? Scope : "all", Topic = Topic,
             Tag = (Tags ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.OrdinalIgnoreCase).Take(20).ToArray(),
             Period = Period is "week" or "month" or "year" ? Period : "all",
-            Sort = Sort is "newest" or "oldest" ? Sort : "relevance", Page = int.TryParse(Page, out var page) && page > 0 ? page : 1 };
+            Sort = Sort is "newest" or "oldest" ? Sort : "relevance", Page = int.TryParse(Page, out var page) && page > 0 ? page : 1,
+            PageSize = int.TryParse(PageSize, NumberStyles.None, CultureInfo.InvariantCulture, out var pageSize) && PageSizes.Contains(pageSize) ? pageSize : 10 };
         return LoadAsync();
     }
 
@@ -178,7 +184,7 @@
     private void ResetFilters() { _request.Topic = null; _request.Tag = []; _request.Scope = "all"; _request.Period = "all"; Apply(); }
     private void ClearSearch() { _text = ""; _request.Query = null; ResetFilters(); }
     private string PageUrl(int page) => "/search?" + PublicContentClient.SearchQueryString(new() { Query = _request.Query, LanguageCode = _request.LanguageCode,
-        Scope = _request.Scope, Topic = _request.Topic, Tag = _request.Tag, Period = _request.Period, Sort = _request.Sort, Page = page });
+        Scope = _request.Scope, Topic = _request.Topic, Tag = _request.Tag, Period = _request.Period, Sort = _request.Sort, Page = page, PageSize = _request.PageSize });
     private string TopicUrl(string slug) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = _request.LanguageCode, Topic = slug });
     private string TagUrl(string tag) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = _request.LanguageCode, Tag = [tag] });
     private static string ArticleUrl(PublicArticleListItemDto article) => $"/{article.LanguageCode}/articles/{article.Slug}";

@@ -21,9 +21,10 @@ use the content language associated with the current UI culture.
   total count. Periods use the original publication date, in UTC.
 - Search cards show the last content edit time as "Updated" and omit the author.
   Publication date still controls period filtering and chronological sorting.
-- Ten items per page in the UI. URL parameters preserve filters, language, sort
-  and page through reload, direct links and browser history. Out-of-range pages
-  normalize to the last available page (or page 1 for an empty result).
+- The UI offers 10, 20 or 50 items per page, with 10 as the default. URL
+  parameters preserve filters, language, sort, page and page size through reload,
+  direct links and browser history. Out-of-range pages normalize to the last
+  available page (or page 1 for an empty result).
 - Loading, empty and retry states are implemented. Superseded requests are
   cancelled and their responses cannot replace newer results.
 

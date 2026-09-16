@@ -43,7 +43,8 @@
 .active-filters .reset-filters { border-color: transparent; background: transparent; color: var(--color-text-muted); }
 .results-toolbar { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-bottom: 1rem; }
 .results-toolbar p { margin: 0; font-weight: 500; }
-.results-toolbar label { display: flex; gap: .7rem; align-items: center; color: var(--color-text-muted); font-size: .9rem; }
+.results-toolbar-controls { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .7rem; }
+.results-toolbar-controls label { display: flex; gap: .7rem; align-items: center; color: var(--color-text-muted); font-size: .9rem; white-space: nowrap; }
 .search-list { display: grid; gap: .8rem; }
 .search-card { display: flex; gap: 1.5rem; padding: 1.15rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-sm); transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
 .search-card:hover { border-color: var(--color-border-strong); box-shadow: var(--shadow-md); }
@@ -96,7 +97,8 @@
     .search-filters select, .tag-picker summary { min-height: 1.5rem; padding: .1rem .65rem; font-size: .8rem; }
     .tag-options { left: auto; right: 0; width: min(17rem, 85vw); }
     .results-toolbar { align-items: flex-start; flex-direction: column; }
-    .results-toolbar label { width: 100%; justify-content: space-between; }
+    .results-toolbar-controls { width: 100%; }
+    .results-toolbar-controls label { flex: 1 1 10rem; justify-content: space-between; }
     .search-card { flex-direction: column; gap: .8rem; padding: 1rem; }
     .search-cover { flex-basis: auto; width: 100%; }
     .search-cover img { aspect-ratio: 2 / 1; }

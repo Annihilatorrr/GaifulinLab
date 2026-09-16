@@ -8,18 +8,18 @@ namespace GaifulinLab.Web.Tests.Content;
 public sealed class PublicContentClientTests
 {
     [Fact]
-    public void SearchQueryString_EncodesTechnicalTagsAndKeepsRepeatedFiltersAndPagination()
+    public void SearchQueryString_EncodesTechnicalTagsAndKeepsRepeatedFiltersAndCustomPageSize()
     {
         var query = PublicContentClient.SearchQueryString(new()
         {
             Query = "фильтры & C++", LanguageCode = "ru", Tag = ["C#", ".NET"],
-            Topic = "signal-processing", Scope = "content", Period = "year", Sort = "oldest", Page = 3
+            Topic = "signal-processing", Scope = "content", Period = "year", Sort = "oldest", Page = 3, PageSize = 50
         });
         Assert.Contains("tag=C%23&tag=.NET", query);
         Assert.Contains("%26%20C%2B%2B", query);
         Assert.Contains("languageCode=ru", query);
         Assert.Contains("scope=content", query);
-        Assert.Contains("period=year&sort=oldest&page=3&pageSize=10", query);
+        Assert.Contains("period=year&sort=oldest&page=3&pageSize=50", query);
     }
     [Fact]
     public async Task CreateArticlePdfExportAsync_PostsTypographyAndReturnsQueuedExport()

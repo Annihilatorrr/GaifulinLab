@@ -206,8 +206,9 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         Assert.Equal(HttpStatusCode.BadRequest, (await api.GetAsync("/api/public/search?page=0")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await api.GetAsync("/api/public/search?scope=wrong")).StatusCode);
         await Page.SetViewportSizeAsync(1440, 1100);
-        await Page.GotoAsync(new Uri(environment.BaseUri, $"/search?tag={token}").ToString());
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/search?tag={token}&pageSize=invalid").ToString());
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10, new() { Timeout = 15000 });
+        await Expect(Page.GetByLabel("Items per page", new() { Exact = true })).ToHaveValueAsync("10");
 
         // The compact hero keeps its accessible name while removing all visible introductory copy.
         await Expect(Page.GetByRole(AriaRole.Region, new() { Name = "Search", Exact = true })).ToBeVisibleAsync();
@@ -236,29 +237,43 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
         Assert.Contains($"tag={token}", Page.Url);
         Assert.Contains("page=2", Page.Url);
-        var secondTitles = await Page.Locator(".search-card h2").AllTextContentsAsync();
-        await Page.ReloadAsync();
-        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
-        Assert.Equal(secondTitles, await Page.Locator(".search-card h2").AllTextContentsAsync());
+        Assert.Contains("pageSize=10", Page.Url);
+        await Page.GetByLabel("Items per page", new() { Exact = true }).SelectOptionAsync("20");
+        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(20);
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 2");
+        Assert.Contains("page=1", Page.Url);
+        Assert.Contains("pageSize=20", Page.Url);
         await Page.GetByRole(AriaRole.Link, new() { Name = "Next page" }).ClickAsync();
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(3);
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 2");
+        Assert.Contains("pageSize=20", Page.Url);
+        await Page.GetByRole(AriaRole.Link, new() { Name = "Previous page" }).ClickAsync();
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 2");
+        await Page.GetByRole(AriaRole.Link, new() { Name = "Page 2", Exact = true }).ClickAsync();
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 2");
+        var secondTitles = await Page.Locator(".search-card h2").AllTextContentsAsync();
+        await Page.ReloadAsync();
+        await Expect(Page.GetByLabel("Items per page", new() { Exact = true })).ToHaveValueAsync("20");
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 2");
+        Assert.Equal(secondTitles, await Page.Locator(".search-card h2").AllTextContentsAsync());
         await Page.GoBackAsync();
-        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 2");
         await Page.GoForwardAsync();
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(3);
         await Page.GoBackAsync();
-        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 2");
         await Page.GetByLabel("Search articles", new() { Exact = true }).FillAsync("interface");
         await Page.GetByLabel("Search articles", new() { Exact = true }).PressAsync("Enter");
-        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 3");
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 2");
         Assert.Contains("q=interface", Page.Url);
         Assert.Contains("page=1", Page.Url);
+        Assert.Contains("pageSize=20", Page.Url);
         await Expect(Page.Locator(".search-card h2 mark").First).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Link, new() { Name = "Page 2", Exact = true }).ClickAsync();
-        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 3");
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 2 of 2");
         await Page.GetByLabel("Search in", new() { Exact = true }).SelectOptionAsync("title");
-        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 3");
-        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10);
+        await Expect(Page.Locator(".page-summary")).ToHaveTextAsync("Page 1 of 2");
+        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(20);
         await Page.GetByLabel("Search articles", new() { Exact = true }).FillAsync("less");
         await Page.GetByLabel("Search articles", new() { Exact = true }).PressAsync("Enter");
         await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("23 articles found");
@@ -287,7 +302,7 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page.GetByRole(AriaRole.Alert)).ToBeVisibleAsync();
         await Page.UnrouteAsync("**/api/public/search?**");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Try again" }).ClickAsync();
-        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10);
+        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(20);
 
         await Page.Locator(".tag-picker summary").ClickAsync();
         await Page.Locator("#tag-filter").FillAsync(token);
@@ -315,10 +330,10 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page.Locator(".search-skeleton")).ToHaveCountAsync(3);
         await Page.GetByLabel("Search articles", new() { Exact = true }).FillAsync("interface");
         await Page.GetByLabel("Search articles", new() { Exact = true }).PressAsync("Enter");
-        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10);
+        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(20);
         releaseOld.TrySetResult();
         await oldFinished.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(10);
+        await Expect(Page.Locator(".search-card")).ToHaveCountAsync(20);
         await Page.UnrouteAsync("**/api/public/search?**");
 
         var htmlToken = "searchhtml" + Guid.NewGuid().ToString("N");
