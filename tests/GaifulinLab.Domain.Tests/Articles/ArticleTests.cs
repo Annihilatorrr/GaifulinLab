@@ -10,7 +10,7 @@ public sealed class ArticleTests
     [Fact]
     public void Create_AddsDraftLocalizationAndNormalizesLanguage()
     {
-        var article = Article.Create("test-owner", " EN ", CreatedAt);
+        var article = Article.Create("test-owner", " EN ", CreatedAt, "Draft title");
 
         var localization = Assert.Single(article.Localizations);
         Assert.Equal("test-owner", article.OwnerUserId);
@@ -22,7 +22,7 @@ public sealed class ArticleTests
     [Fact]
     public void AddLocalization_RejectsDuplicateLanguage()
     {
-        var article = Article.Create("test-owner", "en", CreatedAt);
+        var article = Article.Create("test-owner", "en", CreatedAt, "Draft title");
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => article.AddLocalization("EN", CreatedAt));
@@ -55,15 +55,59 @@ public sealed class ArticleTests
     }
 
     [Theory]
-    [InlineData(null, "content", "article-slug")]
-    [InlineData("Title", null, "article-slug")]
-    [InlineData("Title", "content", null)]
-    public void Publish_RejectsIncompleteDraft(string? title, string? html, string? slug)
+    [InlineData(null, "article-slug")]
+    [InlineData("content", null)]
+    public void Publish_RejectsIncompleteDraft(string? html, string? slug)
     {
-        var article = Article.Create("test-owner", "en", CreatedAt, title, html: html, slug: slug);
+        var article = Article.Create("test-owner", "en", CreatedAt, "Title", html: html, slug: slug);
 
         Assert.Throws<InvalidOperationException>(
             () => article.PublishLocalization("en", CreatedAt.AddDays(1)));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_RejectsDraftWithoutTitle(string? title)
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => Article.Create("test-owner", "en", CreatedAt, title));
+
+        Assert.Equal("title", exception.ParamName);
+    }
+
+    [Fact]
+    public void UpdateDraft_RejectsBlankTitleWithoutChangingContent()
+    {
+        var article = Article.Create(
+            "test-owner",
+            "en",
+            CreatedAt,
+            "Original title",
+            "Original summary",
+            "Original content",
+            "original-slug");
+        var localization = Assert.Single(article.Localizations);
+        var articleVersion = article.Version;
+        var localizationVersion = localization.Version;
+
+        var exception = Assert.Throws<ArgumentException>(() => article.UpdateLocalization(
+            "en",
+            " ",
+            "Changed summary",
+            "Changed content",
+            "changed-slug",
+            CreatedAt.AddDays(1)));
+
+        Assert.Equal("title", exception.ParamName);
+        Assert.Equal(articleVersion, article.Version);
+        Assert.Equal(localizationVersion, localization.Version);
+        Assert.Equal("Original title", localization.Title);
+        Assert.Equal("Original summary", localization.Summary);
+        Assert.Equal("Original content", localization.Html);
+        Assert.Equal("original-slug", localization.Slug);
+        Assert.Equal(CreatedAt, localization.UpdatedAt);
     }
 
     [Fact]
@@ -219,7 +263,7 @@ public sealed class ArticleTests
     [Fact]
     public void FindLocalization_DoesNotFallBackToAnotherLanguage()
     {
-        var article = Article.Create("test-owner", "en", CreatedAt);
+        var article = Article.Create("test-owner", "en", CreatedAt, "Draft title");
 
         Assert.Null(article.FindLocalization("ru"));
     }

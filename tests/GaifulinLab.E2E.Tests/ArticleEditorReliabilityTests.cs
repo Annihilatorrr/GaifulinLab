@@ -800,8 +800,10 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await RouteNewEditorAsync();
         await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
 
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true })).ToBeDisabledAsync();
         await Page.GetByLabel("Article title").FillAsync("Test Html → PDF");
         await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("test-html-pdf");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true })).ToBeEnabledAsync();
         await Page.GetByLabel("Article title").FillAsync("Café déjà vu");
         await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("cafe-deja-vu");
 
@@ -813,23 +815,236 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     }
 
     [Fact]
-    public async Task ManualSlug_SurvivesTitleChangesSaveAndReloadForPublishedArticle()
+    public async Task PublishedArticle_TitleInputRegeneratesSlugAndManualSlugSurvivesOnlyUntilNextTitleEdit()
     {
         var article = new MockArticle { Status = 1, Title = "Published original", Slug = "stable-public-url" };
         await AuthenticateAsync();
         await RouteEditorAsync(article);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
 
-        await Page.GetByLabel("Article title").FillAsync("Title changed before save");
-        await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("stable-public-url");
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
-        await Page.ReloadAsync();
-        await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("stable-public-url");
+        var title = Page.GetByLabel("Article title");
+        var slug = Page.GetByPlaceholder("article-slug");
+        await title.FillAsync("");
+        await title.PressSequentiallyAsync("Published replacement");
 
-        await Page.GetByLabel("Article title").FillAsync("Title changed after reload");
-        await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("stable-public-url");
+        // A loaded published localization must generate its slug from title input and persist it.
+        await Expect(slug).ToHaveValueAsync("published-replacement");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
+        Assert.Equal("Published replacement", article.Title);
+        Assert.Equal("published-replacement", article.Slug);
         await OpenActionsAsync();
-        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article", Exact = true })).ToHaveAttributeAsync("href", "/en/articles/stable-public-url");
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article", Exact = true }))
+            .ToHaveAttributeAsync("href", "/en/articles/published-replacement");
+
+        var autosaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseAutosave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/en", async route =>
+        {
+            if (route.Request.Method != "PUT") { await route.FallbackAsync(); return; }
+            autosaveStarted.TrySetResult();
+            await releaseAutosave.Task;
+            using var request = JsonDocument.Parse(route.Request.PostData!);
+            ApplyUpdateRequest(article, request.RootElement);
+            article.Version++;
+            await JsonAsync(route, article.Version);
+        });
+
+        await slug.FillAsync("manual-public-url");
+        await Page.Locator("textarea.summary-field").FillAsync("Changed without editing the title");
+        await Expect(slug).ToHaveValueAsync("manual-public-url");
+        try
+        {
+            await autosaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Expect(Page.Locator(".save-action button")).ToHaveTextAsync("Saving…");
+        }
+        finally
+        {
+            releaseAutosave.TrySetResult();
+        }
+
+        await Expect(Page.Locator(".save-action button")).ToHaveTextAsync("Save changes");
+        Assert.Equal("manual-public-url", article.Slug);
+
+        // Manual slug input survives other edits and reloads, but the next title input regenerates it.
+        await Expect(slug).ToHaveValueAsync("manual-public-url");
+        await title.FillAsync("Title after autosave");
+        await Expect(slug).ToHaveValueAsync("title-after-autosave");
+        await OpenActionsAsync();
+        await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article", Exact = true }))
+            .ToHaveAttributeAsync("href", "/en/articles/title-after-autosave");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task LoadedDraftOrPublishedArticle_TitleInputOverwritesCustomSlug(int status)
+    {
+        var article = new MockArticle { Status = status, Title = "Original title", Slug = "custom-stable-url" };
+        await AuthenticateAsync();
+        await RouteEditorAsync(article);
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+
+        await Page.GetByLabel("Article title").FillAsync("Changed title");
+
+        await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("changed-title");
+    }
+
+    [Fact]
+    public async Task LoadedUnpublishedArticle_TitleInputPreservesCustomSlug()
+    {
+        var article = new MockArticle { Status = 2, Title = "Original title", Slug = "custom-stable-url" };
+        await AuthenticateAsync();
+        await RouteEditorAsync(article);
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+
+        await Page.GetByLabel("Article title").FillAsync("Changed title");
+
+        await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("custom-stable-url");
+    }
+
+    [Fact]
+    public async Task UntitledDraft_BlocksManualAndAutomaticSaveUntilTitleIsEntered()
+    {
+        var article = new MockArticle
+        {
+            Status = 0,
+            Title = "",
+            Summary = "Original summary",
+            Slug = "legacy-untitled-draft"
+        };
+        await AuthenticateAsync();
+        await RouteEditorAsync(article);
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+
+        var saveButton = Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true });
+        await Page.Locator("textarea.summary-field").FillAsync("Blocked summary change");
+
+        // The invalid draft blocks both the button and the delayed autosave request.
+        await Expect(saveButton).ToBeDisabledAsync();
+        await Page.WaitForTimeoutAsync(1_600);
+        Assert.Equal("Original summary", article.Summary);
+
+        await Page.GetByLabel("Article title").FillAsync("Recovered draft");
+        await Expect(saveButton).ToBeEnabledAsync();
+        await saveButton.ClickAsync();
+
+        Assert.Equal("Recovered draft", article.Title);
+        Assert.Equal("recovered-draft", article.Slug);
+        Assert.Equal("Blocked summary change", article.Summary);
+    }
+
+    [Fact]
+    public async Task UntitledChangedTranslation_BlocksTheEntireLocalizationSaveBatch()
+    {
+        var article = MultiArticle.WithEnglishAndRussian();
+        await AuthenticateAsync();
+        await RouteMultiEditorAsync(Page, article);
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+
+        await Page.Locator("textarea.summary-field").FillAsync("Changed English summary");
+        await Page.GetByLabel("Article language").SelectOptionAsync("ru");
+        await Page.GetByLabel("Article title").FillAsync("");
+
+        // Validate every changed draft before sending the first localization update.
+        var saveButton = Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true });
+        await Expect(saveButton).ToBeDisabledAsync();
+        await Page.WaitForTimeoutAsync(1_600);
+        Assert.Equal("English summary", article.Localizations["en"].Summary);
+        Assert.Equal("Русский без изменений", article.Localizations["ru"].Title);
+
+        await Page.GetByLabel("Article title").FillAsync("Восстановленный заголовок");
+        await Expect(saveButton).ToBeEnabledAsync();
+        await saveButton.ClickAsync();
+
+        Assert.Equal("Changed English summary", article.Localizations["en"].Summary);
+        Assert.Equal("Восстановленный заголовок", article.Localizations["ru"].Title);
+    }
+
+    [Fact]
+    public async Task EditDuringMultiLocalizationSave_PersistsTheCapturedBatchWithoutSendingTheInvalidEdit()
+    {
+        var article = MultiArticle.WithEnglishAndRussian();
+        var firstUpdateStarted = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstUpdate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondUpdateCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var updates = new List<(string Language, string Title, string Summary)>();
+        await AuthenticateAsync();
+        await RouteMultiEditorAsync(Page, article);
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/**", async route =>
+        {
+            if (route.Request.Method != "PUT") { await route.FallbackAsync(); return; }
+
+            var language = new Uri(route.Request.Url).AbsolutePath.Split('/').Last();
+            using var request = JsonDocument.Parse(route.Request.PostData!);
+            var snapshot = (
+                Language: language,
+                Title: request.RootElement.GetProperty("title").GetString() ?? "",
+                Summary: request.RootElement.GetProperty("summary").GetString() ?? "");
+            updates.Add(snapshot);
+            var updateNumber = updates.Count;
+            if (updateNumber == 1)
+            {
+                firstUpdateStarted.TrySetResult(language);
+                await releaseFirstUpdate.Task;
+            }
+
+            var current = article.Localizations[language];
+            article.Localizations[language] = current with
+            {
+                Version = current.Version + 1,
+                Title = snapshot.Title,
+                Summary = snapshot.Summary,
+                Html = request.RootElement.GetProperty("html").GetString() ?? "",
+                Slug = request.RootElement.GetProperty("slug").GetString() ?? ""
+            };
+            await JsonAsync(route, article.Localizations[language].Version);
+            if (updateNumber == 2)
+            {
+                secondUpdateCompleted.TrySetResult();
+            }
+        });
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
+
+        await Page.Locator("textarea.summary-field").FillAsync("Captured English summary");
+        await Page.GetByLabel("Article language").SelectOptionAsync("ru");
+        await Page.Locator("textarea.summary-field").FillAsync("Captured Russian summary");
+        var saveTask = Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
+        try
+        {
+            Assert.Equal("en", await firstUpdateStarted.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+
+            // The second request must already be captured while the first localization update is awaiting its response.
+            await Page.GetByLabel("Article title").FillAsync("");
+        }
+        finally
+        {
+            releaseFirstUpdate.TrySetResult();
+        }
+
+        await secondUpdateCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await saveTask;
+        Assert.Collection(
+            updates,
+            update =>
+            {
+                Assert.Equal("en", update.Language);
+                Assert.Equal("English original", update.Title);
+                Assert.Equal("Captured English summary", update.Summary);
+            },
+            update =>
+            {
+                Assert.Equal("ru", update.Language);
+                Assert.Equal("Русский без изменений", update.Title);
+                Assert.Equal("Captured Russian summary", update.Summary);
+            });
+        Assert.Equal("Русский без изменений", article.Localizations["ru"].Title);
+
+        // The queued autosave observes the later blank title and must not send an invalid third request.
+        await Page.WaitForTimeoutAsync(1_600);
+        Assert.Equal(2, updates.Count);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true })).ToBeDisabledAsync();
+        await Page.GetByLabel("Article title").FillAsync("Восстановленный после сохранения");
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true })).ToBeEnabledAsync();
     }
 
     [Fact]

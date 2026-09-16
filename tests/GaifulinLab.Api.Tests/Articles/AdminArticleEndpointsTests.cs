@@ -180,15 +180,60 @@ public sealed class AdminArticleEndpointsTests(AuthWebApplicationFactory factory
 
     [Theory]
     [InlineData("", "valid-slug")]
-    [InlineData("Valid title", "")]
-    public async Task Publish_RejectsDraftMissingRequiredFields(string title, string slug)
+    [InlineData("Body", "")]
+    public async Task Publish_RejectsDraftMissingHtmlOrSlug(string html, string slug)
     {
         using var client = await CreateAuthenticatedClient();
-        var created = await (await client.PostAsJsonAsync("/api/admin/articles", new CreateArticleRequest("en", title, null, "Body", slug)))
+        var created = await (await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest("en", "Valid title", null, html, slug)))
             .Content.ReadFromJsonAsync<CreateArticleResponse>();
         Assert.NotNull(created);
         var response = await client.PostAsync($"/api/admin/articles/{created!.ArticleId}/localizations/en/publish", null);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DraftCreateAndUpdate_RejectBlankTitleWithoutPersistingPartialChanges()
+    {
+        using var client = await CreateAuthenticatedClient();
+        var rejectedSlug = $"blank-title-{Guid.NewGuid():N}";
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest("en", "   ", "Rejected summary", "Rejected body", rejectedSlug));
+        await AssertInvalidFieldAsync(createResponse, "Title");
+
+        var articles = await client.GetFromJsonAsync<IReadOnlyList<AdminArticleListItemDto>>("/api/admin/articles");
+        Assert.DoesNotContain(
+            articles!.SelectMany(article => article.Localizations),
+            localization => string.Equals(localization.Slug, rejectedSlug, StringComparison.Ordinal));
+
+        var originalSlug = $"valid-title-{Guid.NewGuid():N}";
+        var created = await (await client.PostAsJsonAsync(
+            "/api/admin/articles",
+            new CreateArticleRequest("en", "Original title", "Original summary", "Original body", originalSlug)))
+            .Content.ReadFromJsonAsync<CreateArticleResponse>();
+        Assert.NotNull(created);
+
+        var updateResponse = await client.PutAsJsonAsync(
+            $"/api/admin/articles/{created!.ArticleId}/localizations/en",
+            new UpdateArticleLocalizationRequest(
+                "\t",
+                "Changed summary",
+                "Changed body",
+                $"changed-{Guid.NewGuid():N}",
+                created.LocalizationVersion));
+        await AssertInvalidFieldAsync(updateResponse, "Title");
+
+        var persisted = await client.GetFromJsonAsync<AdminArticleDetailsDto>(
+            $"/api/admin/articles/{created.ArticleId}");
+        var localization = Assert.Single(persisted!.Localizations);
+        Assert.Equal(created.LocalizationVersion, localization.Version);
+        Assert.Equal("Original title", localization.Title);
+        Assert.Equal("Original summary", localization.Summary);
+        Assert.Equal("Original body", localization.Html);
+        Assert.Equal(originalSlug, localization.Slug);
     }
 
     [Fact]

@@ -359,6 +359,7 @@
     private bool IsBusy => _loading || _saving || _coverUploading || _pdfExportInProgress || _taxonomyCreating;
     private bool CanSave => !IsBusy
         && _conflictLanguage is null
+        && !HasUntitledDraftToSave
         && (ArticleId is null || _isDirty || _saveFailed || _exportRequiresManualSave);
     private bool CanPublishCurrent => Current.Status is PublicationStatusDto.Draft or PublicationStatusDto.Unpublished;
     private bool CanExportPdf => !IsBusy
@@ -645,6 +646,12 @@
             return;
         }
 
+        // Validate the whole batch before its first request so another localization cannot be saved partially.
+        if (HasUntitledDraftToSave)
+        {
+            return;
+        }
+
         // An edit that is reverted still marks the editor dirty. Do not turn that stale UI state
         // into a save operation: there is nothing to persist or reload for an existing article.
         if (ArticleId is not null
@@ -656,6 +663,23 @@
             _isDirty = false;
             _saveFailed = false;
             _exportRequiresManualSave = false;
+            return;
+        }
+
+        (LocalizationModel Model, PublicationStatusDto Status, UpdateArticleLocalizationRequest Request)[]
+            localizationUpdates = ArticleId is null
+                ? []
+                : _localizations.Values
+                    .Where(localization => localization.HasChanges)
+                    .Select(localization => (
+                        Model: localization,
+                        localization.Status,
+                        Request: localization.ToUpdateRequest()))
+                    .ToArray();
+        if (localizationUpdates.Any(update =>
+                update.Status == PublicationStatusDto.Draft
+                && string.IsNullOrWhiteSpace(update.Request.Title)))
+        {
             return;
         }
 
@@ -685,27 +709,20 @@
                 ArticleId = created.ArticleId;
                 Current.MarkSaved(createRequest, created.LocalizationVersion);
             }
-            // A language event already queued before the busy render can add a draft during the request.
-            // Keep iteration stable; MarkDirty schedules another autosave for any later edits.
-            foreach (var localization in _localizations.Values.ToArray())
+            // Send the validated snapshots; later edits stay dirty and are handled by the queued autosave.
+            foreach (var update in localizationUpdates)
             {
-                if (!localization.HasChanges)
-                {
-                    continue;
-                }
-
-                var request = localization.ToUpdateRequest();
                 try
                 {
                     var version = await ArticlesClient.UpdateLocalizationAsync(
                         ArticleId.Value,
-                        localization.LanguageCode,
-                        request);
-                    localization.MarkSaved(request, version);
+                        update.Model.LanguageCode,
+                        update.Request);
+                    update.Model.MarkSaved(update.Request, version);
                 }
                 catch (AdminApiException exception) when (exception.Code == "article_edit_conflict")
                 {
-                    await LoadConflictAsync(localization);
+                    await LoadConflictAsync(update.Model);
                     throw;
                 }
             }
@@ -768,6 +785,12 @@
         if (string.IsNullOrWhiteSpace(Current.Slug))
         {
             ShowMessage("Add a URL slug before publishing.", true);
+            return;
+        }
+
+        if (HasUntitledDraftToSave)
+        {
+            ShowMessage("Add a title to every changed draft before saving.", true);
             return;
         }
 
@@ -947,7 +970,7 @@
     private void HandleTitleInput(ChangeEventArgs eventArgs)
     {
         Current.Title = eventArgs.Value?.ToString() ?? "";
-        if (Current.SlugIsAutomatic)
+        if (Current.Status is PublicationStatusDto.Draft or PublicationStatusDto.Published)
         {
             Current.Slug = SlugSuggestion.FromTitle(Current.Title);
         }
@@ -957,7 +980,6 @@
     private void HandleSlugInput(ChangeEventArgs eventArgs)
     {
         Current.Slug = eventArgs.Value?.ToString() ?? "";
-        Current.SlugIsAutomatic = false;
         MarkDirty();
     }
 
@@ -1170,6 +1192,7 @@
     private async Task SaveMyConflictDraftAsync()
     {
         if (IsBusy
+            || HasUntitledDraftToSave
             || _conflictLanguage is null
             || _conflictServer is null
             || !_localizations.TryGetValue(_conflictLanguage, out var draft))
@@ -1309,6 +1332,12 @@
     }
     private string PublicPath => $"/{Current.LanguageCode}/articles/{(string.IsNullOrWhiteSpace(Current.Slug) ? "{slug}" : Current.Slug.Trim())}";
     private bool CanOpenPublicArticle => Current.Status == PublicationStatusDto.Published && !string.IsNullOrWhiteSpace(Current.Slug);
+    private bool HasUntitledDraftToSave => ArticleId is null
+        ? Current.Status == PublicationStatusDto.Draft && string.IsNullOrWhiteSpace(Current.Title)
+        : _localizations.Values.Any(localization =>
+            localization.Status == PublicationStatusDto.Draft
+            && localization.HasChanges
+            && string.IsNullOrWhiteSpace(localization.Title));
     private string[] ParseTags() => _tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
 
     private void MarkDirty(bool taxonomy = false)
@@ -1454,7 +1483,6 @@
         public LocalizationModel(string languageCode)
         {
             LanguageCode = languageCode;
-            SlugIsAutomatic = true;
             CaptureSavedValues();
         }
 
@@ -1466,7 +1494,6 @@
             CoverMediaAssetId = source.CoverMediaAssetId;
             Html = source.Html;
             Slug = SlugSuggestion.FromTitle(Title);
-            SlugIsAutomatic = true;
             CaptureSavedValues();
         }
 
@@ -1480,12 +1507,6 @@
             Html = dto.Html;
             Slug = dto.Slug ?? "";
             Status = dto.Status;
-            SlugIsAutomatic = Status == PublicationStatusDto.Draft
-                && (string.IsNullOrWhiteSpace(Slug)
-                    || string.Equals(
-                        Slug,
-                        SlugSuggestion.FromTitle(Title),
-                        StringComparison.Ordinal));
             CaptureSavedValues();
         }
         public long? Version { get; private set; }
@@ -1495,7 +1516,6 @@
         public Guid? CoverMediaAssetId { get; set; }
         public string Html { get; set; } = "";
         public string Slug { get; set; } = "";
-        public bool SlugIsAutomatic { get; set; }
         public PublicationStatusDto Status { get; set; } = PublicationStatusDto.Draft;
         public bool HasChanges =>
             !string.Equals(Title, _savedTitle, StringComparison.Ordinal)

@@ -87,6 +87,8 @@
 
 .article-content ul,
 .article-content ol {
+    margin-top: .375rem;
+    padding-top: .25rem;
     padding-left: 1.4em;
 }
 
@@ -298,6 +300,7 @@
 /*
  * Формулы .article-formula/.math и блочный вывод MathJax CHTML: горизонтальная
  * прокрутка защищает узкие экраны. --accent добавляет акцентную подложку.
+ * --large увеличивает выбранную формулу целиком, включая индексы корней.
  */
 .article-content .article-formula,
 .article-content .math,
@@ -317,6 +320,11 @@
     border-radius: var(--radius-md);
     padding: .625rem .875rem;
     background: var(--color-surface-accent);
+}
+
+.article-content .article-formula--large > mjx-container[display="true"] > mjx-math {
+    /* MathJax sets its baseline font size on the container, so scale its child. */
+    font-size: 1.4em !important;
 }
 
 .article-content mjx-container[display="true"] {

@@ -23,14 +23,22 @@
             <div class="content-list surface">
                 @foreach (var article in _articles)
                 {
-                    <article class="content-item">
-                        <div class="content-byline">
-                            <span>@L.Format("common.byAuthor", article.AuthorDisplayName)</span>
-                            <time datetime="@article.PublishedAt.ToString("O")">@L.FormatDateTime(article.PublishedAt)</time>
+                    <article class="@(Kind == "articles" && article.CoverMediaAssetId is not null ? "content-item content-item-with-cover" : "content-item")">
+                        @if (Kind == "articles" && article.CoverMediaAssetId is { } cover)
+                        {
+                            <a class="content-cover" href="@($"/{article.LanguageCode}/articles/{article.Slug}")" tabindex="-1" aria-hidden="true">
+                                <img src="@(ContentClient.AssetBaseUrl.TrimEnd('/') + $"/media/{cover}")" alt="" loading="lazy" />
+                            </a>
+                        }
+                        <div class="content-item-body">
+                            <div class="content-byline">
+                                <span>@L.Format("common.byAuthor", article.AuthorDisplayName)</span>
+                                <time datetime="@article.PublishedAt.ToString("O")">@L.FormatDateTime(article.PublishedAt)</time>
+                            </div>
+                            <h2><a href="@($"/{article.LanguageCode}/articles/{article.Slug}")">@article.Title</a></h2>
+                            @if (!string.IsNullOrWhiteSpace(article.Summary)) { <p>@article.Summary</p> }
+                            <div class="metadata">@string.Join(" · ", article.Tags)</div>
                         </div>
-                        <h2><a href="@($"/{article.LanguageCode}/articles/{article.Slug}")">@article.Title</a></h2>
-                        @if (!string.IsNullOrWhiteSpace(article.Summary)) { <p>@article.Summary</p> }
-                        <div class="metadata">@string.Join(" · ", article.Tags)</div>
                     </article>
                 }
             </div>
@@ -46,8 +54,13 @@
             <div class="card-grid">
                 @foreach (var topic in _topics)
                 {
-                    <a class="taxonomy-card surface" href="@($"/articles?topic={Uri.EscapeDataString(topic.Slug)}")">
-                        <h2>@topic.Name</h2><p>@topic.Description</p><span>@L.FormatArticleCount(topic.ArticleCount)</span>
+                    <a class="taxonomy-card topic-card surface" href="@($"/articles?topic={Uri.EscapeDataString(topic.Slug)}")">
+                        <h2>@topic.Name</h2>
+                        @if (!string.IsNullOrWhiteSpace(topic.Description))
+                        {
+                            <p>@topic.Description</p>
+                        }
+                        <span>@L.FormatArticleCount(topic.ArticleCount)</span>
                     </a>
                 }
             </div>

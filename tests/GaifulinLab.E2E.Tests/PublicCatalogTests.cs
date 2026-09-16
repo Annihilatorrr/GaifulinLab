@@ -30,6 +30,39 @@ public sealed class PublicCatalogTests(E2EEnvironment environment) : E2EPageTest
         Assert.Equal(["Newest published", "Middle published", "Oldest published"], await TitlesAsync());
     }
 
+    [Fact]
+    public async Task ArticlesCatalog_ShowsCoversAndArchiveKeepsTextOnlyCards()
+    {
+        var coverId = Guid.Parse("72dc7d94-e9fe-4375-90e5-7d83d102ea3a");
+        var articles = new[]
+        {
+            Articles("Article with cover")[0] with { coverMediaAssetId = coverId },
+            Articles("Article without cover")[0]
+        };
+        await RoutePublicApiAsync((_, query) => JsonSerializer.Serialize(ArticlePage(articles, query)));
+
+        await Page.SetViewportSizeAsync(1280, 900);
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/articles").ToString());
+
+        var articleWithCover = Page.Locator(".content-item").Filter(new() { HasText = "Article with cover" });
+        var cover = articleWithCover.Locator(".content-cover");
+        await Expect(cover).ToHaveAttributeAsync("href", "/en/articles/article-with-cover");
+        await Expect(cover).ToHaveAttributeAsync("aria-hidden", "true");
+        await Expect(cover).ToHaveAttributeAsync("tabindex", "-1");
+        await Expect(cover.Locator("img")).ToHaveAttributeAsync("src", new System.Text.RegularExpressions.Regex($"/media/{coverId}$"));
+        await Expect(cover.Locator("img")).ToHaveAttributeAsync("alt", "");
+        await Expect(cover.Locator("img")).ToHaveAttributeAsync("loading", "lazy");
+        await Expect(Page.Locator(".content-item").Filter(new() { HasText = "Article without cover" }).Locator(".content-cover")).ToHaveCountAsync(0);
+        Assert.Equal("row", await articleWithCover.EvaluateAsync<string>("element => getComputedStyle(element).flexDirection"));
+
+        await Page.SetViewportSizeAsync(600, 800);
+        Assert.Equal("column", await articleWithCover.EvaluateAsync<string>("element => getComputedStyle(element).flexDirection"));
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/archive").ToString());
+        await Expect(Page.Locator(".content-item")).ToHaveCountAsync(2);
+        await Expect(Page.Locator(".content-cover")).ToHaveCountAsync(0);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]

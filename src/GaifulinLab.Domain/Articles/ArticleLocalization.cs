@@ -81,6 +81,11 @@ public sealed class ArticleLocalization
         DomainRules.EnsureMaximumLength(normalizedSlug, ContentLimits.ArticleSlug, nameof(slug));
         DomainRules.EnsureMaximumLength(normalizedHtml, ContentLimits.ArticleHtml, nameof(html));
 
+        if (Status == PublicationStatus.Draft && string.IsNullOrWhiteSpace(normalizedTitle))
+        {
+            throw new ArgumentException("A title is required for a draft.", nameof(title));
+        }
+
         if (Status == PublicationStatus.Published)
         {
             EnsurePublishable(normalizedTitle, normalizedSlug, normalizedHtml);

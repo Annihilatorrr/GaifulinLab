@@ -60,7 +60,7 @@ public sealed class ArticleHtmlSanitizer : IArticleHtmlSanitizer
             "article-figure--center", "article-figure--left", "article-figure--right",
             "article-figure--small", "article-figure--wide", "article-figure__canvas",
             "article-figure__index", "article-clear",
-            "article-formula", "article-formula--accent", "article-next", "article-next__eyebrow",
+            "article-formula", "article-formula--accent", "article-formula--large", "article-next", "article-next__eyebrow",
             "article-summary", "article-toc", "math",
             "language-bash", "language-c", "language-cpp", "language-csharp", "language-css",
             "language-go", "language-java", "language-javascript", "language-json", "language-php",
