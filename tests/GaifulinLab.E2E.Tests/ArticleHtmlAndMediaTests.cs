@@ -178,6 +178,62 @@ public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPa
     }
 
     [Fact]
+    public async Task DangerousHtml_IsSanitizedInPreviewPersistenceAndPublishedArticle()
+    {
+        const string dangerousHtml = """
+            <p id="safe-content">Safe article content</p>
+            <a id="safe-link" href="#safe-content">Safe link</a>
+            <script>window.articleXssEvents.push('script')</script>
+            <img id="broken-image" src="/missing-xss-image" onerror="window.articleXssEvents.push('onerror')" style="display:none">
+            <a id="unsafe-link" href="javascript:window.articleXssEvents.push('javascript')" onclick="window.articleXssEvents.push('onclick')">Unsafe link</a>
+            <iframe src="https://example.test/iframe"></iframe>
+            <svg onload="window.articleXssEvents.push('svg')"></svg>
+            """;
+        var uniqueId = Guid.NewGuid().ToString("N");
+        var title = "Sanitized article " + uniqueId;
+        var slug = "sanitized-article-" + uniqueId;
+        var (login, password) = environment.GetAdminCredentials();
+
+        // The probe is installed before each document starts, including reload and public navigation.
+        await Page.AddInitScriptAsync("window.articleXssEvents = [];");
+        await SignInAsync(login, password);
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
+
+        await Page.GetByLabel("Article title").FillAsync(title);
+        await Page.Locator(".metadata-slug input").FillAsync(slug);
+        await Page.GetByLabel("Article Html").FillAsync(dangerousHtml);
+
+        // Preview must retain content but remove executable tags, attributes, styles, and URI schemes.
+        var preview = Page.Locator("article.article-preview");
+        await AssertSanitizedArticleAsync(preview);
+
+        var saveButton = Page.Locator(".save-action > button");
+        await Expect(saveButton).ToBeEnabledAsync();
+        await saveButton.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
+        await Expect(saveButton).ToBeDisabledAsync();
+        var articleId = Guid.Parse(new Uri(Page.Url).Segments[^1].Trim('/'));
+
+        // Reading the table avoids masking a write-path regression with read-time sanitization.
+        var storedHtml = await environment.GetArticleLocalizationHtmlAsync(articleId, "en");
+        Assert.Contains("Safe article content", storedHtml, StringComparison.Ordinal);
+        AssertSanitizedHtml(storedHtml);
+
+        await Page.ReloadAsync();
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync(new Regex("Safe article content"));
+        AssertSanitizedHtml(await Page.GetByLabel("Article Html").InputValueAsync());
+        await AssertNoArticleJavaScriptExecutedAsync();
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Publish", Exact = true }).ClickAsync();
+        await Expect(Page.Locator(".publication-status")).ToHaveTextAsync("Published");
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/articles/{slug}").ToString());
+
+        // Public rendering receives the persisted article through the real public API.
+        var article = Page.Locator("article.article-body");
+        await AssertSanitizedArticleAsync(article);
+    }
+
+    [Fact]
     public async Task ExtendedHtml_IsRenderedAndTypesetInPreviewAndPublishedArticle()
     {
         const string rendered = """
@@ -368,6 +424,40 @@ public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPa
                 $"{{\"sub\":\"html-author\",\"role\":\"{role}\",\"exp\":{DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()}}}"))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
         await Page.AddInitScriptAsync($"sessionStorage.setItem('gaifulinlab.admin.access_token','header.{payload}.signature');");
+    }
+
+    private async Task SignInAsync(string login, string password)
+    {
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/login").ToString());
+        await Page.Locator("#admin-login").FillAsync(login);
+        await Page.Locator("#admin-password").FillAsync(password);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in" }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "My articles" })).ToBeVisibleAsync();
+    }
+
+    private async Task AssertSanitizedArticleAsync(ILocator content)
+    {
+        await Expect(content.Locator("#safe-content")).ToHaveTextAsync("Safe article content");
+        await Expect(content.Locator("#safe-link")).ToHaveAttributeAsync("href", "#safe-content");
+        await Expect(content.Locator("script, iframe, svg")).ToHaveCountAsync(0);
+        await Expect(content.Locator("[onerror], [onclick], [onload], [style]")).ToHaveCountAsync(0);
+        await Expect(content.Locator("[href^='javascript:']")).ToHaveCountAsync(0);
+        await AssertNoArticleJavaScriptExecutedAsync();
+    }
+
+    private async Task AssertNoArticleJavaScriptExecutedAsync() =>
+        Assert.Empty(await Page.EvaluateAsync<string[]>("() => window.articleXssEvents"));
+
+    private static void AssertSanitizedHtml(string html)
+    {
+        Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<iframe", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<svg", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onerror", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onclick", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onload", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("style=", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("javascript:", html, StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task UploadAsync(string name, string mimeType, byte[] bytes) =>

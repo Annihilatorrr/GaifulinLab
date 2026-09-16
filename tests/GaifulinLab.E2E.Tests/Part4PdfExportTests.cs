@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace GaifulinLab.E2E.Tests;
@@ -116,6 +117,108 @@ public sealed class Part4PdfExportTests(E2EEnvironment environment) : E2EPageTes
         Assert.Equal(2, attempt);
     }
 
+    [Fact]
+    public async Task GuestSigningInForPdf_ReturnsToTheOriginalArticleAndShowsDownloadButton()
+    {
+        var article = await SeedPublishedArticleAsync();
+        var articlePath = $"/en/articles/{article.Slug}";
+        var (login, password) = environment.GetAdminCredentials();
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, articlePath).ToString());
+        var signInLink = Page.Locator(".article-meta")
+            .GetByRole(AriaRole.Link, new() { Name = "Sign in", Exact = true });
+
+        await signInLink.ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Sign in", Exact = true })).ToBeVisibleAsync();
+
+        // The PDF call to action must preserve the decoded local article path through login.
+        Assert.Equal(articlePath, GetQueryParameter(new Uri(Page.Url), "returnUrl"));
+
+        await SignInAsync(login, password);
+
+        await AssertLocalPathAsync(articlePath);
+        // A successful sign-in changes this article's PDF prompt into its download action.
+        await Expect(Page.Locator(".article-meta")
+            .GetByRole(AriaRole.Button, new() { Name = "Download PDF", Exact = true }))
+            .ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public async Task GuestRegisteringForPdf_ReturnsToTheOriginalArticleAndShowsDownloadButton()
+    {
+        var article = await SeedPublishedArticleAsync();
+        var articlePath = $"/en/articles/{article.Slug}";
+        var login = $"pdf-return-{Guid.NewGuid():N}@example.com";
+        const string password = "Strong-password-1!";
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, articlePath).ToString());
+        var registerLink = Page.Locator(".article-meta")
+            .GetByRole(AriaRole.Link, new() { Name = "register", Exact = true });
+
+        await registerLink.ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Create an account", Exact = true }))
+            .ToBeVisibleAsync();
+
+        // Registration receives the same decoded local destination as direct sign-in.
+        Assert.Equal(articlePath, GetQueryParameter(new Uri(Page.Url), "returnUrl"));
+
+        await RegisterFromCurrentPageAsync(login, "PDF Return Reader", password);
+        var signInLink = Page.GetByRole(AriaRole.Link, new() { Name = "Sign in", Exact = true });
+        var signInHref = await signInLink.GetAttributeAsync("href") ?? string.Empty;
+
+        // The post-registration sign-in link must carry that destination onward.
+        Assert.Equal(articlePath, GetQueryParameter(new Uri(environment.BaseUri, signInHref), "returnUrl"));
+
+        await signInLink.ClickAsync();
+        await SignInAsync(login, password);
+
+        await AssertLocalPathAsync(articlePath);
+        await Expect(Page.Locator(".article-meta")
+            .GetByRole(AriaRole.Button, new() { Name = "Download PDF", Exact = true }))
+            .ToBeVisibleAsync();
+    }
+
+    [Theory]
+    [InlineData("https://attacker.example/return")]
+    [InlineData("//attacker.example/return")]
+    [InlineData("/\\attacker.example/return")]
+    public async Task SignIn_RejectsUnsafeReturnUrlAndFallsBackToArticleList(string unsafeReturnUrl)
+    {
+        var (login, password) = environment.GetAdminCredentials();
+
+        await Page.GotoAsync(new Uri(
+            environment.BaseUri,
+            $"/admin/login?returnUrl={Uri.EscapeDataString(unsafeReturnUrl)}").ToString());
+        await SignInAsync(login, password);
+
+        await AssertLocalPathAsync("/admin/articles");
+    }
+
+    [Theory]
+    [InlineData("https://attacker.example/return")]
+    [InlineData("//attacker.example/return")]
+    [InlineData("/\\attacker.example/return")]
+    public async Task Registration_RejectsUnsafeReturnUrlBeforeAndAfterSignIn(string unsafeReturnUrl)
+    {
+        var login = $"unsafe-return-{Guid.NewGuid():N}@example.com";
+        const string password = "Strong-password-1!";
+
+        await Page.GotoAsync(new Uri(
+            environment.BaseUri,
+            $"/register?returnUrl={Uri.EscapeDataString(unsafeReturnUrl)}").ToString());
+        await RegisterFromCurrentPageAsync(login, "Unsafe Return Reader", password);
+
+        var signInLink = Page.GetByRole(AriaRole.Link, new() { Name = "Sign in", Exact = true });
+
+        // An unsafe target must not survive registration as a sign-in return parameter.
+        Assert.Equal("/admin/login", await signInLink.GetAttributeAsync("href"));
+
+        await signInLink.ClickAsync();
+        await SignInAsync(login, password);
+
+        await AssertLocalPathAsync("/admin/articles");
+    }
+
     private async Task AuthenticateAdminAsync()
     {
         var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(
@@ -164,4 +267,47 @@ public sealed class Part4PdfExportTests(E2EEnvironment environment) : E2EPageTes
         ContentType = "application/json",
         Body = JsonSerializer.Serialize(body, body.GetType())
     });
+
+    private Task<SeededArticle> SeedPublishedArticleAsync()
+    {
+        var uniqueId = Guid.NewGuid().ToString("N");
+        return environment.SeedPublishedArticleAsync(
+            $"PDF return article {uniqueId}",
+            $"pdf-return-{uniqueId}",
+            "<p>PDF return article.</p>");
+    }
+
+    private async Task RegisterFromCurrentPageAsync(string login, string displayName, string password)
+    {
+        await Page.GetByLabel("Display name").FillAsync(displayName);
+        await Page.GetByLabel("Email").FillAsync(login);
+        await Page.GetByLabel("Password", new() { Exact = true }).FillAsync(password);
+        await Page.GetByLabel("Confirm password").FillAsync(password);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Create an account", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = $"Welcome, {displayName}", Exact = true }))
+            .ToBeVisibleAsync();
+    }
+
+    private async Task SignInAsync(string login, string password)
+    {
+        await Page.Locator("#admin-login").FillAsync(login);
+        await Page.Locator("#admin-password").FillAsync(password);
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
+    }
+
+    private async Task AssertLocalPathAsync(string expectedPath)
+    {
+        await Expect(Page).ToHaveURLAsync(new Regex($"{Regex.Escape(expectedPath)}$"));
+        var actualUrl = new Uri(Page.Url);
+        Assert.Equal(environment.BaseUri.GetLeftPart(UriPartial.Authority), actualUrl.GetLeftPart(UriPartial.Authority));
+        Assert.Equal(expectedPath, actualUrl.AbsolutePath);
+    }
+
+    private static string? GetQueryParameter(Uri uri, string name) => uri.Query
+        .TrimStart('?')
+        .Split('&', StringSplitOptions.RemoveEmptyEntries)
+        .Select(part => part.Split('=', 2))
+        .Where(part => part.Length == 2 && string.Equals(Uri.UnescapeDataString(part[0]), name, StringComparison.Ordinal))
+        .Select(part => Uri.UnescapeDataString(part[1]))
+        .SingleOrDefault();
 }

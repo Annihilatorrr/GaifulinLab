@@ -208,6 +208,27 @@ public sealed class E2EEnvironment : IAsyncLifetime
             ?? throw new InvalidOperationException("Article view count query returned no value."));
     }
 
+    public async Task<string> GetArticleLocalizationHtmlAsync(
+        Guid articleId,
+        string languageCode,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT "Html"
+            FROM article_localizations
+            WHERE "ArticleId" = @articleId
+              AND "LanguageCode" = @languageCode
+            """,
+            connection);
+        command.Parameters.AddWithValue("articleId", articleId);
+        command.Parameters.AddWithValue("languageCode", languageCode);
+        return (string?)await command.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException($"Article localization '{languageCode}' was not found.");
+    }
+
     public async Task ChangeArticleLocalizationAsync(
         Guid articleId,
         string languageCode,
