@@ -248,7 +248,7 @@ public sealed class Part4PdfExportTests(E2EEnvironment environment) : E2EPageTes
                 languageCode = "en", slug = "pdf-article", title = "PDF article", summary = "Export test",
                 html = "<p>Expected English text</p><p>image embedded</p>",
                 publishedAt = DateTimeOffset.UtcNow.AddDays(-1), updatedAt = DateTimeOffset.UtcNow,
-                lastEditedAt = DateTimeOffset.UtcNow, authorDisplayName = "PDF Author",
+                lastEditedAt = DateTimeOffset.UtcNow,
                 availableLocalizations = new[] { new { languageCode = "en", url = "/en/articles/pdf-article" } },
                 topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L
             });

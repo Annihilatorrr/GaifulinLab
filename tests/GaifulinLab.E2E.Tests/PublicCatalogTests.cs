@@ -21,7 +21,8 @@ public sealed class PublicCatalogTests(E2EEnvironment environment) : E2EPageTest
         await Page.GotoAsync(new Uri(environment.BaseUri, "/articles").ToString());
         await Expect(Page.Locator(".content-item")).ToHaveCountAsync(3);
         Assert.Equal(["Newest published", "Middle published", "Oldest published"], await TitlesAsync());
-        await Expect(Page.Locator(".content-byline").First).ToContainTextAsync("By Catalog author");
+        await Expect(Page.Locator(".content-byline").First.Locator("time")).ToBeVisibleAsync();
+        await Expect(Page.Locator(".content-byline").First).Not.ToContainTextAsync("Catalog author");
         await Page.GetByRole(AriaRole.Link, new() { Name = "Newest published" }).ClickAsync();
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Newest published" })).ToBeVisibleAsync();
 
@@ -145,7 +146,7 @@ public sealed class PublicCatalogTests(E2EEnvironment environment) : E2EPageTest
                 return JsonSerializer.Serialize(new
                 {
                     languageCode = "en", slug = "series-a", title = "Series A", description = "",
-                    articles = new[] { new { position = 1, slug = "series-match", title = "Series match", summary = "", authorDisplayName = "Catalog author" } }
+                    articles = new[] { new { position = 1, slug = "series-match", title = "Series match", summary = "" } }
                 });
             if (url.Contains("/topics/", StringComparison.Ordinal))
                 return JsonSerializer.Serialize(new[] { new { languageCode = "en", slug = "topic-a", name = "Topic A", description = "", articleCount = 2 } });
@@ -272,7 +273,7 @@ public sealed class PublicCatalogTests(E2EEnvironment environment) : E2EPageTest
 
     private static CatalogArticle[] Articles(params string[] titles) => titles.Select((title, index) => new CatalogArticle(
         "en", title.ToLowerInvariant().Replace(' ', '-'), title, $"Summary {title}",
-        DateTimeOffset.UtcNow.AddMinutes(-index), "Catalog author", Array.Empty<object>(), Array.Empty<object>(),
+        DateTimeOffset.UtcNow.AddMinutes(-index), Array.Empty<object>(), Array.Empty<object>(),
         Array.Empty<string>(), null, 1)).ToArray();
 
     private static CatalogArticle[] ArticlePage(IReadOnlyList<CatalogArticle> all, IReadOnlyDictionary<string, string> query)
@@ -286,7 +287,7 @@ public sealed class PublicCatalogTests(E2EEnvironment environment) : E2EPageTest
     {
         languageCode = "en", slug, title, summary = $"Summary {title}", html = "<p>Article body.</p>",
         publishedAt = DateTimeOffset.UtcNow, updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow,
-        authorDisplayName = "Catalog author", availableLocalizations = Array.Empty<object>(), topics = Array.Empty<object>(),
+        availableLocalizations = Array.Empty<object>(), topics = Array.Empty<object>(),
         series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L
     });
 
@@ -301,7 +302,6 @@ public sealed class PublicCatalogTests(E2EEnvironment environment) : E2EPageTest
         string Title,
         string summary,
         DateTimeOffset publishedAt,
-        string authorDisplayName,
         IReadOnlyList<object> topics,
         IReadOnlyList<object> series,
         IReadOnlyList<string> tags,

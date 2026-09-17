@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using GaifulinLab.Application.Articles.Public;
-using GaifulinLab.Application.Authors;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Domain.Articles;
 using GaifulinLab.Domain.Tags;
@@ -386,7 +385,7 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         var publicList = await api.GetFromJsonAsync<IReadOnlyList<PublicArticleListItemDto>>($"/api/public/articles?languageCode=en&tag={token}");
         Assert.Equal(editedAt, Assert.Single(publicList!).LastEditedAt);
 
-        // The found-article card labels that timestamp as an update and has no author metadata.
+        // The found-article card labels that timestamp as an update.
         await Page.GotoAsync(new Uri(environment.BaseUri, "/search?q=" + token).ToString());
         var card = Page.Locator(".search-card");
         await Expect(card).ToHaveCountAsync(1);
@@ -394,7 +393,6 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(metadata.Locator("time")).ToHaveAttributeAsync("datetime", editedAt.ToString("O"));
         await Expect(metadata).ToContainTextAsync("Updated");
         await Expect(metadata).ToContainTextAsync("1 min read");
-        Assert.DoesNotContain(result.AuthorDisplayName, await metadata.InnerTextAsync());
         Assert.DoesNotContain("Published", await metadata.InnerTextAsync());
 
         // Switching the UI language must keep the update meaning explicit in Russian.
@@ -403,7 +401,6 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(card).ToHaveCountAsync(1);
         await Expect(metadata.Locator("time")).ToHaveAttributeAsync("datetime", editedAt.ToString("O"));
         await Expect(metadata).ToContainTextAsync("Обновлено");
-        Assert.DoesNotContain(result.AuthorDisplayName, await metadata.InnerTextAsync());
     }
 
     private static ServiceProvider CreateServices()
@@ -414,7 +411,6 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         // Disable retries for the rollback transaction used by the database test.
         services.AddScoped(_ => new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connection).Options));
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<IAuthorDisplayNameLookup, TestAuthors>();
         return services.BuildServiceProvider();
     }
 
@@ -464,9 +460,4 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page.Locator(".search-cover")).ToHaveCountAsync(0);
     }
 
-    private sealed class TestAuthors : IAuthorDisplayNameLookup
-    {
-        public Task<IReadOnlyDictionary<string, string>> GetDisplayNamesAsync(IReadOnlyCollection<string> userIds, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyDictionary<string, string>>(userIds.Distinct().ToDictionary(id => id, _ => "Search test author"));
-    }
 }

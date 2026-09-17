@@ -104,7 +104,7 @@ public sealed class PublicFailureStatesTests(E2EEnvironment environment) : E2EPa
     {
         languageCode = "en", slug = title.ToLowerInvariant().Replace(' ', '-'), title, summary = "Summary",
         html = "<p>Readable body.</p>", publishedAt = DateTimeOffset.UtcNow, updatedAt = DateTimeOffset.UtcNow,
-        lastEditedAt = DateTimeOffset.UtcNow, authorDisplayName = "Test author", availableLocalizations = Array.Empty<object>(),
+        lastEditedAt = DateTimeOffset.UtcNow, availableLocalizations = Array.Empty<object>(),
         topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 3L,
         coverMediaAssetId = (Guid?)null, readingMinutes = 1
     };

@@ -268,7 +268,7 @@ public sealed class RegistrationTests(E2EEnvironment environment) : E2EPageTest
     }
 
     [Fact]
-    public async Task ProfileValidatesRecoversFromFailuresAndUpdatesPublicAuthorName()
+    public async Task ProfileValidatesRecoversFromFailuresWithoutExposingPublicAuthorName()
     {
         const string password = "Strong-password-1!";
         var email = $"profile-{Guid.NewGuid():N}@example.com";
@@ -341,11 +341,16 @@ public sealed class RegistrationTests(E2EEnvironment environment) : E2EPageTest
         await Page.GotoAsync(new Uri(environment.BaseUri, "/articles").ToString());
         var publicArticleCard = Page.GetByRole(AriaRole.Link, new() { Name = articleTitle })
             .Locator("xpath=ancestor::article");
-        await Expect(publicArticleCard.Locator(".content-byline")).ToContainTextAsync(updatedName);
+        await Expect(publicArticleCard.Locator(".content-byline time")).ToBeVisibleAsync();
+        await Expect(publicArticleCard).Not.ToContainTextAsync(updatedName);
         await Page.GotoAsync(environment.BaseUri.ToString());
-        await Expect(Page.Locator(".overview-column").First).ToContainTextAsync(updatedName);
+        var overview = Page.Locator(".overview-column").First;
+        await Expect(overview.Locator(".overview-link span").First).ToBeVisibleAsync();
+        await Expect(overview).Not.ToContainTextAsync(updatedName);
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/series/{series.Slug}").ToString());
-        await Expect(Page.Locator(".series-list")).ToContainTextAsync($"By {updatedName}");
+        var seriesList = Page.Locator(".series-list");
+        await Expect(seriesList.GetByRole(AriaRole.Link, new() { Name = articleTitle })).ToBeVisibleAsync();
+        await Expect(seriesList).Not.ToContainTextAsync(updatedName);
     }
 
     [Fact]

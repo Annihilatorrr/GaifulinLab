@@ -449,7 +449,7 @@ public sealed class Part4UiInteractionTests(E2EEnvironment environment) : E2EPag
     {
         languageCode = "en", slug = article.Slug, title = "Published article", summary = "Summary",
         html = $"<p>{WebUtility.HtmlEncode(article.Html)}</p>", publishedAt = DateTimeOffset.UtcNow.AddDays(-1),
-        updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow, authorDisplayName = "Part Four",
+        updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow,
         availableLocalizations = new[] { new { languageCode = "en", url = $"/en/articles/{article.Slug}" } },
         topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L
     };

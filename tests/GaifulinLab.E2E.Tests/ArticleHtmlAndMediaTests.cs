@@ -609,7 +609,6 @@ public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPa
         publishedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
         updatedAt = DateTimeOffset.UtcNow,
         lastEditedAt = DateTimeOffset.UtcNow,
-        authorDisplayName = "Test Author",
         availableLocalizations = new[] { new { languageCode = "en", url = $"/en/articles/{slug}" } },
         topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L
     };

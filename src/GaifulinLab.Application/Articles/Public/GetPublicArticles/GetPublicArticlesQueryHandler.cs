@@ -1,5 +1,4 @@
 using GaifulinLab.Application.Persistence;
-using GaifulinLab.Application.Authors;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Domain.Articles;
 using GaifulinLab.Domain.Common;
@@ -8,9 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GaifulinLab.Application.Articles.Public.GetPublicArticles;
 
-internal sealed class GetPublicArticlesQueryHandler(
-    IAppDbContext dbContext,
-    IAuthorDisplayNameLookup authorDisplayNameLookup)
+internal sealed class GetPublicArticlesQueryHandler(IAppDbContext dbContext)
     : IRequestHandler<GetPublicArticlesQuery, IReadOnlyList<PublicArticleListItemDto>>
 {
     private const int MaximumPageSize = 100;
@@ -72,7 +69,6 @@ internal sealed class GetPublicArticlesQueryHandler(
             .Select(localization => new
             {
                 localization.ArticleId,
-                OwnerUserId = localization.Article.OwnerUserId,
                 Slug = localization.Slug!,
                 localization.Title,
                 localization.Summary,
@@ -87,10 +83,6 @@ internal sealed class GetPublicArticlesQueryHandler(
             articles.Select(article => article.ArticleId).ToArray(),
             languageCode,
             cancellationToken);
-        var authorDisplayNames = await authorDisplayNameLookup.GetDisplayNamesAsync(
-            articles.Select(article => article.OwnerUserId).ToArray(),
-            cancellationToken);
-
         return articles
             .Select(article => new PublicArticleListItemDto(
                 languageCode,
@@ -98,7 +90,6 @@ internal sealed class GetPublicArticlesQueryHandler(
                 article.Title,
                 article.Summary,
                 article.PublishedAt,
-                authorDisplayNames.GetValueOrDefault(article.OwnerUserId, "Author"),
                 taxonomy.TopicsFor(article.ArticleId),
                 taxonomy.SeriesFor(article.ArticleId),
                 taxonomy.TagsFor(article.ArticleId),

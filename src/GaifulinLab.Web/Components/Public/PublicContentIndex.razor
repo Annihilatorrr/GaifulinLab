@@ -32,7 +32,6 @@
                         }
                         <div class="content-item-body">
                             <div class="content-byline">
-                                <span>@L.Format("common.byAuthor", article.AuthorDisplayName)</span>
                                 <time datetime="@article.PublishedAt.ToString("O")">@L.FormatDateTime(article.PublishedAt)</time>
                             </div>
                             <h2><a href="@($"/{article.LanguageCode}/articles/{article.Slug}")">@article.Title</a></h2>

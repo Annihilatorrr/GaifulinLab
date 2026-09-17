@@ -152,7 +152,7 @@ public sealed class LocalizationTests : E2EPageTest
                 Status = 200,
                 ContentType = "application/json",
                 Body = isRussianArticleList
-                    ? "[{\"languageCode\":\"ru\",\"slug\":\"tolko-russkaya\",\"title\":\"Только русская статья\",\"summary\":\"\",\"publishedAt\":\"2026-01-01T00:00:00Z\",\"authorDisplayName\":\"Автор\",\"topics\":[],\"series\":[],\"tags\":[],\"readingMinutes\":1}]"
+                    ? "[{\"languageCode\":\"ru\",\"slug\":\"tolko-russkaya\",\"title\":\"Только русская статья\",\"summary\":\"\",\"publishedAt\":\"2026-01-01T00:00:00Z\",\"topics\":[],\"series\":[],\"tags\":[],\"readingMinutes\":1}]"
                     : "[]"
             });
         });
@@ -247,7 +247,7 @@ public sealed class LocalizationTests : E2EPageTest
 
             var russian = route.Request.Url.Contains("/articles/ru/", StringComparison.Ordinal);
             var body = $$"""
-                {"languageCode":"{{(russian ? "ru" : "en")}}","slug":"{{(russian ? "russkaya" : "english")}}","title":"{{(russian ? "Русская версия" : "English version")}}","summary":"","html":"<p>Body</p>","publishedAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:00:00Z","lastEditedAt":"2026-01-01T00:00:00Z","authorDisplayName":"Author","availableLocalizations":[{"languageCode":"en","url":"/en/articles/english"},{"languageCode":"ru","url":"/ru/articles/russkaya"}],"topics":[],"series":[],"tags":[],"viewCount":0}
+                {"languageCode":"{{(russian ? "ru" : "en")}}","slug":"{{(russian ? "russkaya" : "english")}}","title":"{{(russian ? "Русская версия" : "English version")}}","summary":"","html":"<p>Body</p>","publishedAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:00:00Z","lastEditedAt":"2026-01-01T00:00:00Z","availableLocalizations":[{"languageCode":"en","url":"/en/articles/english"},{"languageCode":"ru","url":"/ru/articles/russkaya"}],"topics":[],"series":[],"tags":[],"viewCount":0}
                 """;
             await route.FulfillAsync(new() { Status = 200, ContentType = "application/json", Body = body });
         });
@@ -278,7 +278,7 @@ public sealed class LocalizationTests : E2EPageTest
                 {
                     Status = 200,
                     ContentType = "application/json",
-                    Body = "{\"languageCode\":\"en\",\"slug\":\"only-english\",\"title\":\"Only English\",\"summary\":\"\",\"html\":\"<p>Body</p>\",\"publishedAt\":\"2026-01-01T00:00:00Z\",\"updatedAt\":\"2026-01-01T00:00:00Z\",\"lastEditedAt\":\"2026-01-01T00:00:00Z\",\"authorDisplayName\":\"Author\",\"availableLocalizations\":[{\"languageCode\":\"en\",\"url\":\"/en/articles/only-english\"}],\"topics\":[],\"series\":[],\"tags\":[],\"viewCount\":0}"
+                    Body = "{\"languageCode\":\"en\",\"slug\":\"only-english\",\"title\":\"Only English\",\"summary\":\"\",\"html\":\"<p>Body</p>\",\"publishedAt\":\"2026-01-01T00:00:00Z\",\"updatedAt\":\"2026-01-01T00:00:00Z\",\"lastEditedAt\":\"2026-01-01T00:00:00Z\",\"availableLocalizations\":[{\"languageCode\":\"en\",\"url\":\"/en/articles/only-english\"}],\"topics\":[],\"series\":[],\"tags\":[],\"viewCount\":0}"
                 });
                 return;
             }

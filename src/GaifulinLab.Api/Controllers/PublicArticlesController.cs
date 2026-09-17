@@ -23,6 +23,7 @@ public sealed class PublicArticlesController(
     ArticleViewVisitorHasher articleViewVisitorHasher) : ControllerBase
 {
     [HttpGet("search")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType<ArticleSearchResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ArticleSearchResponse>> Search(
@@ -36,6 +37,7 @@ public sealed class PublicArticlesController(
     }
 
     [HttpGet("articles")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType<IReadOnlyList<PublicArticleListItemDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<IReadOnlyList<PublicArticleListItemDto>>> GetArticles(
@@ -51,6 +53,7 @@ public sealed class PublicArticlesController(
             cancellationToken));
 
     [HttpGet("articles/{languageCode}/{slug}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType<PublicArticleDetailsDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]

@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using GaifulinLab.Api.Tests.Authentication;
+using GaifulinLab.Application.Articles.Public;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Contracts.Taxonomy;
 using GaifulinLab.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GaifulinLab.Api.Tests.PublicContent;
 
@@ -36,7 +38,6 @@ public sealed class PublicArticleEndpointsTests
         Assert.NotNull(article);
         Assert.Equal("en", article.LanguageCode);
         Assert.Equal("Understanding FFT", article.Title);
-        Assert.Equal("Test Author", article.AuthorDisplayName);
         Assert.Contains("<strong>safe</strong>", article.Html);
         Assert.DoesNotContain("<script", article.Html, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, article.ViewCount);
@@ -93,17 +94,38 @@ public sealed class PublicArticleEndpointsTests
     }
 
     [Fact]
-    public async Task ArticleDetails_ExposeDisplayNameButNotIdentityFields()
+    public async Task PublicArticleResponses_OmitAuthorDataAndAreNotStored()
     {
-        await using var factory = new AuthWebApplicationFactory();
+        await using var factory = new AuthWebApplicationFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IArticleSearch>();
+                services.AddScoped<IArticleSearch, NonEmptyArticleSearch>();
+            }));
         await PublicContentTestData.SeedAsync(factory.Services);
         using var client = factory.CreateClient();
 
-        var payload = await client.GetStringAsync("/api/public/articles/en/understanding-fft");
+        foreach (var path in new[]
+                 {
+                     "/api/public/articles/en/understanding-fft",
+                     "/api/public/articles?languageCode=en",
+                     "/api/public/search?languageCode=en&tag=.NET&q=FFT"
+                 })
+        {
+            var response = await client.GetAsync(path);
+            var payload = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("Test Author", payload);
-        Assert.DoesNotContain("test-owner", payload);
-        Assert.DoesNotContain("private-owner@example.com", payload);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.True(response.Headers.CacheControl?.NoStore);
+            Assert.DoesNotContain("authorDisplayName", payload, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Test Author", payload);
+            Assert.DoesNotContain("test-owner", payload);
+            Assert.DoesNotContain("private-owner@example.com", payload);
+            if (path.Contains("/search", StringComparison.Ordinal))
+            {
+                Assert.Contains("understanding-fft", payload);
+            }
+        }
     }
 
     [Fact]
@@ -132,7 +154,6 @@ public sealed class PublicArticleEndpointsTests
 
         var article = Assert.Single(filtered!);
         Assert.Equal("understanding-fft", article.Slug);
-        Assert.Equal("Test Author", article.AuthorDisplayName);
         Assert.Equal("Signal processing", Assert.Single(article.Topics).DisplayName);
         Assert.Equal("Fourier notes", Assert.Single(article.Series).DisplayName);
         Assert.Equal([".NET"], article.Tags);
@@ -239,5 +260,26 @@ public sealed class PublicArticleEndpointsTests
         Assert.DoesNotContain(series!.Articles, item => item.Slug == "understanding-fft");
         Assert.Empty(topics!);
         Assert.Empty(tags!);
+    }
+
+    private sealed class NonEmptyArticleSearch : IArticleSearch
+    {
+        public Task<ArticleSearchResponse> SearchAsync(
+            ArticleSearchRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ArticleSearchResponse(
+                [new PublicArticleListItemDto(
+                    request.LanguageCode,
+                    "understanding-fft",
+                    "Understanding FFT",
+                    "A practical introduction",
+                    DateTimeOffset.UnixEpoch,
+                    [],
+                    [],
+                    [])],
+                1,
+                1,
+                10,
+                1));
     }
 }

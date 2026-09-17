@@ -16,6 +16,7 @@ namespace GaifulinLab.Api.Controllers;
 public sealed class PublicTaxonomyController(ISender sender) : ControllerBase
 {
     [HttpGet("topics/{languageCode}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType<IReadOnlyList<PublicTopicDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<IReadOnlyList<PublicTopicDto>>> GetTopics(
@@ -24,6 +25,7 @@ public sealed class PublicTaxonomyController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetPublicTopicsQuery(languageCode), cancellationToken));
 
     [HttpGet("series/{languageCode}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType<IReadOnlyList<PublicSeriesListItemDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<IReadOnlyList<PublicSeriesListItemDto>>> GetSeries(
@@ -32,6 +34,7 @@ public sealed class PublicTaxonomyController(ISender sender) : ControllerBase
         Ok(await sender.Send(new GetPublicSeriesQuery(languageCode), cancellationToken));
 
     [HttpGet("series/{languageCode}/{slug}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType<PublicSeriesDetailsDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
@@ -44,6 +47,7 @@ public sealed class PublicTaxonomyController(ISender sender) : ControllerBase
             cancellationToken));
 
     [HttpGet("tags/{languageCode}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType<IReadOnlyList<PublicTagDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<IReadOnlyList<PublicTagDto>>> GetTags(

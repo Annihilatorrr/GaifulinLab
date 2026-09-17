@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using GaifulinLab.Application.Articles.Public;
-using GaifulinLab.Application.Authors;
 using GaifulinLab.Contracts.Articles;
 using GaifulinLab.Domain.Articles;
 using GaifulinLab.Infrastructure.Persistence;
@@ -9,7 +8,7 @@ using NpgsqlTypes;
 
 namespace GaifulinLab.Infrastructure.Content;
 
-internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup authors, TimeProvider clock) : IArticleSearch
+internal sealed class ArticleSearch(AppDbContext db, TimeProvider clock) : IArticleSearch
 {
     private const string SnippetOptions = "StartSel=\uE000, StopSel=\uE001, MaxWords=42, MinWords=16, MaxFragments=1";
     private const string TitleOptions = "StartSel=\uE000, StopSel=\uE001, HighlightAll=true";
@@ -109,7 +108,6 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
         var rows = await ordered.Skip(checked((page - 1) * request.PageSize)).Take(request.PageSize).Select(row => new
         {
             row.Localization.ArticleId,
-            row.Localization.Article.OwnerUserId,
             row.Localization.Slug,
             row.Localization.Title,
             row.Localization.Summary,
@@ -144,12 +142,11 @@ internal sealed class ArticleSearch(AppDbContext db, IAuthorDisplayNameLookup au
                     .Replace("glcpp", "C++").Replace("glcsharp", "C#").Replace("gldotnet", ".NET")
         }).ToListAsync(cancellationToken);
 
-        // Reuse the existing batched loaders after pagination: three taxonomy queries
-        // and one author query, independent of page size, without multiplying result rows.
+        // Reuse the existing batched taxonomy loaders after pagination without
+        // multiplying result rows.
         var taxonomy = await PublicArticleTaxonomyLoader.Load(db, rows.Select(row => row.ArticleId).ToArray(), request.LanguageCode, cancellationToken);
-        var names = await authors.GetDisplayNamesAsync(rows.Select(row => row.OwnerUserId).ToArray(), cancellationToken);
         return new(rows.Select(row => new PublicArticleListItemDto(request.LanguageCode, row.Slug!, row.Title,
-            row.Summary, row.PublishedAt!.Value, names.GetValueOrDefault(row.OwnerUserId, "Author"),
+            row.Summary, row.PublishedAt!.Value,
             taxonomy.TopicsFor(row.ArticleId), taxonomy.SeriesFor(row.ArticleId), taxonomy.TagsFor(row.ArticleId),
             row.CoverMediaAssetId, row.ReadingMinutes, row.Snippet, row.Headline, row.LastEditedAt)).ToArray(),
             count, page, request.PageSize, totalPages);

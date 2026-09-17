@@ -1753,7 +1753,6 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
                 publishedAt = DateTimeOffset.UtcNow.AddMinutes(-1),
                 updatedAt = DateTimeOffset.UtcNow,
                 lastEditedAt = DateTimeOffset.UtcNow,
-                authorDisplayName = "Translation Author",
                 availableLocalizations = available,
                 topics = Array.Empty<object>(),
                 series = Array.Empty<object>(),
@@ -1798,7 +1797,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     private static object ListItem(Guid id, string title, int status) => new { id, createdAt = DateTimeOffset.UtcNow.AddDays(-1), updatedAt = DateTimeOffset.UtcNow, localizations = new[] { new { id = Guid.NewGuid(), languageCode = "en", slug = title.ToLowerInvariant().Replace(' ', '-'), title, status, publishedAt = (DateTimeOffset?)null, updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow } } };
     private static object Paged<T>(IReadOnlyCollection<T> items) => new { items, totalCount = items.Count, page = 1, pageSize = 10, totalPages = items.Count == 0 ? 0 : 1 };
     private static object Details(MockArticle article) => new { id = article.Id, createdAt = DateTimeOffset.UtcNow.AddDays(-1), updatedAt = DateTimeOffset.UtcNow, localizations = new[] { new { id = article.LocalizationId, version = article.Version, languageCode = "en", slug = article.Slug, title = article.Title, summary = article.Summary, html = article.Html, status = article.Status, publishedAt = article.Status == 1 ? (DateTimeOffset?)DateTimeOffset.UtcNow.AddDays(-1) : null, updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow } }, topicIds = Array.Empty<Guid>(), series = Array.Empty<object>(), tags = article.Tags };
-    private static object PublicDetails(MockArticle article) => new { languageCode = "en", slug = article.Slug, title = article.Title, summary = article.Summary, html = $"<p>{article.Html}</p>", publishedAt = DateTimeOffset.UtcNow.AddMinutes(-1), updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow, authorDisplayName = "Test Author", availableLocalizations = new[] { new { languageCode = "en", url = $"/en/articles/{article.Slug}" } }, topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L };
+    private static object PublicDetails(MockArticle article) => new { languageCode = "en", slug = article.Slug, title = article.Title, summary = article.Summary, html = $"<p>{article.Html}</p>", publishedAt = DateTimeOffset.UtcNow.AddMinutes(-1), updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow, availableLocalizations = new[] { new { languageCode = "en", url = $"/en/articles/{article.Slug}" } }, topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L };
     private static object MultiDetails(MultiArticle article) => new
     {
         id = article.Id,

@@ -1,5 +1,4 @@
 using GaifulinLab.Application.Common;
-using GaifulinLab.Application.Authors;
 using GaifulinLab.Application.Content;
 using GaifulinLab.Application.Persistence;
 using GaifulinLab.Contracts.Articles;
@@ -12,8 +11,7 @@ namespace GaifulinLab.Application.Articles.Public.GetPublicArticle;
 
 internal sealed class GetPublicArticleQueryHandler(
     IAppDbContext dbContext,
-    IArticleHtmlSanitizer htmlSanitizer,
-    IAuthorDisplayNameLookup authorDisplayNameLookup) : IRequestHandler<GetPublicArticleQuery, PublicArticleDetailsDto>
+    IArticleHtmlSanitizer htmlSanitizer) : IRequestHandler<GetPublicArticleQuery, PublicArticleDetailsDto>
 {
     public async Task<PublicArticleDetailsDto> Handle(
         GetPublicArticleQuery request,
@@ -40,10 +38,6 @@ internal sealed class GetPublicArticleQueryHandler(
             cancellationToken);
         var viewCount = await dbContext.ArticleViews
             .LongCountAsync(view => view.ArticleLocalizationId == localization.Id, cancellationToken);
-        var authorDisplayNames = await authorDisplayNameLookup.GetDisplayNamesAsync(
-            [article.OwnerUserId],
-            cancellationToken);
-
         return new PublicArticleDetailsDto(
             languageCode,
             localization.Slug!,
@@ -53,7 +47,6 @@ internal sealed class GetPublicArticleQueryHandler(
             localization.PublishedAt!.Value,
             localization.UpdatedAt,
             localization.LastEditedAt,
-            authorDisplayNames.GetValueOrDefault(article.OwnerUserId, "Author"),
             article.Localizations
                 .Where(item => item.Status == PublicationStatus.Published)
                 .OrderBy(item => item.LanguageCode)

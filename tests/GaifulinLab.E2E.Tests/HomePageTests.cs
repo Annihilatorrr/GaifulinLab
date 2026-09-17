@@ -22,7 +22,8 @@ public sealed class HomePageTests(E2EEnvironment environment) : E2EPageTest
         Assert.Equal(
             ["Latest article 4", "Latest article 3", "Latest article 2"],
             await articles.Locator("strong").AllTextContentsAsync());
-        await Expect(articles.First).ToContainTextAsync("By Author 4");
+        await Expect(articles.First.Locator("span")).ToBeVisibleAsync();
+        await Expect(articles.First).Not.ToContainTextAsync("Author 4");
         await Expect(topics.First).ToContainTextAsync("1 article");
         await Expect(series.First).ToContainTextAsync("1 article");
     }
@@ -86,7 +87,7 @@ public sealed class HomePageTests(E2EEnvironment environment) : E2EPageTest
             {
                 "topics" => "[{\"languageCode\":\"en\",\"slug\":\"topic\",\"name\":\"Healthy topic\",\"description\":\"\",\"articleCount\":1}]",
                 "series" => "[{\"languageCode\":\"en\",\"slug\":\"series\",\"title\":\"Healthy series\",\"description\":\"\",\"articleCount\":1}]",
-                _ => "[{\"languageCode\":\"en\",\"slug\":\"article\",\"title\":\"Healthy article\",\"summary\":\"\",\"publishedAt\":\"2026-01-01T00:00:00Z\",\"authorDisplayName\":\"Author\",\"topics\":[],\"series\":[],\"tags\":[],\"readingMinutes\":1}]"
+                _ => "[{\"languageCode\":\"en\",\"slug\":\"article\",\"title\":\"Healthy article\",\"summary\":\"\",\"publishedAt\":\"2026-01-01T00:00:00Z\",\"topics\":[],\"series\":[],\"tags\":[],\"readingMinutes\":1}]"
             };
             await route.FulfillAsync(new() { Status = 200, ContentType = "application/json", Body = body });
         });
@@ -120,7 +121,6 @@ public sealed class HomePageTests(E2EEnvironment environment) : E2EPageTest
             title = $"Latest article {index}",
             summary = $"Summary {index}",
             publishedAt = DateTimeOffset.UtcNow.AddDays(-index),
-            authorDisplayName = $"Author {index}",
             topics = Array.Empty<object>(),
             series = Array.Empty<object>(),
             tags = Array.Empty<string>(),
@@ -149,14 +149,14 @@ public sealed class HomePageTests(E2EEnvironment environment) : E2EPageTest
                     languageCode = "en", slug = "latest-4", title = "Latest article 4", summary = "Summary 4",
                     html = "<p>Latest article body.</p>", publishedAt = DateTimeOffset.UtcNow,
                     updatedAt = DateTimeOffset.UtcNow, lastEditedAt = DateTimeOffset.UtcNow,
-                    authorDisplayName = "Author 4", availableLocalizations = Array.Empty<object>(),
+                    availableLocalizations = Array.Empty<object>(),
                     topics = Array.Empty<object>(), series = Array.Empty<object>(), tags = Array.Empty<string>(), viewCount = 0L
                 })
                 : url.Contains("/api/public/series/en/series-1", StringComparison.Ordinal)
                     ? JsonSerializer.Serialize(new
                     {
                         languageCode = "en", slug = "series-1", title = "Series 1", description = "Series description 1",
-                        articles = new[] { new { position = 1, slug = "latest-4", title = "Latest article 4", summary = "Summary 4", authorDisplayName = "Author 4" } }
+                        articles = new[] { new { position = 1, slug = "latest-4", title = "Latest article 4", summary = "Summary 4" } }
                     })
                 : url.Contains("/api/public/topics/", StringComparison.Ordinal)
                 ? JsonSerializer.Serialize(topics)
