@@ -443,12 +443,22 @@
 .article-content .article-figure--left > img,
 .article-content .article-figure--right > img,
 .article-content .article-figure--small > img,
-.article-content .article-figure--wide > img {
+.article-content .article-figure--wide > img,
+.article-content .article-figure--left > svg,
+.article-content .article-figure--right > svg,
+.article-content .article-figure--small > svg,
+.article-content .article-figure--wide > svg {
     width: 100%;
 }
 
-.article-content .article-figure--center > img {
+.article-content .article-figure--center > :is(img, svg) {
     margin-inline: auto;
+}
+
+.article-content svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
 }
 
 .article-content .article-figure figcaption {
@@ -594,7 +604,7 @@
         break-after: avoid-page;
     }
 
-    .article-content img,
+    .article-content :is(img, svg),
     .article-content pre,
     .article-content table,
     .article-content blockquote,

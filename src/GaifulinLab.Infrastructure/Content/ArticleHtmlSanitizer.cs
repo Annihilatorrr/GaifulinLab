@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using AngleSharp.Html.Parser;
 using GaifulinLab.Application.Content;
 using Ganss.Xss;
+using System.Text.RegularExpressions;
 
 namespace GaifulinLab.Infrastructure.Content;
 
@@ -10,14 +11,49 @@ namespace GaifulinLab.Infrastructure.Content;
 /// executable surface. Articles may select documented <c>article-*</c> classes,
 /// but never provide their own CSS or script.
 /// </summary>
-public sealed class ArticleHtmlSanitizer : IArticleHtmlSanitizer
+public sealed partial class ArticleHtmlSanitizer : IArticleHtmlSanitizer
 {
     private readonly HtmlSanitizer _sanitizer = CreateSanitizer();
+    private readonly ArticleSvgSanitizer _svgSanitizer = new();
 
     public string Sanitize(string html)
     {
         ArgumentNullException.ThrowIfNull(html);
-        return _sanitizer.Sanitize(html);
+        var fragments = new List<(string Placeholder, string Source)>();
+        var markupWithoutSvg = SvgDocumentRegex().Replace(html, match =>
+        {
+            var placeholder = $"article-svg-placeholder-{Guid.NewGuid():N}";
+            fragments.Add((placeholder, match.Groups["svg"].Value));
+            return placeholder;
+        });
+
+        var sanitized = _sanitizer.Sanitize(markupWithoutSvg);
+        var occupiedIds = new HtmlParser()
+            .ParseDocument(sanitized)
+            .QuerySelectorAll("[id]")
+            .Select(element => element.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var (placeholder, source, ordinal) in fragments.Select((fragment, ordinal) => (fragment.Placeholder, fragment.Source, ordinal)))
+        {
+            var svg = _svgSanitizer.Sanitize(source, ordinal, occupiedIds);
+            if (svg is null)
+            {
+                sanitized = sanitized.Replace(placeholder, string.Empty, StringComparison.Ordinal);
+                continue;
+            }
+
+            foreach (var id in new HtmlParser().ParseDocument(svg).QuerySelectorAll("[id]").Select(element => element.Id).Where(id => id is not null))
+            {
+                occupiedIds.Add(id!);
+            }
+
+            sanitized = sanitized.Replace(placeholder, svg, StringComparison.Ordinal);
+        }
+
+        return sanitized;
     }
 
     public string RenderForDisplay(string html)
@@ -240,4 +276,9 @@ public sealed class ArticleHtmlSanitizer : IArticleHtmlSanitizer
         || string.Equals(text, "Important:", StringComparison.OrdinalIgnoreCase)
         || string.Equals(text, "Warning:", StringComparison.OrdinalIgnoreCase)
         || string.Equals(text, "Warning", StringComparison.OrdinalIgnoreCase);
+
+    // The optional XML declaration and SVG doctype are consumed with the SVG itself,
+    // before XML parsing. The SVG parser never receives a DTD and cannot resolve one.
+    [GeneratedRegex("(?:<\\?xml\\b[\\s\\S]*?\\?>\\s*)?(?:<!DOCTYPE\\s+svg\\b[\\s\\S]*?>\\s*)?(?<svg><svg\\b[\\s\\S]*?</svg\\s*>)", RegexOptions.IgnoreCase)]
+    private static partial Regex SvgDocumentRegex();
 }

@@ -31,4 +31,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\GaifulinLab.Infrastructure.Tests\Content\MatplotlibSvgFixture.cs"
+             Link="Content\MatplotlibSvgFixture.cs" />
+  </ItemGroup>
+
 </Project>

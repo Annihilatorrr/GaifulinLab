@@ -1,6 +1,7 @@
 using AngleSharp.Dom;
 using AngleSharp.Html.Parser;
 using GaifulinLab.Infrastructure.Content;
+using System.Text;
 using System.Xml.Linq;
 
 namespace GaifulinLab.Infrastructure.Tests.Content;
@@ -48,6 +49,118 @@ public sealed class ArticleHtmlSanitizerTests
         Assert.DoesNotContain("style=", sanitized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("javascript:", sanitized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<iframe", sanitized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Sanitize_PreservesTheMatplotlibInlineSvgProfileAndNormalizesItsUnsafeContainerMarkup()
+    {
+        const string html = """
+            <?xml version="1.0" encoding="utf-8" standalone="no"?>
+            <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="792pt" height="540pt" viewBox="0 0 792 540">
+              <metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" /></metadata>
+              <defs><style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style><path id="marker" d="M 0 0 L 0 3.5" style="stroke: #a6b4cb; stroke-width: 0.8" /></defs>
+              <g id="axes"><path id="line" d="M 0 0 L 20 20" clip-path="url(#clip)" style="fill: none; stroke: #303c52; stroke-width: 0.7" /><use xlink:href="#marker" x="10" y="12" style="fill: #a6b4cb" /><text x="10" y="20" style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #a6b4cb">График</text></g>
+              <defs><clipPath id="clip"><rect x="0" y="0" width="20" height="20" /></clipPath></defs>
+            </svg>
+            """;
+
+        var sanitized = _sanitizer.Sanitize(html);
+        var document = Parse(sanitized);
+        var svg = Assert.Single(document.QuerySelectorAll("svg"));
+        var marker = Assert.Single(svg.QuerySelectorAll("path[id$='marker']"));
+        var use = Assert.Single(svg.QuerySelectorAll("use"));
+        var line = Assert.Single(svg.QuerySelectorAll("path[id$='line']"));
+        var clipPath = Assert.Single(svg.QuerySelectorAll("clipPath"));
+
+        Assert.Equal("0 0 792 540", svg.GetAttribute("viewBox"));
+        Assert.Equal($"#{marker.Id}", use.GetAttribute("href"));
+        Assert.Equal($"url(#{clipPath.Id})", line.GetAttribute("clip-path"));
+        Assert.Equal("#303c52", line.GetAttribute("stroke"));
+        Assert.Equal("round", line.GetAttribute("stroke-linejoin"));
+        Assert.Equal("butt", line.GetAttribute("stroke-linecap"));
+        Assert.Equal("График", svg.QuerySelector("text")!.TextContent);
+        Assert.Empty(svg.QuerySelectorAll("metadata, style, [style], [xlink\\:href]"));
+        Assert.DoesNotContain("DOCTYPE", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("rdf:", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(sanitized, _sanitizer.Sanitize(sanitized));
+    }
+
+    [Fact]
+    public void Sanitize_PreservesTheExactSuppliedMatplotlibSvgAsAGoldenFixture()
+    {
+        var source = MatplotlibSvgFixture.Get();
+        var sanitized = _sanitizer.Sanitize(source);
+        var document = Parse(sanitized);
+        var svg = Assert.Single(document.QuerySelectorAll("svg"));
+        var paths = svg.QuerySelectorAll("path");
+        var uses = svg.QuerySelectorAll("use");
+        var clipPath = Assert.Single(svg.QuerySelectorAll("clipPath"));
+        var tspans = svg.QuerySelectorAll("tspan");
+
+        Assert.Equal(31_493, Encoding.UTF8.GetByteCount(source));
+        Assert.True(paths.Length > 30);
+        Assert.True(uses.Length > 10);
+        Assert.True(tspans.Length > 20);
+        Assert.Equal("0 0 792 540", svg.GetAttribute("viewBox"));
+        Assert.Contains("Поворот", svg.TextContent);
+        Assert.All(svg.QuerySelectorAll("[id]"), element => Assert.StartsWith("article-svg-", element.Id));
+        Assert.All(uses, use => Assert.NotNull(svg.QuerySelector(use.GetAttribute("href")!)));
+        Assert.All(svg.QuerySelectorAll("[clip-path]"), element => Assert.NotNull(svg.QuerySelector(element.GetAttribute("clip-path")![4..^1])));
+        Assert.NotNull(clipPath.QuerySelector("rect"));
+        Assert.Contains(paths, path => path.GetAttribute("stroke-dasharray") == "4.4,5.5");
+        Assert.Contains(tspans, tspan => tspan.GetAttribute("font-style") == "oblique");
+        Assert.Empty(svg.QuerySelectorAll("metadata, style, [style], script, foreignObject, image"));
+        Assert.DoesNotContain("DOCTYPE", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(sanitized, _sanitizer.Sanitize(sanitized));
+    }
+
+    [Fact]
+    public void Sanitize_IsolatesSvgIdsFromArticleMarkupAndOtherSvgFragments()
+    {
+        const string html = """
+            <p id="article-svg-1--marker">Article target</p>
+            <svg viewBox="0 0 1 1"><defs><path id="article-svg-1--marker" d="M 0 0" /></defs><use href="#article-svg-1--marker" /></svg>
+            <svg viewBox="0 0 1 1"><defs><path id="article-svg-1--marker" d="M 0 0" /></defs><use href="#article-svg-1--marker" /></svg>
+            """;
+
+        var sanitized = _sanitizer.Sanitize(html);
+        var document = Parse(sanitized);
+        var svgs = document.QuerySelectorAll("svg");
+        var articleId = document.QuerySelector("p")!.Id;
+        var firstMarker = svgs[0].QuerySelector("path")!.Id;
+        var secondMarker = svgs[1].QuerySelector("path")!.Id;
+
+        Assert.Equal("article-svg-1--marker", articleId);
+        Assert.NotEqual(articleId, firstMarker);
+        Assert.NotEqual(firstMarker, secondMarker);
+        Assert.Equal($"#{firstMarker}", svgs[0].QuerySelector("use")!.GetAttribute("href"));
+        Assert.Equal($"#{secondMarker}", svgs[1].QuerySelector("use")!.GetAttribute("href"));
+        Assert.Equal(sanitized, _sanitizer.Sanitize(sanitized));
+    }
+
+    [Fact]
+    public void Sanitize_RemovesExecutableAndExternalSvgContentWithoutRemovingSafeShapes()
+    {
+        const string html = """
+            <svg viewBox="0 0 20 20" onload="alert('xss')">
+              <path d="M 0 0 L 20 20" style="stroke: #000" />
+              <script>alert('xss')</script><foreignObject><iframe src="https://example.test"></iframe></foreignObject>
+              <image href="https://example.test/image.svg" /><use href="javascript:alert('xss')" />
+            </svg>
+            """;
+
+        var sanitized = _sanitizer.Sanitize(html);
+
+        Assert.Contains("<svg", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<path", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onload", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<script", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("foreignObject", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<iframe", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<image", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("javascript:", sanitized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("https://example.test", sanitized, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

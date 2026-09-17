@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using GaifulinLab.Infrastructure.Tests.Content;
 using Microsoft.Playwright;
 using Microsoft.Playwright.Xunit;
 
@@ -187,7 +188,12 @@ public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPa
             <img id="broken-image" src="/missing-xss-image" onerror="window.articleXssEvents.push('onerror')" style="display:none">
             <a id="unsafe-link" href="javascript:window.articleXssEvents.push('javascript')" onclick="window.articleXssEvents.push('onclick')">Unsafe link</a>
             <iframe src="https://example.test/iframe"></iframe>
-            <svg onload="window.articleXssEvents.push('svg')"></svg>
+            <svg viewBox="0 0 20 20" onload="window.articleXssEvents.push('svg')">
+              <path d="M 0 0 L 20 20" style="stroke: #000; stroke-width: 2" />
+              <script>window.articleXssEvents.push('svg-script')</script>
+              <foreignObject><iframe src="https://example.test/svg-frame"></iframe></foreignObject>
+              <use href="javascript:window.articleXssEvents.push('svg-link')" />
+            </svg>
             """;
         var uniqueId = Guid.NewGuid().ToString("N");
         var title = "Sanitized article " + uniqueId;
@@ -231,6 +237,65 @@ public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPa
         // Public rendering receives the persisted article through the real public API.
         var article = Page.Locator("article.article-body");
         await AssertSanitizedArticleAsync(article);
+    }
+
+    [Fact]
+    public async Task MatplotlibSvg_GoldenFixtureSurvivesPreviewPersistencePublicationAndPdfExport()
+    {
+        await environment.EnsurePdfWorkerAsync();
+        var uniqueId = Guid.NewGuid().ToString("N");
+        var title = "Matplotlib SVG " + uniqueId;
+        var slug = "matplotlib-svg-" + uniqueId;
+        var (login, password) = environment.GetAdminCredentials();
+        var source = MatplotlibSvgFixture.Get();
+
+        await SignInAsync(login, password);
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
+        await Page.GetByLabel("Article title").FillAsync(title);
+        await Page.Locator(".metadata-slug input").FillAsync(slug);
+        await Page.GetByLabel("Article Html").FillAsync(source);
+
+        var previewSvg = Page.Locator("article.article-preview svg");
+        await Expect(previewSvg).ToHaveCountAsync(1);
+        Assert.True(await previewSvg.EvaluateAsync<bool>("element => element.getBBox().width > 0"));
+        Assert.True(await previewSvg.Locator("use").CountAsync() > 0);
+        Assert.True(await previewSvg.Locator("clipPath").CountAsync() > 0);
+        Assert.True(await previewSvg.Locator("tspan").CountAsync() > 0);
+
+        var saveButton = Page.Locator(".save-action > button");
+        await saveButton.ClickAsync();
+        await Expect(Page).ToHaveURLAsync(new Regex("/admin/articles/[0-9a-f-]{36}$"));
+        var articleId = Guid.Parse(new Uri(Page.Url).Segments[^1].Trim('/'));
+        var storedHtml = await environment.GetArticleLocalizationHtmlAsync(articleId, "en");
+        Assert.Contains("<svg", storedHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("article-svg-", storedHtml, StringComparison.Ordinal);
+
+        await Page.ReloadAsync();
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync(new Regex("<svg", RegexOptions.IgnoreCase));
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Publish", Exact = true }).ClickAsync();
+        await Expect(Page.Locator(".publication-status")).ToHaveTextAsync("Published");
+
+        var queuedResponseTask = Page.WaitForResponseAsync(response =>
+            response.Request.Method == "POST"
+            && response.Url.Contains("/api/admin/articles/", StringComparison.Ordinal)
+            && response.Url.Contains("/pdf-exports", StringComparison.Ordinal));
+        var downloadResponseTask = Page.WaitForResponseAsync(response =>
+            response.Request.Method == "GET"
+            && response.Url.Contains("/api/admin/pdf-exports/", StringComparison.Ordinal)
+            && response.Url.Contains("/download", StringComparison.Ordinal));
+        var downloadTask = Page.WaitForDownloadAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Export PDF" }).ClickAsync();
+        Assert.Equal(202, (await queuedResponseTask).Status);
+        var downloadResponse = await downloadResponseTask;
+        var download = await downloadTask;
+        Assert.Equal(200, downloadResponse.Status);
+        Assert.StartsWith("application/pdf", downloadResponse.Headers["content-type"], StringComparison.OrdinalIgnoreCase);
+        Assert.Null(await download.FailureAsync());
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/articles/{slug}").ToString());
+        var publicSvg = Page.Locator("article.article-body svg");
+        await Expect(publicSvg).ToHaveCountAsync(1);
+        Assert.True(await publicSvg.EvaluateAsync<bool>("element => element.getBBox().width > 0"));
     }
 
     [Fact]
@@ -439,7 +504,11 @@ public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPa
     {
         await Expect(content.Locator("#safe-content")).ToHaveTextAsync("Safe article content");
         await Expect(content.Locator("#safe-link")).ToHaveAttributeAsync("href", "#safe-content");
-        await Expect(content.Locator("script, iframe, svg")).ToHaveCountAsync(0);
+        await Expect(content.Locator("script, iframe, foreignObject, image")).ToHaveCountAsync(0);
+        var svg = content.Locator("svg");
+        await Expect(svg).ToHaveCountAsync(1);
+        await Expect(svg.Locator("path")).ToHaveCountAsync(1);
+        Assert.True(await svg.EvaluateAsync<bool>("element => element.getBBox().width > 0"));
         await Expect(content.Locator("[onerror], [onclick], [onload], [style]")).ToHaveCountAsync(0);
         await Expect(content.Locator("[href^='javascript:']")).ToHaveCountAsync(0);
         await AssertNoArticleJavaScriptExecutedAsync();
@@ -452,7 +521,7 @@ public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPa
     {
         Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<iframe", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("<svg", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<svg", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("onerror", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("onclick", html, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("onload", html, StringComparison.OrdinalIgnoreCase);
