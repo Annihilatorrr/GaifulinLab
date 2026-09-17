@@ -123,14 +123,42 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     }
 
     [Fact]
-    public async Task ManualAndAutomaticSavesPersistLatestEditsWithoutCreatingNewDrafts()
+    public async Task ExistingArticleEditsRequireExplicitSaveAndReloadDiscardsUnsavedFields()
     {
         Page.SetDefaultTimeout(5_000);
         var article = new MockArticle { Status = 1 };
+        var saveRequests = 0;
         await AuthenticateAsync();
         await RouteEditorAsync(article);
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/en", async route =>
+        {
+            if (route.Request.Method == "PUT")
+            {
+                saveRequests++;
+            }
+
+            await route.FallbackAsync();
+        });
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
         await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync(article.Html);
+        await Page.GetByLabel("Article title").FillAsync("Updated title");
+        await Page.Locator("textarea.summary-field").FillAsync("Updated summary");
+        await Page.GetByLabel("Article Html").FillAsync("Updated body");
+        await Page.GetByPlaceholder("article-slug").FillAsync("updated-slug");
+        // A pause longer than the former autosave delay must not write any field.
+        await Page.WaitForTimeoutAsync(1_600);
+        Assert.Equal(0, saveRequests);
+        Assert.Equal("Original title", article.Title);
+        Assert.Equal("Original summary", article.Summary);
+        Assert.Equal("Original body", article.Html);
+        Assert.Equal("original-slug", article.Slug);
+
+        await Page.ReloadAsync();
+        await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("Original title");
+        await Expect(Page.Locator("textarea.summary-field")).ToHaveValueAsync("Original summary");
+        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Original body");
+        await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("original-slug");
+
         await Page.GetByLabel("Article title").FillAsync("Updated title");
         await Page.Locator("textarea.summary-field").FillAsync("Updated summary");
         await Page.GetByLabel("Article Html").FillAsync("Updated body");
@@ -138,48 +166,28 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
         await Page.ReloadAsync();
         await Expect(Page.GetByLabel("Article title")).ToHaveValueAsync("Updated title");
+        await Expect(Page.Locator("textarea.summary-field")).ToHaveValueAsync("Updated summary");
         await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Updated body");
         await Expect(Page.GetByPlaceholder("article-slug")).ToHaveValueAsync("updated-slug");
-
-        await Page.GetByLabel("Article Html").FillAsync("Autosaved final body");
-        await Page.WaitForTimeoutAsync(2200);
-        await Page.ReloadAsync();
-        await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Autosaved final body");
-
-        var creates = 0;
-        await Page.UnrouteAsync("**/api/admin/**");
-        await Page.RouteAsync("**/api/admin/**", async route =>
-        {
-            var path = new Uri(route.Request.Url).AbsolutePath.TrimEnd('/');
-            if (path == "/api/admin/taxonomy") { await JsonAsync(route, EmptyTaxonomy()); return; }
-            if (path == "/api/admin/articles" && route.Request.Method == "POST") creates++;
-            if (path == "/api/admin/html/preview") { await JsonAsync(route, new { html = "" }); return; }
-            await JsonAsync(route, new { });
-        });
-        await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
-        await Page.GetByLabel("Article title").FillAsync("Unsaved new article");
-        await Page.GetByLabel("Article Html").FillAsync("No automatic create");
-        await Page.WaitForTimeoutAsync(1600);
-        await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles").ToString());
-        Assert.Equal(0, creates);
+        Assert.Equal(1, saveRequests);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task AutosaveRendersBusyAndCompletedStatusWithoutAnotherEditorEvent(bool failSave)
+    public async Task ManualSaveRendersBusyAndCompletedStatusWithoutAnotherEditorEvent(bool failSave)
     {
         Page.SetDefaultTimeout(5_000);
         var article = new MockArticle();
-        var autosaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseAutosave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await AuthenticateAsync();
         await RouteEditorAsync(article);
         await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/en", async route =>
         {
             if (route.Request.Method != "PUT") { await route.FallbackAsync(); return; }
-            autosaveStarted.TrySetResult();
-            await releaseAutosave.Task;
+            saveStarted.TrySetResult();
+            await releaseSave.Task;
             if (failSave)
             {
                 await ErrorAsync(route, 500, "save_failed", "The article could not be saved.");
@@ -189,22 +197,23 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         });
 
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
-        await Page.GetByLabel("Article Html").FillAsync("Background save snapshot");
+        await Page.GetByLabel("Article Html").FillAsync("Manual save snapshot");
         var saveButton = Page.Locator(".save-action button");
+        await saveButton.ClickAsync();
         try
         {
-            await autosaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await saveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            // The delayed response keeps autosave in progress, so the toolbar must show its busy state.
+            // The delayed response keeps the explicit save in progress, so the toolbar must show its busy state.
             await Expect(saveButton).ToHaveTextAsync("Saving…");
             await Expect(saveButton).ToBeDisabledAsync();
         }
         finally
         {
-            releaseAutosave.TrySetResult();
+            releaseSave.TrySetResult();
         }
 
-        // After the response, background completion must render without another input or navigation.
+        // After the response, manual completion must render without another input or navigation.
         if (failSave)
         {
             await Expect(saveButton).ToHaveTextAsync("Retry");
@@ -214,10 +223,9 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         }
         else
         {
-            // Autosave retains the manual-save requirement for PDF export even after content persists.
-            await Expect(saveButton).ToHaveTextAsync("Save changes");
-            await Expect(saveButton).ToBeEnabledAsync();
-            Assert.Equal("Background save snapshot", article.Html);
+            await Expect(saveButton).ToHaveTextAsync("Save");
+            await Expect(saveButton).ToBeDisabledAsync();
+            Assert.Equal("Manual save snapshot", article.Html);
         }
     }
 
@@ -243,7 +251,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     }
 
     [Fact]
-    public async Task TypingDuringDelayedSave_QueuesTheLatestRevision()
+    public async Task TypingDuringManualSave_LeavesLaterRevisionDirtyUntilTheNextExplicitSave()
     {
         var article = new MockArticle();
         var firstSaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -274,21 +282,36 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await firstSaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Page.GetByLabel("Article Html").FillAsync("Latest revision");
         releaseFirstSave.TrySetResult();
-        await Page.WaitForTimeoutAsync(2200);
+        await Page.WaitForTimeoutAsync(1_600);
+        Assert.Equal(1, saves);
+        Assert.Equal("First revision", article.Html);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save changes" })).ToBeEnabledAsync();
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes" }).ClickAsync();
         await Page.ReloadAsync();
         await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Latest revision");
-        Assert.True(saves >= 2);
+        Assert.Equal(2, saves);
     }
 
     [Fact]
-    public async Task AutosaveDuringAFailedCoverUpload_PreservesTheTextDraft()
+    public async Task ManualSaveAfterAFailedCoverUpload_PersistsTheTextDraft()
     {
         Page.SetDefaultTimeout(5_000);
         var article = MultiArticle.WithEnglishDraft();
         var coverUploadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var failCoverUpload = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveRequests = 0;
         await AuthenticateAsync();
         await RouteMultiEditorAsync(Page, article);
+        await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/en", async route =>
+        {
+            if (route.Request.Method == "PUT")
+            {
+                saveRequests++;
+            }
+
+            await route.FallbackAsync();
+        });
         await Page.RouteAsync("**/api/admin/media", async route =>
         {
             coverUploadStarted.TrySetResult();
@@ -306,23 +329,27 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         });
         await coverUploadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        // Keep the upload busy past the autosave delay; a failed upload will not mark the draft dirty again.
-        var saveResponse = Page.WaitForResponseAsync(response =>
-            response.Request.Method == "PUT"
-            && new Uri(response.Url).AbsolutePath == $"/api/admin/articles/{article.Id}/localizations/en");
+        // Keep the upload busy past the former autosave delay; the draft must remain local.
         await Page.GetByLabel("Article Html").FillAsync("Text saved while cover upload is pending");
-        Assert.Equal(200, (await saveResponse).Status);
-        Assert.Equal("Text saved while cover upload is pending", article.Localizations["en"].Html);
+        await Page.WaitForTimeoutAsync(1_600);
+        Assert.Equal(0, saveRequests);
+        Assert.Equal("English body", article.Localizations["en"].Html);
         failCoverUpload.TrySetResult();
         await Expect(Page.Locator(".cover-setting [role=alert]")).ToHaveTextAsync("The cover could not be uploaded.");
 
-        // The text must survive reload without a manual save or a successful upload scheduling another save.
+        var saveResponse = Page.WaitForResponseAsync(response =>
+            response.Request.Method == "PUT"
+            && new Uri(response.Url).AbsolutePath == $"/api/admin/articles/{article.Id}/localizations/en");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
+        Assert.Equal(200, (await saveResponse).Status);
+
+        // The text survives reload only after the explicit save.
         await Page.ReloadAsync();
         await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("Text saved while cover upload is pending");
     }
 
     [Fact]
-    public async Task SwitchingLanguagesDuringAutosave_DoesNotApplyAStaleReloadOrShowAConflict()
+    public async Task SwitchingLanguagesDuringManualSave_DoesNotApplyAStaleReloadOrShowAConflict()
     {
         Page.SetDefaultTimeout(5_000);
         var article = MultiArticle.WithEnglishAndRussian();
@@ -400,10 +427,12 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
 
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/admin/articles/{article.Id}").ToString());
         await Page.GetByLabel("Article language").SelectOptionAsync("ru");
-        await Page.GetByLabel("Article Html").FillAsync("Russian autosave snapshot");
-        await Page.GetByLabel("Article language").SelectOptionAsync("en");
+        await Page.GetByLabel("Article Html").FillAsync("Russian manual save snapshot");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
 
         await russianSaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        // Programmatic selection exercises the component path while the explicit save keeps the UI busy.
+        await Page.GetByLabel("Article language").EvaluateAsync("select => { select.value = 'en'; select.dispatchEvent(new Event('change', { bubbles: true })); }");
         releaseRussianSave.TrySetResult();
         await reloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
@@ -411,6 +440,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Page.GetByLabel("Article Html").FillAsync("English edit after reload began");
         releaseReload.TrySetResult();
 
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
         await englishSaveCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("English edit after reload began");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true })).ToBeEnabledAsync();
@@ -422,7 +452,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
 
         // Both language snapshots must reach persistence despite the late reload.
         Assert.Equal(6, article.Localizations["ru"].Version);
-        Assert.Equal("Russian autosave snapshot", article.Localizations["ru"].Html);
+        Assert.Equal("Russian manual save snapshot", article.Localizations["ru"].Html);
         Assert.Equal(2, article.Localizations["en"].Version);
         Assert.Equal("English edit after reload began", article.Localizations["en"].Html);
     }
@@ -541,7 +571,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     }
 
     [Fact]
-    public async Task SwitchingToAMissingLanguageDuringDelayedSave_QueuesTheNewLocalization()
+    public async Task SwitchingToAMissingLanguageDuringManualSave_RequiresAnExplicitSaveForTheNewLocalization()
     {
         Page.SetDefaultTimeout(5_000);
         var article = MultiArticle.WithEnglishDraft();
@@ -570,21 +600,22 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         // Programmatic change exercises the component path even though the busy UI disables the selector.
         await Page.GetByLabel("Article language").EvaluateAsync("select => { select.value = 'ru'; select.dispatchEvent(new Event('change', { bubbles: true })); }");
         await Page.GetByLabel("Article Html").FillAsync("New Russian draft");
+        releaseEnglishSave.TrySetResult();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true })).ToBeEnabledAsync();
         var russianSaveResponse = Page.WaitForResponseAsync(response =>
             response.Request.Method == "PUT"
             && new Uri(response.Url).AbsolutePath == $"/api/admin/articles/{article.Id}/localizations/ru");
-        releaseEnglishSave.TrySetResult();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
 
-        // The response confirms persistence while the toolbar can settle after the post-save reload.
+        // The response confirms the explicit second save persists the new localization.
         Assert.Equal(200, (await russianSaveResponse).Status);
-        // The pending autosave must preserve both drafts after a language event adds a localization.
         await Expect(Page.Locator(".editor-conflict")).ToHaveCountAsync(0);
         Assert.Equal(2, article.Localizations["en"].Version);
         Assert.Equal(1, article.Localizations["ru"].Version);
         Assert.Equal("English snapshot", article.Localizations["en"].Html);
         Assert.Equal("New Russian draft", article.Localizations["ru"].Html);
 
-        // Reload without another manual save to prove both snapshots were already persisted.
+        // Reload confirms both snapshots were persisted by their explicit saves.
         await Page.ReloadAsync();
         await Expect(Page.GetByLabel("Article Html")).ToHaveValueAsync("English snapshot");
         await Page.GetByLabel("Article language").SelectOptionAsync("ru");
@@ -836,13 +867,13 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article", Exact = true }))
             .ToHaveAttributeAsync("href", "/en/articles/published-replacement");
 
-        var autosaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseAutosave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var saveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await Page.RouteAsync($"**/api/admin/articles/{article.Id}/localizations/en", async route =>
         {
             if (route.Request.Method != "PUT") { await route.FallbackAsync(); return; }
-            autosaveStarted.TrySetResult();
-            await releaseAutosave.Task;
+            saveStarted.TrySetResult();
+            await releaseSave.Task;
             using var request = JsonDocument.Parse(route.Request.PostData!);
             ApplyUpdateRequest(article, request.RootElement);
             article.Version++;
@@ -852,26 +883,27 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await slug.FillAsync("manual-public-url");
         await Page.Locator("textarea.summary-field").FillAsync("Changed without editing the title");
         await Expect(slug).ToHaveValueAsync("manual-public-url");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
         try
         {
-            await autosaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await saveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             await Expect(Page.Locator(".save-action button")).ToHaveTextAsync("Saving…");
         }
         finally
         {
-            releaseAutosave.TrySetResult();
+            releaseSave.TrySetResult();
         }
 
-        await Expect(Page.Locator(".save-action button")).ToHaveTextAsync("Save changes");
+        await Expect(Page.Locator(".save-action button")).ToHaveTextAsync("Save");
         Assert.Equal("manual-public-url", article.Slug);
 
         // Manual slug input survives other edits and reloads, but the next title input regenerates it.
         await Expect(slug).ToHaveValueAsync("manual-public-url");
-        await title.FillAsync("Title after autosave");
-        await Expect(slug).ToHaveValueAsync("title-after-autosave");
+        await title.FillAsync("Title after manual save");
+        await Expect(slug).ToHaveValueAsync("title-after-manual-save");
         await OpenActionsAsync();
         await Expect(Page.GetByRole(AriaRole.Link, new() { Name = "Open article", Exact = true }))
-            .ToHaveAttributeAsync("href", "/en/articles/title-after-autosave");
+            .ToHaveAttributeAsync("href", "/en/articles/title-after-manual-save");
     }
 
     [Theory]
@@ -903,7 +935,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     }
 
     [Fact]
-    public async Task UntitledDraft_BlocksManualAndAutomaticSaveUntilTitleIsEntered()
+    public async Task UntitledDraft_BlocksManualSaveUntilTitleIsEntered()
     {
         var article = new MockArticle
         {
@@ -919,7 +951,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         var saveButton = Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true });
         await Page.Locator("textarea.summary-field").FillAsync("Blocked summary change");
 
-        // The invalid draft blocks both the button and the delayed autosave request.
+        // The invalid draft keeps the explicit Save button disabled.
         await Expect(saveButton).ToBeDisabledAsync();
         await Page.WaitForTimeoutAsync(1_600);
         Assert.Equal("Original summary", article.Summary);
@@ -1039,7 +1071,7 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             });
         Assert.Equal("Русский без изменений", article.Localizations["ru"].Title);
 
-        // The queued autosave observes the later blank title and must not send an invalid third request.
+        // The later blank title remains unsaved and must not produce a third request without Save.
         await Page.WaitForTimeoutAsync(1_600);
         Assert.Equal(2, updates.Count);
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true })).ToBeDisabledAsync();
@@ -1421,14 +1453,13 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
     }
 
     [Fact]
-    public async Task EditorPdfExport_EditDuringExportResumesAutosaveButStillRequiresManualSaveForAnotherExport()
+    public async Task EditorPdfExport_EditDuringExportRequiresManualSaveForAnotherExport()
     {
         Page.SetDefaultTimeout(5_000);
         var article = new MockArticle();
         var exportId = Guid.NewGuid();
         var releaseExport = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var exportStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var autosaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var saveRequests = 0;
         await AuthenticateAsync();
         await RouteEditorAsync(article);
@@ -1462,7 +1493,6 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
             using var request = JsonDocument.Parse(route.Request.PostData!);
             ApplyUpdateRequest(article, request.RootElement);
             article.Version++;
-            autosaveStarted.TrySetResult();
             await JsonAsync(route, article.Version);
         });
 
@@ -1471,17 +1501,20 @@ public sealed class ArticleEditorReliabilityTests(E2EEnvironment environment) : 
         await exportButton.ClickAsync();
         await exportStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        await Page.GetByLabel("Article Html").FillAsync("Autosaved after export");
+        await Page.GetByLabel("Article Html").FillAsync("Edited after export");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Preparing PDF…", Exact = true })).ToBeDisabledAsync();
 
         var downloadTask = Page.WaitForDownloadAsync();
         releaseExport.TrySetResult();
         await downloadTask;
-        await autosaveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await Page.WaitForTimeoutAsync(1_500);
+        await Page.WaitForTimeoutAsync(1_600);
 
-        Assert.Equal(1, saveRequests);
+        Assert.Equal(0, saveRequests);
         await Expect(exportButton).ToBeDisabledAsync();
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Save changes", Exact = true }).ClickAsync();
+        Assert.Equal(1, saveRequests);
+        await Expect(exportButton).ToBeEnabledAsync();
     }
 
     [Fact]

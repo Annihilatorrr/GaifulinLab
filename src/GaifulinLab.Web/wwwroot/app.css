@@ -74,7 +74,7 @@
     letter-spacing: 0.01em;
 }
 
-.app-preloader__label span {
+.app-preloader__ellipsis {
     display: inline-block;
     width: 1.15em;
     overflow: hidden;

@@ -319,8 +319,25 @@ public sealed class RegistrationTests(E2EEnvironment environment) : E2EPageTest
         await Page.ReloadAsync();
         await Expect(Page.GetByLabel("Display name")).ToHaveValueAsync(updatedName);
 
-        await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/articles/{slug}").ToString());
-        await Expect(Page.GetByText($"By {updatedName}")).ToBeVisibleAsync();
+        // Regression: the public article header must be identical on desktop and mobile,
+        // including the deliberate absence of the author's display name.
+        foreach (var (width, height) in new[] { (1280, 900), (390, 844) })
+        {
+            await Page.SetViewportSizeAsync(width, height);
+            await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/articles/{slug}").ToString());
+
+            var articleHeader = Page.Locator(".article-header");
+            await Expect(articleHeader.GetByRole(AriaRole.Heading, new() { Name = articleTitle })).ToBeVisibleAsync();
+            await Expect(articleHeader.GetByText(new Regex("^Published "))).ToBeVisibleAsync();
+            await Expect(articleHeader.Locator(".article-views")).ToBeVisibleAsync();
+            await Expect(articleHeader.GetByText(new Regex("^Last edited "))).ToBeVisibleAsync();
+
+            // Neither former author label nor byline markup may be rendered in the detail header.
+            await Expect(articleHeader.GetByText($"By {updatedName}", new() { Exact = true })).ToHaveCountAsync(0);
+            await Expect(articleHeader.GetByText(updatedName, new() { Exact = true })).ToHaveCountAsync(0);
+            await Expect(articleHeader.Locator(".content-byline")).ToHaveCountAsync(0);
+        }
+
         await Page.GotoAsync(new Uri(environment.BaseUri, "/articles").ToString());
         var publicArticleCard = Page.GetByRole(AriaRole.Link, new() { Name = articleTitle })
             .Locator("xpath=ancestor::article");

@@ -192,6 +192,21 @@ public sealed class LocalizationServiceTests
         Assert.DoesNotContain(keys, key => !en.ContainsKey(key));
     }
 
+    [Fact]
+    public void TranslationBundles_ContainEveryStaticIndexKey()
+    {
+        var root = FindRepositoryRoot();
+        var en = ReadBundle(Path.Combine(root, "src", "GaifulinLab.Web", "wwwroot", "i18n", "en.json"));
+        var ru = ReadBundle(Path.Combine(root, "src", "GaifulinLab.Web", "wwwroot", "i18n", "ru.json"));
+        var index = Path.Combine(root, "src", "GaifulinLab.Web", "wwwroot", "index.html");
+        var keys = Regex.Matches(File.ReadAllText(index), @"data-i18n(?:-aria-label)?=""([^""]+)""")
+            .Select(match => match.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal);
+
+        Assert.DoesNotContain(keys, key => !en.ContainsKey(key));
+        Assert.DoesNotContain(keys, key => !ru.ContainsKey(key));
+    }
+
     private static LocalizationService CreateService(StubJsRuntime js, string ruJson = "{\"test.key\":\"Русское значение\"}") =>
         CreateService(js, request => request.RequestUri!.AbsolutePath.EndsWith("ru.json", StringComparison.Ordinal)
             ? Json(ruJson)
