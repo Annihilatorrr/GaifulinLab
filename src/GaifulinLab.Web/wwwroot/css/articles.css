@@ -74,10 +74,13 @@
 }
 
 /*
- * Обычный поток: абзацы <p>, списки <ul>/<ol>, цитаты <blockquote> и таблицы
- * используют настраиваемый читателем --article-block-spacing.
+ * Абзацы <p> начинаются после одной текущей строки; остальные блоки используют
+ * настраиваемый читателем --article-block-spacing.
  */
-.article-content p,
+.article-content p {
+    margin-block: 1lh var(--article-block-spacing, .75rem);
+}
+
 .article-content ul,
 .article-content ol,
 .article-content blockquote,
@@ -371,6 +374,78 @@
     font-size: inherit;
 }
 
+/* The copied-code control is added only to published block code by article-assets.js. */
+.article-content .article-code-block {
+    position: relative;
+    width: 100%;
+    margin-block: .65rem;
+}
+
+.article-content .article-code-block > pre {
+    margin-block: 0;
+    padding-inline-end: 4rem;
+    font-size: .8rem;
+}
+
+.article-content .article-code-copy {
+    position: absolute;
+    z-index: 1;
+    top: .45rem;
+    right: .45rem;
+    display: inline-grid;
+    width: 1.75rem;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    min-height: 1.75rem;
+    place-items: center;
+    border: 0;
+    border-radius: var(--radius-sm);
+    padding: 0;
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition:
+        background-color var(--transition-fast),
+        color var(--transition-fast);
+}
+
+.article-content .article-code-copy:hover {
+    color: var(--color-accent);
+}
+
+.article-content .article-code-copy:focus-visible {
+    outline-offset: 2px;
+}
+
+.article-content .article-code-copy svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.article-content .article-code-copy[data-copy-state="success"] {
+    color: #39794c;
+}
+
+.article-content .article-code-copy[data-copy-state="error"] {
+    color: var(--color-danger);
+}
+
+.article-content .article-code-copy[data-copy-state]::after {
+    position: absolute;
+    top: calc(100% + .35rem);
+    right: 0;
+    padding: .3rem .5rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-text);
+    color: var(--color-background);
+    content: attr(data-copy-feedback);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
 /* Таблицы <table>: ячейки читаемы, а широкая таблица прокручивается по горизонтали. */
 .article-content table {
     display: block;
@@ -620,6 +695,10 @@
     .article-content pre {
         overflow: visible;
         white-space: pre-wrap;
+    }
+
+    .article-content .article-code-copy {
+        display: none;
     }
 
     .article-content .article-toc a {

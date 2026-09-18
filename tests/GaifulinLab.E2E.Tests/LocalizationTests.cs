@@ -162,7 +162,9 @@ public sealed class LocalizationTests : E2EPageTest
         await Page.GetByTestId("language-toggle").ClickAsync();
         await Page.GetByTestId("language-ru").ClickAsync();
         await Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Инженерные заметки, эксперименты и подробные разборы." })).ToBeVisibleAsync();
+        var heroTitle = Page.Locator("#hero-title");
+        await Expect(heroTitle).ToHaveTextAsync("Инженерные заметки, эксперименты и подробные разборы.");
+        await Expect(heroTitle).ToHaveClassAsync("visually-hidden");
         await Expect(Page.GetByText("Только русская статья", new() { Exact = true })).ToBeVisibleAsync();
         Assert.Equal("ru", await Page.EvaluateAsync<string>("document.documentElement.lang"));
         Assert.Equal("ru", await Page.EvaluateAsync<string>("localStorage.getItem('GaifulinLab.Web.UiCulture')"));

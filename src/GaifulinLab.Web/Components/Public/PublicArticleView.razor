@@ -122,7 +122,13 @@
                 await JS.InvokeVoidAsync(
                     "articleAssets.prepare",
                     _articleElement,
-                    ContentClient.AssetBaseUrl);
+                    ContentClient.AssetBaseUrl,
+                    new
+                    {
+                        copyCode = L["article.copyCode"],
+                        codeCopied = L["article.codeCopied"],
+                        copyCodeFailed = L["article.copyCodeFailed"]
+                    });
             }
             catch (JSException)
             {

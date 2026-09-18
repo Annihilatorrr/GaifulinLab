@@ -336,6 +336,57 @@ public sealed class ArticleHtmlAndMediaTests(E2EEnvironment environment) : E2EPa
     }
 
     [Fact]
+    public async Task PublicArticle_BlockCodeCanBeCopiedWithoutChangingPreview()
+    {
+        const string rendered = """
+            <pre><code class="language-csharp">const value = &quot;&lt;copied&gt;&quot;;
+            return value;</code></pre>
+            <p>Inline <code>must not have a copy button</code>.</p>
+            <pre><code>plain &amp; exact</code></pre>
+            """;
+        await Page.AddInitScriptAsync("""
+            window.copiedArticleCode = null;
+            Object.defineProperty(navigator, "clipboard", {
+              configurable: true,
+              value: { writeText: async text => { window.copiedArticleCode = text; } }
+            });
+            """);
+        await AuthenticateAsync();
+        await RouteHtmlEditorAndPublicAsync(rendered);
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/admin/articles/new").ToString());
+        await Page.GetByLabel("Article Html").FillAsync(rendered);
+        await Expect(Page.Locator("article.article-preview .article-code-copy")).ToHaveCountAsync(0);
+
+        await Page.GotoAsync(new Uri(environment.BaseUri, "/en/articles/advanced-document").ToString());
+        var article = Page.Locator("article.article-body");
+        var copyButtons = article.Locator(".article-code-copy");
+        await Expect(copyButtons).ToHaveCountAsync(2);
+        await Expect(article.Locator("p code + .article-code-copy")).ToHaveCountAsync(0);
+
+        await copyButtons.Nth(0).ClickAsync();
+        await Expect(copyButtons.Nth(0)).ToHaveAttributeAsync("data-copy-state", "success");
+        Assert.Equal("const value = \"<copied>\";\nreturn value;", await Page.EvaluateAsync<string>("() => window.copiedArticleCode"));
+
+        await copyButtons.Nth(1).ClickAsync();
+        Assert.Equal("plain & exact", await Page.EvaluateAsync<string>("() => window.copiedArticleCode"));
+
+        await article.EvaluateAsync("""
+            root => window.articleAssets.prepare(root, window.location.origin, {
+              copyCode: "Copy code",
+              codeCopied: "Code copied",
+              copyCodeFailed: "Could not copy code"
+            })
+            """);
+        await Expect(copyButtons).ToHaveCountAsync(2);
+
+        await Page.EvaluateAsync("""() => { navigator.clipboard.writeText = async () => { throw new Error("blocked"); }; }""");
+        await copyButtons.Nth(1).ClickAsync();
+        await Expect(copyButtons.Nth(1)).ToHaveAttributeAsync("data-copy-state", "error");
+        await Expect(copyButtons.Nth(1)).ToHaveAttributeAsync("aria-label", "Could not copy code");
+    }
+
+    [Fact]
     public async Task TableOfContents_StaysOutOfSourceHtmlAndUsesCurrentPageFragments()
     {
         const string source = """

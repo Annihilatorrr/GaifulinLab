@@ -178,14 +178,6 @@ button {
     color: var(--color-accent);
 }
 
-.eyebrow {
-    color: var(--color-accent);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
 .muted {
     color: var(--color-text-muted);
 }

@@ -7,7 +7,6 @@
         {
             <div class="registration-success" role="status">
                 <span class="success-mark" aria-hidden="true">✓</span>
-                <span class="eyebrow">@L["auth.accountCreated"]</span>
                 <h1 id="registration-title">@L.Format("auth.welcome", _registeredDisplayName)</h1>
                 <p>@L["auth.accountReady"]</p>
                 <a class="button button-primary" href="@LoginUrl">@L["auth.signIn"]</a>
@@ -15,7 +14,6 @@
         }
         else
         {
-            <span class="eyebrow">@L["auth.accountEyebrow"]</span>
             <h1 id="registration-title">@L["auth.createAccount"]</h1>
             <p>@L["auth.createDescription"]</p>
 

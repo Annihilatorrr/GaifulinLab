@@ -2,7 +2,7 @@
     const mathJaxUrl = "https://cdn.jsdelivr.net/npm/mathjax@4.1.3/tex-chtml.js";
     let mathJaxLoadPromise;
 
-    const prepare = (root, apiBaseUrl) => {
+    const prepare = (root, apiBaseUrl, copyLabels) => {
         root.querySelectorAll('img[src^="/media/"]').forEach((image) => {
             image.src = new URL(image.getAttribute("src"), apiBaseUrl).toString();
         });
@@ -15,7 +15,93 @@
             }
         });
 
+        if (copyLabels) {
+            prepareCodeCopy(root, copyLabels);
+        }
+
         prepareTableOfContents(root);
+    };
+
+    const prepareCodeCopy = (root, labels) => {
+        root.querySelectorAll("pre > code").forEach((code) => {
+            const pre = code.parentElement;
+            if (pre.dataset.articleCodeCopy === "true") {
+                return;
+            }
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "article-code-block";
+            pre.before(wrapper);
+            wrapper.append(pre);
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "article-code-copy";
+            button.setAttribute("aria-label", labels.copyCode);
+            button.title = labels.copyCode;
+            button.append(createCopyIcon("copy"));
+
+            const status = document.createElement("span");
+            status.className = "visually-hidden";
+            status.setAttribute("role", "status");
+            status.setAttribute("aria-live", "polite");
+
+            let feedbackTimer;
+            const showFeedback = (state, message) => {
+                window.clearTimeout(feedbackTimer);
+                button.dataset.copyState = state;
+                button.dataset.copyFeedback = message;
+                button.setAttribute("aria-label", message);
+                button.title = message;
+                button.replaceChildren(createCopyIcon(state));
+                status.textContent = message;
+                feedbackTimer = window.setTimeout(() => {
+                    delete button.dataset.copyState;
+                    delete button.dataset.copyFeedback;
+                    button.setAttribute("aria-label", labels.copyCode);
+                    button.title = labels.copyCode;
+                    button.replaceChildren(createCopyIcon("copy"));
+                    status.textContent = "";
+                }, 2000);
+            };
+
+            button.addEventListener("click", async () => {
+                try {
+                    if (!navigator.clipboard?.writeText) {
+                        throw new Error("Clipboard API is unavailable.");
+                    }
+
+                    await navigator.clipboard.writeText(code.textContent ?? "");
+                    showFeedback("success", labels.codeCopied);
+                } catch {
+                    showFeedback("error", labels.copyCodeFailed);
+                }
+            });
+
+            wrapper.append(button, status);
+            pre.dataset.articleCodeCopy = "true";
+        });
+    };
+
+    const createCopyIcon = (state) => {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "currentColor");
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("stroke-linejoin", "round");
+        path.setAttribute("stroke-width", "2");
+        path.setAttribute("d", state === "success"
+            ? "m5 12 4 4L19 6"
+            : state === "error"
+                ? "m6 6 12 12M18 6 6 18"
+                : "M9 8h10v12H9zM5 4h10v4M5 4v12h4");
+        svg.append(path);
+        return svg;
     };
 
     const prepareTableOfContents = (root) => {

@@ -13,25 +13,8 @@
     font-size: var(--text-lg);
 }
 
-.about-note {
-    padding: var(--space-8);
-}
-
-.about-note h2 {
-    margin-bottom: var(--space-3);
-    font-size: var(--text-xl);
-}
-
-.about-note p {
-    margin: 0;
-}
-
 @media (max-width: 40rem) {
     .about-layout {
         padding-block: var(--space-10);
-    }
-
-    .about-note {
-        padding: var(--space-6);
     }
 }

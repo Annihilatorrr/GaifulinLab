@@ -7,6 +7,10 @@ RUN dotnet restore src/GaifulinLab.Web/GaifulinLab.Web.csproj
 RUN dotnet publish src/GaifulinLab.Web/GaifulinLab.Web.csproj -c Release -o /app/publish
 RUN printf '{\n  "Api": {\n    "BaseUrl": "%s"\n  }\n}\n' "$API_BASE_URL" > /app/publish/wwwroot/appsettings.json
 RUN rm -f /app/publish/wwwroot/appsettings.json.br /app/publish/wwwroot/appsettings.json.gz
+RUN build_version="$(sha256sum /app/publish/wwwroot/_framework/dotnet.js | awk '{print $1}')" \
+    && sed -i "s/__BUILD_VERSION__/$build_version/g" /app/publish/wwwroot/index.html /app/publish/wwwroot/js/blazor-start.js \
+    && rm -f /app/publish/wwwroot/index.html.br /app/publish/wwwroot/index.html.gz \
+        /app/publish/wwwroot/js/blazor-start.js.br /app/publish/wwwroot/js/blazor-start.js.gz
 
 # Open-source upstream DNS re-resolution requires nginx >= 1.27.3.
 FROM nginx:1.27.5-alpine AS final

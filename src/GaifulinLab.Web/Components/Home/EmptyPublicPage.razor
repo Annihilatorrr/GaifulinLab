@@ -1,6 +1,5 @@
 <main id="main-content" class="site-main empty-page">
     <div class="site-container empty-page-layout">
-        <span class="eyebrow">@Eyebrow</span>
         <h1>@Title</h1>
         <p class="empty-page-description">@Description</p>
 
@@ -16,9 +15,6 @@
 </main>
 
 @code {
-    [Parameter, EditorRequired]
-    public string Eyebrow { get; set; } = string.Empty;
-
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
 

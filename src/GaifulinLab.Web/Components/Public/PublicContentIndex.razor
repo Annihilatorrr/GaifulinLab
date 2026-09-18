@@ -2,7 +2,6 @@
 
 <main id="main-content" class="site-main public-index">
     <div class="site-container public-layout">
-        <span class="eyebrow">@Eyebrow</span>
         <h1>@Title</h1>
         <p class="description">@Description</p>
 
@@ -90,7 +89,6 @@
 @code {
     [Parameter, EditorRequired] public string Kind { get; set; } = "articles";
     [Parameter] public string LanguageCode { get; set; } = "ru";
-    [Parameter, EditorRequired] public string Eyebrow { get; set; } = "Writing";
     [Parameter, EditorRequired] public string Title { get; set; } = "Articles";
     [Parameter, EditorRequired] public string Description { get; set; } = "";
     [Parameter, EditorRequired] public string EmptyTitle { get; set; } = "No content yet";
