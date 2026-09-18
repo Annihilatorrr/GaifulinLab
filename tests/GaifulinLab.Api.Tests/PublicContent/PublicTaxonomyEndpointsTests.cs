@@ -47,7 +47,12 @@ public sealed class PublicTaxonomyEndpointsTests
         Assert.Equal(1, Assert.Single(topics!).ArticleCount);
         Assert.Equal(1, Assert.Single(series!).ArticleCount);
         Assert.Equal(1, Assert.Single(tags!).ArticleCount);
-        Assert.Equal("understanding-fft", Assert.Single(seriesDetails!.Articles).Slug);
+        var seriesArticle = Assert.Single(seriesDetails!.Articles);
+        Assert.Equal("understanding-fft", seriesArticle.Slug);
+        Assert.Equal("Signal processing", Assert.Single(seriesArticle.Topics!).DisplayName);
+        Assert.Equal([".NET"], seriesArticle.Tags);
+        Assert.Equal(1, seriesArticle.ReadingMinutes);
+        Assert.NotNull(seriesArticle.LastEditedAt);
         Assert.DoesNotContain("authorDisplayName", seriesDetailsPayload, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Test Author", seriesDetailsPayload);
     }

@@ -348,7 +348,7 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Page.GotoAsync(new Uri(environment.BaseUri, "/search?q=" + htmlToken).ToString());
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(1);
         await Expect(Page.Locator(".article-meta")).ToContainTextAsync("1 min read");
-        await Expect(Page.Locator(".search-excerpt img")).ToHaveCountAsync(0);
+        await Expect(Page.Locator(".article-card-excerpt img")).ToHaveCountAsync(0);
         Assert.False(await Page.EvaluateAsync<bool>("window.searchCardScriptExecuted === true"));
         await Page.Locator(".search-card h2 a").ClickAsync();
         await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex($"/en/articles/{htmlSlug}$"));
@@ -441,7 +441,7 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page.Locator(".publication-status")).ToHaveTextAsync("Published");
         await Page.GotoAsync(new Uri(environment.BaseUri, "/search?q=" + token).ToString());
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(1);
-        var image = Page.Locator(".search-cover img");
+        var image = Page.Locator(".article-card-cover img");
         await Expect(image).ToBeVisibleAsync();
         Assert.True(await image.EvaluateAsync<bool>("img => img.complete && img.naturalWidth > 0"));
         await Expect(Page.Locator(".article-meta")).ToContainTextAsync("2 min read");
@@ -457,7 +457,7 @@ public sealed class ArticleSearchTests(E2EEnvironment environment, ITestOutputHe
         await Expect(Page.GetByText("+ Add cover", new() { Exact = true })).ToBeVisibleAsync();
         await Page.GotoAsync(new Uri(environment.BaseUri, "/search?q=" + token).ToString());
         await Expect(Page.Locator(".search-card")).ToHaveCountAsync(1);
-        await Expect(Page.Locator(".search-cover")).ToHaveCountAsync(0);
+        await Expect(Page.Locator(".article-card-cover")).ToHaveCountAsync(0);
     }
 
 }

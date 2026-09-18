@@ -79,27 +79,19 @@
             <div class="search-list">
                 @foreach (var article in _result.Items)
                 {
-                    <article class="search-card" @key="article.Slug">
-                        @if (article.CoverMediaAssetId is { } cover)
-                        { <a class="search-cover" href="@ArticleUrl(article)" tabindex="-1" aria-hidden="true"><img src="@(ContentClient.AssetBaseUrl.TrimEnd('/') + $"/media/{cover}")" alt="" loading="lazy" /></a> }
-                        <div class="search-card-body">
-                            <div class="article-topics">@foreach (var topic in article.Topics) { <a href="@TopicUrl(topic.Slug)"><SearchHighlight Text="@topic.DisplayName" Query="@_request.Query" /></a> }</div>
-                            <h2><a href="@ArticleUrl(article)"><SearchHighlight Text="@(article.SearchTitle ?? article.Title)" Query="@_request.Query" /></a></h2>
-                            <p class="search-excerpt"><SearchHighlight Text="@(article.SearchSnippet ?? article.Summary ?? "")" Query="@_request.Query" /></p>
-                            <div class="article-meta">
-                                @if (article.LastEditedAt is { } lastEditedAt)
-                                {
-                                    <time datetime="@lastEditedAt.ToString("O")">@L.Format("search.updated", L.FormatDateTime(lastEditedAt))</time>
-                                }
-                                else
-                                {
-                                    <time datetime="@article.PublishedAt.ToString("O")">@L.Format("article.published", L.FormatDateTime(article.PublishedAt))</time>
-                                }
-                                <span aria-hidden="true">·</span><span>@L.Format("article.minutesRead", article.ReadingMinutes)</span>
-                            </div>
-                            <div class="article-tags">@foreach (var tag in article.Tags) { <a href="@TagUrl(tag)">#<SearchHighlight Text="@tag" Query="@_request.Query" /></a> }</div>
-                        </div>
-                    </article>
+                    <PublicArticleCard @key="article.Slug"
+                        CssClass="search-card"
+                        LanguageCode="@article.LanguageCode"
+                        Slug="@article.Slug"
+                        Title="@(article.SearchTitle ?? article.Title)"
+                        Excerpt="@(article.SearchSnippet ?? article.Summary)"
+                        PublishedAt="@article.PublishedAt"
+                        LastEditedAt="@article.LastEditedAt"
+                        ReadingMinutes="@article.ReadingMinutes"
+                        CoverMediaAssetId="@article.CoverMediaAssetId"
+                        Topics="@article.Topics"
+                        Tags="@article.Tags"
+                        Query="@_request.Query" />
                 }
             </div>
             <Pagination Page="_result.Page" TotalPages="_result.TotalPages" PageUrl="PageUrl" AriaLabel="@L["search.pages"]" />
@@ -173,8 +165,5 @@
     private void ClearSearch() { _text = ""; _request.Query = null; ResetFilters(); }
     private string PageUrl(int page) => "/search?" + PublicContentClient.SearchQueryString(new() { Query = _request.Query, LanguageCode = _request.LanguageCode,
         Scope = _request.Scope, Topic = _request.Topic, Tag = _request.Tag, Period = _request.Period, Sort = _request.Sort, Page = page, PageSize = _request.PageSize });
-    private string TopicUrl(string slug) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = _request.LanguageCode, Topic = slug });
-    private string TagUrl(string tag) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = _request.LanguageCode, Tag = [tag] });
-    private static string ArticleUrl(PublicArticleListItemDto article) => $"/{article.LanguageCode}/articles/{article.Slug}";
     public void Dispose() { _cancellation?.Cancel(); _cancellation?.Dispose(); }
 }

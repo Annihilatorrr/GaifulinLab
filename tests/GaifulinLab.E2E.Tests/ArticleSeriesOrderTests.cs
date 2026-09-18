@@ -32,7 +32,9 @@ public sealed class ArticleSeriesOrderTests(E2EEnvironment environment) : E2EPag
         await CreateAndPublishArticleAsync("New second lesson", $"new-second-lesson-{suffix}", series.Title, 2);
 
         await Page.GotoAsync(new Uri(environment.BaseUri, $"/en/series/{series.Slug}").ToString());
-        var titles = Page.Locator(".series-list li strong");
+        var cards = Page.Locator(".series-list .article-card");
+        await Expect(cards).ToHaveCountAsync(4);
+        var titles = cards.Locator("h2");
         await Expect(titles).ToHaveCountAsync(4);
         Assert.Equal(
             ["First lesson", "New second lesson", "Third lesson", "Fourth lesson"],

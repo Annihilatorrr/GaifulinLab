@@ -1,0 +1,65 @@
+@inject PublicContentClient ContentClient
+
+<article class="article-card @CssClass">
+    @if (CoverMediaAssetId is { } cover)
+    {
+        <a class="article-card-cover" href="@ArticleUrl" tabindex="-1" aria-hidden="true">
+            <img src="@(ContentClient.AssetBaseUrl.TrimEnd('/') + $"/media/{cover}")" alt="" loading="lazy" />
+        </a>
+    }
+    <div class="article-card-body">
+        @if (Topics.Count > 0)
+        {
+            <div class="article-topics">
+                @foreach (var topic in Topics)
+                {
+                    <a href="@TopicUrl(topic.Slug)"><SearchHighlight Text="@topic.DisplayName" Query="@Query" /></a>
+                }
+            </div>
+        }
+        <h2><a href="@ArticleUrl"><SearchHighlight Text="@Title" Query="@Query" /></a></h2>
+        @if (!string.IsNullOrWhiteSpace(Excerpt))
+        {
+            <p class="article-card-excerpt"><SearchHighlight Text="@Excerpt" Query="@Query" /></p>
+        }
+        <div class="article-meta">
+            @if (LastEditedAt is { } lastEditedAt)
+            {
+                <time datetime="@lastEditedAt.ToString("O")">@L.Format("search.updated", L.FormatDateTime(lastEditedAt))</time>
+            }
+            else
+            {
+                <time datetime="@PublishedAt.ToString("O")">@L.Format("article.published", L.FormatDateTime(PublishedAt))</time>
+            }
+            <span aria-hidden="true">·</span><span>@L.Format("article.minutesRead", ReadingMinutes)</span>
+        </div>
+        @if (Tags.Count > 0)
+        {
+            <div class="article-tags">
+                @foreach (var tag in Tags)
+                {
+                    <a href="@TagUrl(tag)">#<SearchHighlight Text="@tag" Query="@Query" /></a>
+                }
+            </div>
+        }
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public string LanguageCode { get; set; } = "en";
+    [Parameter, EditorRequired] public string Slug { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Excerpt { get; set; }
+    [Parameter, EditorRequired] public DateTimeOffset PublishedAt { get; set; }
+    [Parameter] public DateTimeOffset? LastEditedAt { get; set; }
+    [Parameter] public int ReadingMinutes { get; set; } = 1;
+    [Parameter] public Guid? CoverMediaAssetId { get; set; }
+    [Parameter] public IReadOnlyList<PublicArticleTaxonomyLinkDto> Topics { get; set; } = [];
+    [Parameter] public IReadOnlyList<string> Tags { get; set; } = [];
+    [Parameter] public string? Query { get; set; }
+    [Parameter] public string? CssClass { get; set; }
+
+    private string ArticleUrl => $"/{LanguageCode}/articles/{Slug}";
+    private string TopicUrl(string slug) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = LanguageCode, Topic = slug });
+    private string TagUrl(string tag) => "/search?" + PublicContentClient.SearchQueryString(new() { LanguageCode = LanguageCode, Tag = [tag] });
+}

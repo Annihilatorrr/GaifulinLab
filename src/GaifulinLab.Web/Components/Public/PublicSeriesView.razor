@@ -8,10 +8,23 @@
         {
             <h1>@_series.Title</h1>
             @if (!string.IsNullOrWhiteSpace(_series.Description)) { <p class="description">@_series.Description</p> }
-            <ol class="series-list surface">
+            <ol class="series-list">
                 @foreach (var article in _series.Articles)
                 {
-                    <li value="@article.Position"><a href="@($"/{_series.LanguageCode}/articles/{article.Slug}")"><strong>@article.Title</strong><span>@article.Summary</span></a></li>
+                    <li value="@article.Position">
+                        <PublicArticleCard
+                            CssClass="series-card"
+                            LanguageCode="@_series.LanguageCode"
+                            Slug="@article.Slug"
+                            Title="@article.Title"
+                            Excerpt="@article.Summary"
+                            PublishedAt="@article.PublishedAt"
+                            LastEditedAt="@article.LastEditedAt"
+                            ReadingMinutes="@article.ReadingMinutes"
+                            CoverMediaAssetId="@article.CoverMediaAssetId"
+                            Topics="@(article.Topics ?? [])"
+                            Tags="@(article.Tags ?? [])" />
+                    </li>
                 }
             </ol>
         }
